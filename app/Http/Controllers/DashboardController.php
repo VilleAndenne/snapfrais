@@ -2,19 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExpenseSheet;
 use App\Models\Form;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     public function index()
-{
-    $forms = Form::all();
+    {
+        $forms = Form::all();
 
-    //
+        return ExpenseSheet::all();
 
-    return inertia('Dashboard', [
-        'forms' => $forms,
-    ]);
-}
+        return inertia('Dashboard', [
+            'forms' => $forms,
+        ]);
+    }
 }

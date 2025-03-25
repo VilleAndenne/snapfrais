@@ -1,3 +1,22 @@
+<script setup>
+import {Button} from '@/components/ui/button'
+
+const props = defineProps({
+  availableCosts: Array,
+  selectedCosts: Array
+})
+
+const emit = defineEmits(['add'])
+
+const addCost = (cost) => {
+  if (props.selectedCosts.length < 7) {
+    emit('add', JSON.parse(JSON.stringify(cost))) // Clone pour éviter les mutations
+  } else {
+    alert("Vous avez atteint le maximum de 7 coûts pour une demande.")
+  }
+}
+</script>
+
 <template>
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
     <div
@@ -14,32 +33,10 @@
       <p class="text-sm text-gray-600">{{ cost.description }}</p>
 
       <div class="flex justify-end">
-        <Button size="sm" @click="addCost(cost)" :disabled="isAlreadySelected(cost)">
-          {{ isAlreadySelected(cost) ? "Ajouté" : "Ajouter" }}
+        <Button size="sm" @click="addCost(cost)">
+          Ajouter
         </Button>
       </div>
     </div>
   </div>
 </template>
-
-<script setup>
-import { Button } from "@/components/ui/button";
-import { computed, toRefs } from "vue";
-
-const props = defineProps({
-  availableCosts: Array,
-  selectedCosts: Array,
-});
-
-const emits = defineEmits(["add"]);
-
-const isAlreadySelected = (cost) => {
-  return props.selectedCosts.some((c) => c.name === cost.name);
-};
-
-const addCost = (cost) => {
-  if (!isAlreadySelected(cost)) {
-    emits("add", cost);
-  }
-};
-</script>

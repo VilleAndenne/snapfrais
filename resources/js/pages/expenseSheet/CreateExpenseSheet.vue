@@ -5,40 +5,38 @@
     <div class="container mx-auto p-4 space-y-6">
       <h1 class="text-2xl font-semibold">Créer une note de frais</h1>
 
-      <!-- Picker des coûts -->
-      <div>
-        <h2 class="text-lg font-medium mb-2">Coûts disponibles</h2>
-        <CostPicker
-          :available-costs="costs"
-          :selected-costs="selectedCosts"
-          @add="addToRequest"
-        />
-      </div>
-
-      <!-- Liste des coûts ajoutés à la demande -->
+      <!-- Coûts ajoutés -->
       <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t">
         <h2 class="text-lg font-medium">Votre demande</h2>
 
         <div
           v-for="(cost, index) in selectedCosts"
           :key="index"
-          class="p-4 border rounded space-y-4 bg-white"
+          class="p-4 border rounded space-y-4 bg-white relative"
         >
+          <!-- Supprimer -->
+          <Button
+            variant="ghost"
+            size="icon"
+            class="absolute top-2 right-2 text-destructive"
+            @click="removeCost(index)"
+          >
+            <Trash2Icon class="w-5 h-5" />
+          </Button>
+
           <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold">{{ cost.name }}</h3>
             <span class="text-sm italic text-muted">{{ cost.type }}</span>
           </div>
           <p class="text-sm text-gray-600">{{ cost.description }}</p>
 
-          <!-- Type dynamique -->
+          <!-- Champs dynamiques -->
           <div v-if="cost.type === 'km'">
             <KmCostInput v-model="costData[index].kmData" />
           </div>
-
           <div v-else-if="cost.type === 'fixed'">
-            <FixedCostDisplay :amount="getActiveRate(cost)" />
+            <FixedCostDisplay v-model="costData[index].fixedAmount" />
           </div>
-
           <div v-else-if="cost.type === 'percentage'">
             <PercentageCostInput v-model="costData[index].percentageData" />
           </div>
@@ -52,11 +50,25 @@
         </div>
       </div>
 
+      <!-- Coûts disponibles -->
+      <div>
+        <h2 class="text-lg font-medium mb-2">Types de coûts disponibles</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Coûts ajoutés : {{ selectedCosts.length }}/7
+        </p>
+        <CostPicker
+          :available-costs="costs"
+          :selected-costs="selectedCosts"
+          @add="addToRequest"
+        />
+      </div>
+
       <!-- Submit -->
       <div class="flex justify-end pt-8">
-        <Button @click="submit" :disabled="!selectedCosts.length"
-          >Envoyer la demande</Button
-        >
+        <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
+          <Loader2Icon v-if="form.processing" class="w-4 h-4 animate-spin mr-2" />
+          {{ form.processing ? "Envoi en cours..." : "Envoyer la demande" }}
+        </Button>
       </div>
     </div>
   </AppLayout>
@@ -64,9 +76,10 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { Head } from "@inertiajs/vue3";
+import { useForm, Head } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Loader2Icon, Trash2Icon } from "lucide-vue-next";
 
 import CostPicker from "@/components/expense/CostPicker.vue";
 import KmCostInput from "@/components/expense/KmCostInput.vue";
@@ -74,41 +87,24 @@ import FixedCostDisplay from "@/components/expense/FixedCostDisplay.vue";
 import PercentageCostInput from "@/components/expense/PercentageCostInput.vue";
 import CostRequierementInput from "@/components/expense/CostRequierementInput.vue";
 
-const costs = ref([]); // tous les coûts définis dans le formulaire
-const selectedCosts = ref([]); // ceux que l’utilisateur a sélectionnés
-const costData = ref([]); // leurs données spécifiques
+const costs = ref([]);
+const selectedCosts = ref([]);
+const costData = ref([]);
+
+const props = defineProps({
+  form: {
+    type: Object,
+    required: true,
+  },
+});
+
+
+const form = useForm({
+  costs: [],
+});
 
 onMounted(() => {
-  // À remplacer par un fetch dynamique depuis le backend
-  costs.value = [
-    {
-      name: "Déplacement en voiture",
-      type: "km",
-      description: "Remboursé au km avec étapes",
-      reimbursement_rates: [
-        { start_date: "2024-01-01", end_date: "2025-12-31", value: 0.22 },
-      ],
-      requierements: [{ name: "Raison", type: "text" }],
-    },
-    {
-      name: "Billet de train",
-      type: "percentage",
-      description: "Remboursé à 88%",
-      reimbursement_rates: [
-        { start_date: "2024-01-01", end_date: "2025-12-31", value: 88 },
-      ],
-      requierements: [{ name: "Billet", type: "file" }],
-    },
-    {
-      name: "Prime vélo",
-      type: "fixed",
-      description: "Montant forfaitaire",
-      reimbursement_rates: [
-        { start_date: "2024-01-01", end_date: "2025-12-31", value: 15 },
-      ],
-      requierements: [],
-    },
-  ];
+  costs.value = props.form.costs;
 });
 
 const getActiveRate = (cost) => {
@@ -120,7 +116,13 @@ const getActiveRate = (cost) => {
 };
 
 const addToRequest = (cost) => {
-    selectedCosts.value.push(JSON.parse(JSON.stringify(cost)))
+  if (selectedCosts.value.length >= 7) {
+    alert("Vous avez atteint le maximum de 7 coûts.");
+    return;
+  }
+
+  const copy = JSON.parse(JSON.stringify(cost));
+  selectedCosts.value.push(copy);
 
   costData.value.push({
     kmData: {},
@@ -130,26 +132,39 @@ const addToRequest = (cost) => {
       reimbursedAmount: 0,
     },
     requirements: {},
+    fixedAmount: getActiveRate(cost),
   });
+
+  console.log(costData.value);
+};
+
+const removeCost = (index) => {
+  selectedCosts.value.splice(index, 1);
+  costData.value.splice(index, 1);
 };
 
 const submit = () => {
-  const payload = {
-    costs: selectedCosts.value.map((cost, index) => ({
-      name: cost.name,
-      type: cost.type,
-      data:
-        cost.type === "km"
-          ? costData.value[index].kmData
-          : cost.type === "percentage"
-          ? costData.value[index].percentageData
-          : { amount: getActiveRate(cost) },
-      requirements: costData.value[index].requirements,
-    })),
-  };
+  form.costs = selectedCosts.value.map((cost, index) => ({
+    cost_id: cost.id,
+    data:
+      cost.type === "km"
+        ? costData.value[index].kmData
+        : cost.type === "percentage"
+        ? costData.value[index].percentageData
+        : { amount: getActiveRate(cost) },
+    requirements: costData.value[index].requirements,
+  }));
 
-  console.log("Payload à envoyer :", payload);
-
-  // Tu peux ici faire un form.post('/notes-de-frais', payload) avec Inertia
+  form.post("/expense-sheet/" + props.form.id, {
+    onSuccess: () => {
+      alert("Note de frais enregistrée avec succès !");
+      form.reset();
+      selectedCosts.value = [];
+      costData.value = [];
+    },
+    onError: (errors) => {
+      console.error("Erreurs à l’envoi :", errors);
+    },
+  });
 };
 </script>
