@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class FormCostRemboursiementRate extends Model
 {
     protected $fillable = [
-        'form_id',
+        'cost_id',
         'start_date',
         'end_date',
         'value',

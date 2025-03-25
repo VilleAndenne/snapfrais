@@ -31,7 +31,61 @@ class FormController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'costs' => 'required|array|min:1',
+            'costs.*.name' => 'required|string|max:255',
+            'costs.*.description' => 'required|string|max:255',
+            'costs.*.type' => 'required|string|in:km,fixed,percentage',
+            'costs.*.reimbursement_rates' => 'nullable|array',
+            'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
+            'costs.*.reimbursement_rates.*.end_date' => 'nullable|date|after_or_equal:costs.*.reimbursement_rates.*.start_date',
+            'costs.*.reimbursement_rates.*.end_date' => 'nullable|date|after_or_equal:costs.*.reimbursement_rates.*.start_date',
+            'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
+
+            'costs.*.requirements' => 'nullable|array',
+            'costs.*.requirements.*.name' => 'required_with:costs.*.requirements|string|max:255',
+            'costs.*.requirements.*.type' => 'required_with:costs.*.requirements|string|in:file,text',
+        ]);
+
+        // Créer le formulaire
+        $form = Form::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? '',
+            'organization_id' => 1,
+        ]);
+
+        foreach ($validated['costs'] as $costData) {
+            $cost = $form->costs()->create([
+                'name' => $costData['name'],
+                'description' => $costData['description'],
+                'type' => $costData['type'],
+            ]);
+
+            // Créer les taux de remboursement
+            if (!empty($costData['reimbursement_rates'])) {
+                foreach ($costData['reimbursement_rates'] as $rateData) {
+                    $cost->reimbursementRates()->create([
+                        'start_date' => $rateData['start_date'],
+                        'end_date' => $rateData['end_date'],
+                        'value' => $rateData['value'],
+                    ]);
+                }
+            }
+
+            // Créer les prérequis
+            if (!empty($costData['requirements'])) {
+                foreach ($costData['requirements'] as $requirementData) {
+                    $cost->requirements()->create([
+                        'name' => $requirementData['name'],
+                        'type' => $requirementData['type'],
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('forms.index')->with('success', 'Formulaire créé avec succès!');
     }
 
     /**
@@ -45,17 +99,142 @@ class FormController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Form $form)
     {
-        //
+        $form->load('costs.reimbursementRates', 'costs.requirements');
+
+        // ✅ S'assurer que le tableau requirements est toujours défini
+        $form->costs->each(function ($cost) {
+            if (!$cost->requirements) {
+                $cost->requirements = [];
+            }
+
+            if (!$cost->reimbursementRates) {
+                $cost->reimbursementRates = [];
+            }
+        });
+
+        return inertia('forms/EditForm', [
+            'form' => $form
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Form $form)
     {
-        //
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'costs' => 'required|array|min:1',
+            'costs.*.id' => 'nullable|exists:form_costs,id',
+            'costs.*.name' => 'required|string|max:255',
+            'costs.*.type' => 'required|string|in:km,fixed,percentage',
+
+            'costs.*.reimbursement_rates' => 'nullable|array',
+            'costs.*.reimbursement_rates.*.id' => 'nullable|exists:form_cost_remboursiement_rates,id',
+            'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
+            'costs.*.reimbursement_rates.*.end_date' => [
+                'nullable',
+                'date',
+                'after_or_equal:costs.*.reimbursement_rates.*.start_date',
+                function ($attribute, $value, $fail) {
+                    if ($value && now()->gt($value)) {
+                        $fail('La date de fin doit être dans le futur.');
+                    }
+                }
+            ],
+            'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
+
+            'costs.*.requirements' => 'nullable|array',
+            'costs.*.requirements.*.id' => 'nullable|exists:form_costs_requirements,id',
+            'costs.*.requirements.*.name' => 'required_with:costs.*.requirements|string|max:255',
+            'costs.*.requirements.*.type' => 'required_with:costs.*.requirements|string|in:file,text',
+        ]);
+
+        // ✅ Mettre à jour le formulaire
+        $form->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? '',
+        ]);
+
+        // ✅ Récupérer les IDs des coûts envoyés dans la requête
+        $incomingCostIds = collect($validated['costs'])->pluck('id')->filter()->toArray();
+
+        // ✅ Supprimer les coûts qui ne sont plus dans la requête
+        $form->costs()->whereNotIn('id', $incomingCostIds)->delete();
+
+        // ✅ Traiter chaque coût
+        foreach ($validated['costs'] as $costData) {
+            if (!empty($costData['id'])) {
+                // ✅ Si le coût existe, on le met à jour
+                $cost = $form->costs()->find($costData['id']);
+                $cost->update([
+                    'name' => $costData['name'],
+                    'type' => $costData['type'],
+                ]);
+            } else {
+                // ✅ Si le coût n'existe pas, on le crée
+                $cost = $form->costs()->create([
+                    'name' => $costData['name'],
+                    'type' => $costData['type'],
+                ]);
+            }
+
+            // ✅ Mise à jour des taux de remboursement
+            $incomingRateIds = collect($costData['reimbursement_rates'])->pluck('id')->filter()->toArray();
+
+            // ➡️ Supprimer les taux non existants
+            $cost->reimbursementRates()->whereNotIn('id', $incomingRateIds)->delete();
+
+            foreach ($costData['reimbursement_rates'] as $rateData) {
+                if (!empty($rateData['id'])) {
+                    // ✅ Si le taux existe, mise à jour
+                    $rate = $cost->reimbursementRates()->find($rateData['id']);
+                    $rate->update([
+                        'start_date' => $rateData['start_date'],
+                        'end_date' => $rateData['end_date'],
+                        'value' => $rateData['value'],
+                    ]);
+                } else {
+                    // ✅ Si le taux n'existe pas, création
+                    $cost->reimbursementRates()->create([
+                        'start_date' => $rateData['start_date'],
+                        'end_date' => $rateData['end_date'],
+                        'value' => $rateData['value'],
+                    ]);
+                }
+            }
+
+            // ✅ Mise à jour des prérequis
+            $incomingRequirementIds = collect($costData['requirements'])->pluck('id')->filter()->toArray();
+
+            // ➡️ Supprimer les prérequis non existants
+            $cost->requirements()->whereNotIn('id', $incomingRequirementIds)->delete();
+
+            foreach ($costData['requirements'] as $requirementData) {
+                if (!empty($requirementData['id'])) {
+                    // ✅ Si le prérequis existe, mise à jour
+                    $requirement = $cost->requirements()->find($requirementData['id']);
+                    $requirement->update([
+                        'name' => $requirementData['name'],
+                        'type' => $requirementData['type'],
+                    ]);
+                } else {
+                    // ✅ Si le prérequis n'existe pas, création
+                    $cost->requirements()->create([
+                        'name' => $requirementData['name'],
+                        'type' => $requirementData['type'],
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Formulaire mis à jour avec succès!',
+            'form' => $form->load('costs.reimbursementRates', 'costs.requirements'),
+        ]);
     }
 
     /**

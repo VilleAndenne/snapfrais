@@ -14,7 +14,7 @@ class CostCast implements CastsAttributes
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): mixed
     {
-        return $value / 100;
+        return $value / 1000;
     }
 
     /**
@@ -24,6 +24,6 @@ class CostCast implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): mixed
     {
-        return $value * 100;
+        return $value * 1000;
     }
 }
