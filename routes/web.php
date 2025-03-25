@@ -13,3 +13,4 @@ Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard'
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 require __DIR__.'/forms.php';
+require __DIR__.'/expenseSheet.php';
