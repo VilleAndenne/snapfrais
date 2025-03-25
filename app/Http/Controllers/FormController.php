@@ -231,10 +231,7 @@ class FormController extends Controller
             }
         }
 
-        return response()->json([
-            'message' => 'Formulaire mis à jour avec succès!',
-            'form' => $form->load('costs.reimbursementRates', 'costs.requirements'),
-        ]);
+        return redirect()->route('forms.index')->with('success', 'Formulaire créé avec succès!');
     }
 
     /**
