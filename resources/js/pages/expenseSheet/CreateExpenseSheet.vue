@@ -1,103 +1,155 @@
 <template>
-    <AppLayout>
-        <div class="container mx-auto p-6">
-            <h1 class="text-xl font-bold mb-4">Créer une note de frais</h1>
+  <AppLayout>
+    <Head title="Nouvelle note de frais" />
 
-            <form @submit.prevent="submitForm" class="space-y-4">
-                <!-- Type principal -->
-                <Select v-model="form.type">
-                    <SelectTrigger>
-                        <SelectValue placeholder="Type de remboursement" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="km">Kilométrage</SelectItem>
-                        <SelectItem value="fixed">Fixe</SelectItem>
-                        <SelectItem value="percentage">Pourcentage</SelectItem>
-                    </SelectContent>
-                </Select>
+    <div class="container mx-auto p-4 space-y-6">
+      <h1 class="text-2xl font-semibold">Créer une note de frais</h1>
 
-                <!-- Liste des coûts associés -->
-                <div v-for="(cost, index) in form.costs" :key="index" class="space-y-2 border p-4 rounded-md">
-                    <Select v-model="cost.type">
-                        <SelectTrigger>
-                            <SelectValue placeholder="Type de coût" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="costType in costTypes" :key="costType.id" :value="costType.name">
-                                {{ costType.name }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Input v-model="cost.date" type="date" />
-                    <Input v-model.number="cost.amount" placeholder="Montant" />
+      <!-- Picker des coûts -->
+      <div>
+        <h2 class="text-lg font-medium mb-2">Coûts disponibles</h2>
+        <CostPicker
+          :available-costs="costs"
+          :selected-costs="selectedCosts"
+          @add="addToRequest"
+        />
+      </div>
 
-                    <Button @click="removeCost(index)" variant="destructive">
-                        Supprimer
-                    </Button>
-                </div>
-                
-                <Button @click="addCost" variant="outline">Ajouter un coût</Button>
+      <!-- Liste des coûts ajoutés à la demande -->
+      <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t">
+        <h2 class="text-lg font-medium">Votre demande</h2>
 
-                <!-- Montant total -->
-                <Input v-model.number="form.total" placeholder="Montant total" />
+        <div
+          v-for="(cost, index) in selectedCosts"
+          :key="index"
+          class="p-4 border rounded space-y-4 bg-white"
+        >
+          <div class="flex justify-between items-center">
+            <h3 class="text-xl font-bold">{{ cost.name }}</h3>
+            <span class="text-sm italic text-muted">{{ cost.type }}</span>
+          </div>
+          <p class="text-sm text-gray-600">{{ cost.description }}</p>
 
-                <div class="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" @click="cancelForm">
-                        Annuler
-                    </Button>
-                    <Button type="submit">Créer</Button>
-                </div>
-            </form>
+          <!-- Type dynamique -->
+          <div v-if="cost.type === 'km'">
+            <KmCostInput v-model="costData[index].kmData" />
+          </div>
+
+          <div v-else-if="cost.type === 'fixed'">
+            <FixedCostDisplay :amount="getActiveRate(cost)" />
+          </div>
+
+          <div v-else-if="cost.type === 'percentage'">
+            <PercentageCostInput v-model="costData[index].percentageData" />
+          </div>
+
+          <!-- Prérequis -->
+          <CostRequierementInput
+            v-if="cost.requierements?.length"
+            :requirements="cost.requierements"
+            v-model="costData[index].requirements"
+          />
         </div>
-    </AppLayout>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex justify-end pt-8">
+        <Button @click="submit" :disabled="!selectedCosts.length"
+          >Envoyer la demande</Button
+        >
+      </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
-import { useForm } from '@inertiajs/vue3'
-import { ref, reactive } from 'vue';
-import { Head } from '@inertiajs/vue3';
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
-    CardFooter
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Trash2Icon,
-    PlusIcon,
-    Loader2Icon
-} from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { ref, onMounted } from "vue";
+import { Head } from "@inertiajs/vue3";
+import AppLayout from "@/layouts/AppLayout.vue";
+import {Button} from "@/components/ui/button";
 
-const props = defineProps({
-    form: Object,
+import CostPicker from "@/components/expense/CostPicker.vue";
+import KmCostInput from "@/components/expense/KmCostInput.vue";
+import FixedCostDisplay from "@/components/expense/FixedCostDisplay.vue";
+import PercentageCostInput from "@/components/expense/PercentageCostInput.vue";
+import CostRequierementInput from "@/components/expense/CostRequierementInput.vue";
+
+const costs = ref([]); // tous les coûts définis dans le formulaire
+const selectedCosts = ref([]); // ceux que l’utilisateur a sélectionnés
+const costData = ref([]); // leurs données spécifiques
+
+onMounted(() => {
+  // À remplacer par un fetch dynamique depuis le backend
+  costs.value = [
+    {
+      name: "Déplacement en voiture",
+      type: "km",
+      description: "Remboursé au km avec étapes",
+      reimbursement_rates: [
+        { start_date: "2024-01-01", end_date: "2025-12-31", value: 0.22 },
+      ],
+      requierements: [{ name: "Raison", type: "text" }],
+    },
+    {
+      name: "Billet de train",
+      type: "percentage",
+      description: "Remboursé à 88%",
+      reimbursement_rates: [
+        { start_date: "2024-01-01", end_date: "2025-12-31", value: 88 },
+      ],
+      requierements: [{ name: "Billet", type: "file" }],
+    },
+    {
+      name: "Prime vélo",
+      type: "fixed",
+      description: "Montant forfaitaire",
+      reimbursement_rates: [
+        { start_date: "2024-01-01", end_date: "2025-12-31", value: 15 },
+      ],
+      requierements: [],
+    },
+  ];
 });
 
-const form = useForm({
-    costs: [],
-});
-
-console.log(props.form)
-
-const submitForm = () => {
-    form.post(route('expense-sheets.store'));
+const getActiveRate = (cost) => {
+  const today = new Date().toISOString().split("T")[0];
+  const activeRate = cost.reimbursement_rates.find(
+    (rate) => rate.start_date <= today && (!rate.end_date || rate.end_date >= today)
+  );
+  return activeRate?.value ?? 0;
 };
 
-const cancelForm = () => {
-    window.history.back();
+const addToRequest = (cost) => {
+    selectedCosts.value.push(JSON.parse(JSON.stringify(cost)))
+
+  costData.value.push({
+    kmData: {},
+    percentageData: {
+      paidAmount: null,
+      percentage: getActiveRate(cost),
+      reimbursedAmount: 0,
+    },
+    requirements: {},
+  });
+};
+
+const submit = () => {
+  const payload = {
+    costs: selectedCosts.value.map((cost, index) => ({
+      name: cost.name,
+      type: cost.type,
+      data:
+        cost.type === "km"
+          ? costData.value[index].kmData
+          : cost.type === "percentage"
+          ? costData.value[index].percentageData
+          : { amount: getActiveRate(cost) },
+      requirements: costData.value[index].requirements,
+    })),
+  };
+
+  console.log("Payload à envoyer :", payload);
+
+  // Tu peux ici faire un form.post('/notes-de-frais', payload) avec Inertia
 };
 </script>
