@@ -7,14 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class ExpenseSheetStep extends Model
 {
     protected $fillable = [
-        'expense_sheet_id',
-        'start_point',
-        'end_point',
-        'distance',
+        'expense_sheet_cost_id',
+        'address',
+        'order',
     ];
 
-    public function expenseSheet()
+    public function cost()
     {
-        return $this->belongsTo(ExpenseSheet::class);
+        return $this->belongsTo(ExpenseSheetCost::class, 'expense_sheet_cost_id');
     }
 }

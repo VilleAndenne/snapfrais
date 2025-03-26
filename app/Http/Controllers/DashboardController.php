@@ -12,8 +12,11 @@ class DashboardController extends Controller
     {
         $forms = Form::all();
 
+        return ExpenseSheet::with('costs')->get();
+
         return inertia('Dashboard', [
             'forms' => $forms,
+            'expenseSheets' => ExpenseSheet::with('form', 'costs')->get(),
         ]);
     }
 }

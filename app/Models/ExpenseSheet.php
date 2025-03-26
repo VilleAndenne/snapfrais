@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\CostCast;
 use Illuminate\Database\Eloquent\Model;
 
 class ExpenseSheet extends Model
@@ -17,10 +18,18 @@ class ExpenseSheet extends Model
 
     protected $casts = [
         'route' => 'array',
+        'total' => CostCast::class,
     ];
 
-    public function steps()
+
+    public function costs()
     {
-        return $this->hasMany(ExpenseSheetStep::class);
+        return $this->hasMany(ExpenseSheetCost::class);
     }
+
+    public function form()
+    {
+        return $this->belongsTo(Form::class);
+    }
+
 }

@@ -10,7 +10,6 @@ return new class extends Migration {
         Schema::create('expense_sheets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('type'); // 'km', 'fixed', 'percentage'
             $table->decimal('distance', 8, 2)->nullable(); // Nombre de kilomètres
             $table->json('route')->nullable(); // Stocker les étapes sous forme JSON
             $table->decimal('total', 10, 2)->nullable(); // Montant total du remboursement
