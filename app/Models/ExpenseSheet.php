@@ -14,6 +14,7 @@ class ExpenseSheet extends Model
         'route',
         'total',
         'status',
+        'form_id',
     ];
 
     protected $casts = [

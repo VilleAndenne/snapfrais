@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 const props = defineProps<{
     forms: Array<{
@@ -64,9 +65,6 @@ const goToForm = (formId) => {
                             Type
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                            Distance (km)
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Montant (€)
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -82,14 +80,11 @@ const goToForm = (formId) => {
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <tr v-for="sheet in expenseSheets" :key="sheet.id" class="hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">{{ sheet.type
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">{{ sheet.form.name
                             }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                            {{ sheet.distance }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                            {{ sheet.total.toFixed(2) }}
+                            {{ sheet.total.toFixed(2) + ' €' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                     <span :class="[
@@ -105,10 +100,10 @@ const goToForm = (formId) => {
                             {{ new Date(sheet.created_at).toLocaleDateString('fr-FR') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                            <button @click="goToForm(sheet.id)"
+                            <Link :href="'/expense-sheet/' + sheet.id + '/edit'"
                                     class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                Voir
-                            </button>
+                                Modifier
+                            </Link>
                         </td>
                     </tr>
                     </tbody>
