@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Tableau de bord',
         href: '/dashboard',
     },
 ];
@@ -34,7 +34,7 @@ const goToForm = (formId) => {
 
 <template>
 
-    <Head title="Dashboard" />
+    <Head title="Tableau de bord" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">

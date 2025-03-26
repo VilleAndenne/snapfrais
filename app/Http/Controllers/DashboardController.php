@@ -12,8 +12,6 @@ class DashboardController extends Controller
     {
         $forms = Form::all();
 
-        return ExpenseSheet::all();
-
         return inertia('Dashboard', [
             'forms' => $forms,
         ]);

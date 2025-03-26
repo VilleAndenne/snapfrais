@@ -9,13 +9,13 @@
                 <Heading title="Forms" />
                 <Button @click="addForm" class="flex items-center">
                     <PlusIcon class="mr-2 h-4 w-4" />
-                    Add Form
+                    Ajouter un formulaire
                 </Button>
             </div>
 
             <div class="w-full">
                 <Table>
-                    <TableCaption>A list of your forms.</TableCaption>
+                    <TableCaption>Une liste de vos formulaires.</TableCaption>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nom du formulaire</TableHead>
@@ -30,13 +30,13 @@
                             <TableCell class="text-right">
                                 <Link :href="'/forms/' + form.id + '/edit'">
                                 <Button variant="outline" size="sm">
-                                    Edit
+                                    Modifier
                                 </Button>
                                 </Link>
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="forms.length === 0">
-                            <TableCell colspan="3" class="text-center">No forms found.</TableCell>
+                            <TableCell colspan="3" class="text-center">Pas de formulaire trouvé.</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
