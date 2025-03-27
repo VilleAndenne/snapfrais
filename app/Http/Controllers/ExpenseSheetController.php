@@ -7,6 +7,7 @@ use App\Models\Form;
 use App\Models\FormCost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Inertia\Inertia;
 
 
 class ExpenseSheetController extends Controller
@@ -176,11 +177,35 @@ class ExpenseSheetController extends Controller
      */
     public function edit(ExpenseSheet $expenseSheet)
     {
-        $expenseSheet->load('costs.formCost.reimbursementRates', 'costs.formCost.requirements');
+        // Charger tous les coûts disponibles avec leurs taux et prérequis
+        $formCosts = FormCost::with(['reimbursementRates', 'requirements'])->get();
 
-        return inertia('expenseSheet/EditExpenseSheet', [
-            'form' => $expenseSheet,
-            'costs' => FormCost::with('reimbursementRates', 'requirements')->get(),
+        // Charger les coûts liés à cette note de frais, avec données pivot
+        $expenseSheet->load(['costs']);
+
+        return Inertia::render('expenseSheet/EditExpenseSheet', [
+            'form' => [
+                'costs' => $formCosts, // tous les coûts disponibles
+            ],
+            'expenseSheet' => [
+                'id' => $expenseSheet->id,
+                'costs' => $expenseSheet->costs->map(function ($cost) {
+                    return [
+                        'cost_id' => $cost->id,
+                        'name' => $cost->name,
+                        'description' => $cost->description,
+                        'type' => $cost->pivot->type,
+                        'requierements' => $cost->requirements,
+                        'reimbursement_rates' => $cost->reimbursementRates,
+                        'data' => [
+                            'distance' => $cost->pivot->distance,
+                            'google_distance' => $cost->pivot->google_distance,
+                            'route' => $cost->pivot->route,
+                        ],
+                        'total' => $cost->pivot->total,
+                    ];
+                }),
+            ],
         ]);
     }
 

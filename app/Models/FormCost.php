@@ -18,11 +18,13 @@ class FormCost extends Model
         return $this->belongsTo(Form::class);
     }
 
-    public function reimbursementRates() {
+    public function reimbursementRates()
+    {
         return $this->hasMany(FormCostRemboursiementRate::class);
     }
 
-    public function requirements() {
+    public function requirements()
+    {
         return $this->hasMany(FormCostRequierement::class);
     }
 }
