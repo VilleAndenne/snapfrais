@@ -144,6 +144,12 @@
                                     </div>
                                 </div>
                             </div>
+
+
+                            <Button @click="addCost" type="button" variant="outline">
+                                <PlusIcon class="h-5 w-5 mr-2" />
+                                Ajouter un coût
+                            </Button>
                         </div>
 
                         <!-- Form Submission -->
@@ -237,6 +243,17 @@ const addRequierement = (costIndex) => {
         type: '' // ✅ Champ lié au v-model
     });
 };
+
+const addCost = () => {
+    form.costs.push({
+        name: '',
+        description: '',
+        type: '',
+        reimbursement_rates: [],
+        requierements: []
+    });
+};
+
 
 const removeRequierement = (costIndex, requierementIndex) => {
     form.costs[costIndex].requirements.splice(requierementIndex, 1);

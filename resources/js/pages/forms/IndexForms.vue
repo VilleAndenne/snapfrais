@@ -1,12 +1,12 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
 
-            <Head title="Forms" />
+            <Head title="Formulaires" />
 
             <!-- En-tête avec titre et bouton d'ajout -->
             <div class="flex items-center justify-between mb-4">
-                <Heading title="Forms" />
+                <Heading title="Formulaires" />
                 <Button @click="addForm" class="flex items-center">
                     <PlusIcon class="mr-2 h-4 w-4" />
                     Ajouter un formulaire
@@ -29,9 +29,9 @@
                             <TableCell>{{ form.description }}</TableCell>
                             <TableCell class="text-right">
                                 <Link :href="'/forms/' + form.id + '/edit'">
-                                <Button variant="outline" size="sm">
-                                    Modifier
-                                </Button>
+                                    <Button variant="outline" size="sm">
+                                        Modifier
+                                    </Button>
                                 </Link>
                             </TableCell>
                         </TableRow>
@@ -63,10 +63,17 @@ import Heading from '@/components/Heading.vue';
 import { usePage } from '@inertiajs/vue3';
 import { PlusIcon } from 'lucide-vue-next';
 
-const page = usePage()
+const page = usePage();
 
 // Sample data - in a real app, this would come from an API or store
 const forms = ref(page.props.forms);
+
+const breadcrumbs = [
+    {
+        title: 'Formulaires',
+        href: '/forms'
+    }
+];
 
 
 // Function to handle add action - redirects to the create form page
