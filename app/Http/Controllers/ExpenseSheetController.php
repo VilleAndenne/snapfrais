@@ -167,9 +167,12 @@ class ExpenseSheetController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(ExpenseSheet $expenseSheet)
+    public function show($id)
     {
-        //
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+        return Inertia::render('expenseSheet/ShowExpenseSheet', [
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'costs.steps', 'user']),
+        ]);
     }
 
     /**
