@@ -13,8 +13,4 @@ class FormCostRemboursiementRate extends Model
         'end_date',
         'value',
     ];
-
-    protected $casts = [
-        'value' => CostCast::class,
-    ];
 }

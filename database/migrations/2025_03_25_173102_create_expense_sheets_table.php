@@ -15,6 +15,11 @@ return new class extends Migration {
             $table->json('route')->nullable(); // Stocker les étapes sous forme JSON
             $table->decimal('total', 10, 2)->nullable(); // Montant total du remboursement
             $table->string('status')->default('En attente');
+            $table->timestamp('validated_at')->nullable();
+            $table->foreignId('validated_by')->nullable()->constrained('users');
+            $table->boolean('approved')->nullable();
+            $table->string('refusal_reason')->nullable();
+            $table->foreignId('department_id')->nullable()->constrained();
             $table->timestamps();
         });
     }

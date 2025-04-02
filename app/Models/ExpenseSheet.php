@@ -15,11 +15,29 @@ class ExpenseSheet extends Model
         'total',
         'status',
         'form_id',
+        'department_id',
+        'approved_by',
+        'approved_at',
+        'approved',
+        'refusal_reason',
     ];
+
+    // Add global scopes to the model
+    protected static function boot()
+    {
+        parent::boot();
+        static::addGlobalScope('canView', function ($query) {
+            $user = auth()->user();
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('department', function ($q) use ($user) {
+                    $q->where('manager_id', $user->id);
+                })->orWhere('user_id', $user->id);
+            });
+        });
+    }
 
     protected $casts = [
         'route' => 'array',
-        'total' => CostCast::class,
     ];
 
 
@@ -36,5 +54,10 @@ class ExpenseSheet extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 }

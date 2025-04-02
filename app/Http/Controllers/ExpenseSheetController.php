@@ -28,8 +28,9 @@ class ExpenseSheetController extends Controller
     {
         $form = Form::with('costs.reimbursementRates', 'costs.requirements')->findOrFail($id);
 
-        return inertia('expenseSheet/CreateExpenseSheet', [
+        return inertia('expenseSheet/Create', [
             'form' => $form,
+            'departments' => auth()->user()->departments,
         ]);
     }
 
@@ -43,7 +44,9 @@ class ExpenseSheetController extends Controller
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
+            'costs.*.date' => 'required|date',  // Validation de la date
             'costs.*.requirements' => 'nullable|array',
+            'department_id' => 'required|exists:departments,id',
         ]);
 
         $expenseSheet = ExpenseSheet::create([
@@ -51,6 +54,7 @@ class ExpenseSheetController extends Controller
             'status' => 'En attente',
             'total' => 0,
             'form_id' => $id,
+            'department_id' => $validated['department_id'],
         ]);
 
         $globalTotal = 0;
@@ -58,11 +62,13 @@ class ExpenseSheetController extends Controller
         foreach ($validated['costs'] as $costItem) {
             $formCost = FormCost::find($costItem['cost_id']);
             $type = $formCost->type;
+            $date = $costItem['date'];
 
+            // Récupération du taux de remboursement actif à la date du coût
             $rate = $formCost->reimbursementRates()
-                ->where('start_date', '<=', now())
-                ->where(function ($q) {
-                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                ->where('start_date', '<=', $date)
+                ->where(function ($q) use ($date) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
                 })
                 ->orderByDesc('start_date')
                 ->first();
@@ -104,25 +110,15 @@ class ExpenseSheetController extends Controller
                     $response = Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
                     $json = $response->json();
 
-                    if (
-                        $response->successful() &&
-                        $json['status'] === 'OK' &&
-                        isset($json['routes'][0]['legs'][0]['distance']['value'])
-                    ) {
+                    if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
                         $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                    } else {
-                        logger()->warning('Erreur Google segment', [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'response' => $json,
-                        ]);
                     }
                 }
 
                 $googleKm = round($googleKm / 1000, 2);
                 $googleDistance = $googleKm;
                 $distance = $googleKm + $manualKm;
-                $total = $distance * $rate->value;
+                $total = round($distance * $rate->value, 2);
 
                 $route = [
                     'departure' => $origin,
@@ -132,10 +128,10 @@ class ExpenseSheetController extends Controller
                     'justification' => $data['justification'] ?? null,
                 ];
             } elseif ($type === 'fixed') {
-                $total = $rate->value;
+                $total = round($rate->value, 2);
             } elseif ($type === 'percentage') {
                 $paid = $data['paidAmount'] ?? 0;
-                $total = $paid * ($rate->value / 100);
+                $total = round($paid * ($rate->value / 100), 2);
             }
 
             $createdCost = $expenseSheet->costs()->create([
@@ -145,6 +141,7 @@ class ExpenseSheetController extends Controller
                 'google_distance' => $googleDistance,
                 'route' => $route,
                 'total' => $total,
+                'date' => $date,  // Stockage de la date du coût
             ]);
 
             if ($type === 'km') {
@@ -170,8 +167,15 @@ class ExpenseSheetController extends Controller
     public function show($id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
-        return Inertia::render('expenseSheet/ShowExpenseSheet', [
-            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'costs.steps', 'user']),
+//        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
+        $canApprove = auth()->user()->can('approve', $expenseSheet);
+        $canReject = auth()->user()->can('reject', $expenseSheet);
+        $canEdit = auth()->user()->can('edit', $expenseSheet);
+        return Inertia::render('expenseSheet/Show', [
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']),
+            'canApprove' => $canApprove,
+            'canReject' => $canReject,
+            'canEdit' => $canEdit,
         ]);
     }
 
@@ -186,7 +190,7 @@ class ExpenseSheetController extends Controller
         // Charger les coûts liés à cette note de frais, avec données pivot
         $expenseSheet->load(['costs']);
 
-        return Inertia::render('expenseSheet/EditExpenseSheet', [
+        return Inertia::render('expenseSheet/Edit', [
             'form' => [
                 'costs' => $formCosts, // tous les coûts disponibles
             ],
@@ -218,26 +222,32 @@ class ExpenseSheetController extends Controller
      */
     public function update(Request $request, ExpenseSheet $expenseSheet)
     {
-        $this->authorize('update', $expenseSheet);
+        if (!auth()->user()->can('edit', $expenseSheet)) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
+            'costs.*.date' => 'required|date',  // Validation de la date
             'costs.*.requirements' => 'nullable|array',
         ]);
 
-        $expenseSheet->costs()->delete(); // On recrée tout
+        // Supprimer les coûts existants pour les recréer
+        $expenseSheet->costs()->delete();
         $globalTotal = 0;
 
         foreach ($validated['costs'] as $costItem) {
             $formCost = FormCost::find($costItem['cost_id']);
             $type = $formCost->type;
+            $date = $costItem['date'];
 
+            // Récupération du taux de remboursement actif à la date du coût
             $rate = $formCost->reimbursementRates()
-                ->where('start_date', '<=', now())
-                ->where(function ($q) {
-                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                ->where('start_date', '<=', $date)
+                ->where(function ($q) use ($date) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
                 })
                 ->orderByDesc('start_date')
                 ->first();
@@ -280,11 +290,7 @@ class ExpenseSheetController extends Controller
                     $response = Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
                     $json = $response->json();
 
-                    if (
-                        $response->successful() &&
-                        $json['status'] === 'OK' &&
-                        isset($json['routes'][0]['legs'][0]['distance']['value'])
-                    ) {
+                    if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
                         $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
                     }
                 }
@@ -308,6 +314,7 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
+            // Création du coût avec la date fournie
             $createdCost = $expenseSheet->costs()->create([
                 'form_cost_id' => $formCost->id,
                 'type' => $type,
@@ -315,6 +322,7 @@ class ExpenseSheetController extends Controller
                 'google_distance' => $googleDistance,
                 'route' => $route,
                 'total' => $total,
+                'date' => $date,  // Enregistrement de la date
             ]);
 
             if ($type === 'km') {
@@ -334,11 +342,38 @@ class ExpenseSheetController extends Controller
         return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
     }
 
+
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(ExpenseSheetController $expenseSheetController)
     {
         //
+    }
+
+    /**
+     * Approve or reject the specified resource.
+     */
+    public function approve(Request $request, $id)
+    {
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+
+        $validated = $request->validate([
+            'approval' => 'required|boolean',
+            'reason' => 'required_if:approval,0',
+        ]);
+        if (!auth()->user()->can('approve', $expenseSheet) && $validated['approval'] === true) {
+            abort(403);
+        } elseif (!auth()->user()->can('reject', $expenseSheet) && $validated['approval'] === false) {
+            abort(403);
+        }
+
+        $expenseSheet->approved = $validated['approval'];
+        $expenseSheet->refusal_reason = $validated['reason'] ?? null;
+        $expenseSheet->validated_at = now();
+        $expenseSheet->validated_by = auth()->id();
+        $expenseSheet->save();
+
+        return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
     }
 }

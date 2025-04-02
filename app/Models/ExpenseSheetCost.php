@@ -14,6 +14,7 @@ class ExpenseSheetCost extends Model
         'google_distance',
         'route',
         'total',
+        'date',
     ];
 
     protected $casts = [

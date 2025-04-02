@@ -80,7 +80,8 @@ const goToForm = (formId) => {
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     <tr v-for="sheet in expenseSheets" :key="sheet.id" class="hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">{{ sheet.form.name
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                            {{ sheet.form.name
                             }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
@@ -100,9 +101,9 @@ const goToForm = (formId) => {
                             {{ new Date(sheet.created_at).toLocaleDateString('fr-FR') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                            <Link :href="'/expense-sheet/' + sheet.id + '/edit'"
-                                    class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                Modifier
+                            <Link :href="'/expense-sheet/' + sheet.id"
+                                  class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                Voir la note de frais
                             </Link>
                         </td>
                     </tr>
