@@ -58,8 +58,8 @@ class ExpenseSheetPolicy
      */
     public function edit(User $user, ExpenseSheet $expenseSheet)
     {
-        // Can edit if the user is the owner of the expense sheet and the status is 'draft' or 'rejected'
-        return ($user->id === $expenseSheet->user_id && $expenseSheet->approved === false);
+        // Peut modifier si le statut est "rejeté" (false) et si l'utilisateur est le propriétaire
+        return $expenseSheet->user_id === $user->id && $expenseSheet->approved === 0;
     }
 
     /**

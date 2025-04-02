@@ -12,6 +12,20 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 mr-2">
+                        <Button v-if="canEdit" variant="outline" size="sm" @click="editExpenseSheet">
+                            <PencilIcon class="h-4 w-4 mr-1" />
+                            Modifier
+                        </Button>
+                        <Button v-if="canApprove" variant="success" size="sm" @click="approveExpenseSheet">
+                            <CheckIcon class="h-4 w-4 mr-1" />
+                            Approuver
+                        </Button>
+                        <Button v-if="canReject" variant="destructive" size="sm" @click="openRejectModal">
+                            <XIcon class="h-4 w-4 mr-1" />
+                            Rejeter
+                        </Button>
+                    </div>
                     <Badge :variant="getStatusLabel(expenseSheet).variant">
                         {{ getStatusLabel(expenseSheet).label }}
                     </Badge>
@@ -72,8 +86,10 @@
                             class="p-4 border rounded space-y-4 bg-white"
                         >
                             <div class="flex justify-between items-center">
-                                <h3 class="text-xl font-bold">{{ cost.name }}</h3>
-                                <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
+                                <h3 class="text-xl font-bold">{{ cost.form_cost.name }}</h3>
+                                <span
+                                    class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }}€ / {{ cost.type
+                                    }}</span>
                             </div>
                             <p class="text-sm text-gray-600">{{ cost.description }}</p>
 
@@ -92,11 +108,11 @@
                                         {{ cost.route.departure }}
                                     </li>
 
-                                    <li v-if="cost.route.steps && cost.route.steps.length > 0">
+                                    <li v-if="cost.steps && cost.steps.length > 0">
                                         <span class="font-semibold">Étapes :</span>
                                         <ul class="list-decimal pl-5">
-                                            <li v-for="(step, index) in cost.route.steps" :key="index">
-                                                {{ step }}
+                                            <li v-for="(step, stepIndex) in cost.steps" :key="step.id">
+                                                {{ step.address }}
                                             </li>
                                         </ul>
                                     </li>
@@ -139,7 +155,7 @@
                                     target="_blank"
                                     class="text-blue-600 underline"
                                 >
-                                    Télécharger le fichier
+                                    Visualiser le fichier
                                 </a>
                             </span>
                                         <span v-else>{{ requirement.value }}</span>
@@ -263,14 +279,10 @@ const closeRejectModal = () => {
 const confirmReject = () => {
     if (!rejectionReason.value.trim()) return;
 
-    // Ici, vous pouvez implémenter la logique pour envoyer la raison du rejet
-    console.log('Rejecting expense sheet', props.expenseSheet.id, 'with reason:', rejectionReason.value);
-
-    // Vous pourriez émettre un événement ou appeler une API ici
-    // Par exemple:
-    // emit('reject', { id: props.expenseSheet.id, reason: rejectionReason.value });
-
-    // Fermer le modal après confirmation
+    useForm({
+        approval: false,
+        reason: rejectionReason.value
+    }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
     closeRejectModal();
 };
 
@@ -295,22 +307,6 @@ const printExpenseSheet = () => {
 const downloadPdf = () => {
     // Implement PDF download logic
     console.log('Downloading PDF for expense sheet', props.expenseSheet.id);
-};
-
-// Obtenir la variante de badge selon le statut
-const getStatusVariant = (status) => {
-    switch (status) {
-        case 'pending':
-            return 'outline';
-        case 'approved':
-            return 'success';
-        case 'rejected':
-            return 'destructive';
-        case 'paid':
-            return 'default';
-        default:
-            return 'secondary';
-    }
 };
 
 // Obtenir le libellé du statut
@@ -364,3 +360,4 @@ const getFileUrl = (path) => {
 };
 
 </script>
+

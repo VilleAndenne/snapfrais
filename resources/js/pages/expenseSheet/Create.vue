@@ -62,7 +62,7 @@
                         <KmCostInput v-model="costData[index].kmData" />
                     </div>
                     <div v-else-if="cost.type === 'fixed'">
-                        <FixedCostDisplay v-model="costData[index].fixedAmount" />
+                        <FixedCostDisplay v-model="costData[index]" />
                     </div>
                     <div v-else-if="cost.type === 'percentage'">
                         <PercentageCostInput v-model="costData[index].percentageData" />

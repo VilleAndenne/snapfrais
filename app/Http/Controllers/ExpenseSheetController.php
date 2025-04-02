@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ExpenseSheet;
 use App\Models\Form;
 use App\Models\FormCost;
+use App\Notifications\ReceiptExpenseSheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
@@ -173,6 +174,8 @@ class ExpenseSheetController extends Controller
         }
 
         $expenseSheet->update(['total' => $globalTotal]);
+
+        $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
 
         return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
     }
