@@ -19,6 +19,7 @@ return new class extends Migration
             $table->float('distance')->nullable(); // total distance (manual + google)
             $table->float('google_distance')->nullable(); // distance calculée via Google Maps
             $table->json('route')->nullable(); // itinéraire complet
+            $table->json('requirements')->nullable(); // JSON des besoins
             $table->decimal('total', 10, 2); // montant du remboursement
             $table->date('date');
             $table->timestamps();

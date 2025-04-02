@@ -20,7 +20,6 @@ return new class extends Migration {
             $table->boolean('approved')->nullable();
             $table->string('refusal_reason')->nullable();
             $table->foreignId('department_id')->nullable()->constrained();
-            $table->json('requirements')->nullable(); // Stocker les justificatifs sous forme JSON
             $table->timestamps();
         });
     }

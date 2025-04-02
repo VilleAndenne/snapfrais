@@ -13,12 +13,14 @@ class ExpenseSheetCost extends Model
         'distance',
         'google_distance',
         'route',
+        'requirements',
         'total',
         'date',
     ];
 
     protected $casts = [
         'route' => 'array',
+        'requirements' => 'array',
     ];
 
     public function expenseSheet()

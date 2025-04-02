@@ -44,7 +44,7 @@ class ExpenseSheetController extends Controller
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
-            'costs.*.date' => 'required|date',  // Validation de la date
+            'costs.*.date' => 'required|date',
             'costs.*.requirements' => 'nullable|array',
             'department_id' => 'required|exists:departments,id',
         ]);
@@ -134,6 +134,21 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
+            // Gestion des requirements sous forme de JSON
+            $requirements = [];
+            if (isset($costItem['requirements'])) {
+                foreach ($costItem['requirements'] as $key => $requirement) {
+                    if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
+                        // Stockage du fichier
+                        $path = $requirement['file']->store('requirements', 'public');
+                        $requirements[$key] = ['file' => $path];
+                    } elseif (is_array($requirement) && isset($requirement['value'])) {
+                        $requirements[$key] = ['value' => $requirement['value']];
+                    }
+                }
+            }
+
+            // Création du coût avec requirements stockés en JSON
             $createdCost = $expenseSheet->costs()->create([
                 'form_cost_id' => $formCost->id,
                 'type' => $type,
@@ -141,7 +156,8 @@ class ExpenseSheetController extends Controller
                 'google_distance' => $googleDistance,
                 'route' => $route,
                 'total' => $total,
-                'date' => $date,  // Stockage de la date du coût
+                'date' => $date,
+                'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
             ]);
 
             if ($type === 'km') {
@@ -167,7 +183,7 @@ class ExpenseSheetController extends Controller
     public function show($id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
-//        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
+        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
         $canApprove = auth()->user()->can('approve', $expenseSheet);
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);

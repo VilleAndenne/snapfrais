@@ -184,23 +184,72 @@ const removeCost = (index) => {
 };
 
 const submit = () => {
-    form.costs = selectedCosts.value.map((cost, index) => ({
-        cost_id: cost.id,
-        date: costData.value[index].date,
-        data:
+    form.costs = selectedCosts.value.map((cost, index) => {
+        const data =
             cost.type === 'km' ? costData.value[index].kmData :
                 cost.type === 'percentage' ? costData.value[index].percentageData :
-                    { amount: costData.value[index].fixedAmount },
-        requirements: costData.value[index].requirements
-    }));
+                    { amount: costData.value[index].fixedAmount };
 
-    form.post('/expense-sheet/' + props.form.id, {
+        const requirements = {};
+        if (costData.value[index].requirements) {
+            Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
+                if (req instanceof File) {
+                    requirements[reqId] = { file: req };
+                } else if (req !== null && req !== undefined && req !== '') {
+                    requirements[reqId] = { value: req };
+                }
+            });
+        }
+
+        return {
+            cost_id: cost.id,
+            date: costData.value[index].date,
+            data,
+            requirements
+        };
+    });
+
+    form.post(`/expense-sheet/${props.form.id}`, {
+        preserveState: false,
         onSuccess: () => {
             alert('Note de frais enregistrée avec succès !');
             form.reset();
             selectedCosts.value = [];
             costData.value = [];
+        },
+        onError: (errors) => {
+            alert('Une erreur est survenue lors de l\'envoi.');
+            console.error(errors);
+        },
+        transform: (data) => {
+            const formData = new FormData();
+            formData.append('department_id', form.department_id);
+
+            data.costs.forEach((cost, index) => {
+                formData.append(`costs[${index}][cost_id]`, cost.cost_id);
+                formData.append(`costs[${index}][date]`, cost.date);
+
+                // Ajouter les données du coût
+                Object.entries(cost.data).forEach(([key, value]) => {
+                    formData.append(`costs[${index}][data][${key}]`, value);
+                });
+
+                // Ajouter les requirements correctement
+                if (cost.requirements) {
+                    Object.entries(cost.requirements).forEach(([reqId, req]) => {
+                        if (req.file instanceof File) {
+                            formData.append(`costs[${index}][data][requirements][${reqId}][file]`, req.file);
+                        } else if (req.value) {
+                            formData.append(`costs[${index}][data][requirements][${reqId}][value]`, req.value);
+                        }
+                    });
+                }
+            });
+
+            return formData;
         }
     });
 };
+
+
 </script>
