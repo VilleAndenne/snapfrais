@@ -69,9 +69,9 @@
                     </div>
 
                     <!-- Prérequis du coût -->
-                    <CostRequierementInput
-                        v-if="cost.requierements?.length"
-                        :requirements="cost.requierements"
+                    <CostrequirementInput
+                        v-if="cost.requirements?.length"
+                        :requirements="cost.requirements"
                         v-model="costData[index].requirements"
                     />
                 </div>
@@ -120,7 +120,7 @@ import CostPicker from '@/components/expense/CostPicker.vue';
 import KmCostInput from '@/components/expense/KmCostInput.vue';
 import FixedCostDisplay from '@/components/expense/FixedCostDisplay.vue';
 import PercentageCostInput from '@/components/expense/PercentageCostInput.vue';
-import CostRequierementInput from '@/components/expense/CostRequierementInput.vue';
+import CostrequirementInput from '@/components/expense/CostrequirementInput.vue';
 
 const costs = ref([]);
 const selectedCosts = ref([]);

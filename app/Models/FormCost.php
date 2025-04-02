@@ -25,6 +25,6 @@ class FormCost extends Model
 
     public function requirements()
     {
-        return $this->hasMany(FormCostRequierement::class);
+        return $this->hasMany(FormCostRequirement::class);
     }
 }
