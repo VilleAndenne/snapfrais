@@ -83,90 +83,80 @@
                                 <p>{{ formatDate(cost.date) }}</p>
                             </div>
 
-                            <!-- Affichage selon le type de coût -->
-                            <div v-if="cost.type === 'km'" class="space-y-2">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <h4 class="text-sm font-medium text-muted-foreground">Distance</h4>
-                                        <p>{{ cost.distance }} km</p>
-                                    </div>
-                                    <div>
-                                        <h4 class="text-sm font-medium text-muted-foreground">Taux</h4>
-                                        <p>{{ getActiveRate(cost, cost.date) }} / km</p>
-                                    </div>
-                                    <div>
-                                        <h4 class="text-sm font-medium text-muted-foreground">Montant</h4>
-                                        <p class="font-bold">{{ formatCurrency(cost.total) }}</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Trajet</h4>
-                                    <p>{{ cost.route.departure }} → {{ cost.route.arrival }}</p>
-                                </div>
+                            <!-- Affichage de la route et des étapes -->
+                            <div v-if="cost.route" class="space-y-2">
+                                <h4 class="text-sm font-medium text-muted-foreground">Route :</h4>
+                                <ul class="list-disc pl-5">
+                                    <li>
+                                        <span class="font-semibold">Départ :</span>
+                                        {{ cost.route.departure }}
+                                    </li>
+
+                                    <li v-if="cost.route.steps && cost.route.steps.length > 0">
+                                        <span class="font-semibold">Étapes :</span>
+                                        <ul class="list-decimal pl-5">
+                                            <li v-for="(step, index) in cost.route.steps" :key="index">
+                                                {{ step }}
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    <li>
+                                        <span class="font-semibold">Arrivée :</span>
+                                        {{ cost.route.arrival }}
+                                    </li>
+
+                                    <li>
+                                        <span class="font-semibold">Distance Google :</span>
+                                        {{ cost.route.google_km }} km
+                                    </li>
+
+                                    <li v-if="cost.route.manual_km">
+                                        <span class="font-semibold">Distance manuelle :</span>
+                                        {{ cost.route.manual_km }} km
+                                    </li>
+
+                                    <li v-if="cost.route.justification">
+                                        <span class="font-semibold">Justification :</span>
+                                        {{ cost.route.justification }}
+                                    </li>
+                                </ul>
                             </div>
 
-                            <div v-else-if="cost.type === 'fixed'" class="space-y-2">
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Montant fixe</h4>
-                                    <p class="font-bold">{{ formatCurrency(cost.total) }}</p>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Taux applicable</h4>
-                                    <p>{{ formatRate(cost.rate) }}</p>
-                                </div>
+                            <!-- Affichage des requirements -->
+                            <div v-if="cost.requirements" class="space-y-2">
+                                <h4 class="text-sm font-medium text-muted-foreground">Annexes :</h4>
+                                <ul class="list-disc pl-5">
+                                    <li
+                                        v-for="(requirement, key) in parseRequirements(cost.requirements)"
+                                        :key="key"
+                                        class="text-gray-800"
+                                    >
+                                        <span class="font-semibold">{{ key }} :</span>
+                                        <span v-if="requirement.file">
+                                <a
+                                    :href="getFileUrl(requirement.file)"
+                                    target="_blank"
+                                    class="text-blue-600 underline"
+                                >
+                                    Télécharger le fichier
+                                </a>
+                            </span>
+                                        <span v-else>{{ requirement.value }}</span>
+                                    </li>
+                                </ul>
                             </div>
 
-                            <div v-else-if="cost.type === 'percentage'" class="space-y-2">
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Montant payé</h4>
-                                    <p>{{ formatCurrency(cost.data.paidAmount) }}</p>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Pourcentage</h4>
-                                    <p>{{ cost.percentage }}%</p>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Montant remboursé</h4>
-                                    <p class="font-bold">{{ formatCurrency(cost.data.reimbursedAmount) }}</p>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-medium text-muted-foreground">Taux applicable</h4>
-                                    <p>{{ cost.rate }}%</p>
-                                </div>
+                            <!-- Affichage du montant -->
+                            <div>
+                                <h4 class="text-sm font-medium text-muted-foreground">Montant :</h4>
+                                <p class="font-bold">{{ formatCurrency(cost.total) }}</p>
                             </div>
                         </div>
                     </div>
                 </CardContent>
-                <CardFooter class="flex justify-end">
-                    <!-- Actions buttons -->
-                    <div v-if="canApprove || canReject || canEdit" class="flex flex-wrap gap-2 justify-end">
-                        <Button
-                            v-if="canApprove"
-                            variant="outline"
-                            @click="approveExpenseSheet"
-                        >
-                            <CheckIcon class="mr-2 h-4 w-4" />
-                            Accepter
-                        </Button>
-                        <Button
-                            v-if="canReject"
-                            variant="destructive"
-                            @click="openRejectModal"
-                        >
-                            <XIcon class="mr-2 h-4 w-4" />
-                            Rejeter
-                        </Button>
-                        <Button
-                            v-if="canEdit && ['pending', 'rejected'].includes(expenseSheet.status)"
-                            variant="outline"
-                            @click="editExpenseSheet"
-                        >
-                            <PencilIcon class="mr-2 h-4 w-4" />
-                            Modifier
-                        </Button>
-                    </div>
-                </CardFooter>
             </Card>
+
         </div>
 
         <!-- Modal de justification de refus -->
@@ -357,4 +347,20 @@ const getStatusLabel = (expenseSheet) => {
 const getInitials = (name) => {
     return name.split(' ').map((word) => word.charAt(0)).join('');
 };
+
+// Fonction pour parser les requirements JSON
+const parseRequirements = (requirements) => {
+    try {
+        return typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
+    } catch (e) {
+        console.error('Erreur lors du parsing des requirements:', e);
+        return {};
+    }
+};
+
+// Obtenir l'URL complète du fichier à partir du chemin
+const getFileUrl = (path) => {
+    return `/storage/${path}`;
+};
+
 </script>

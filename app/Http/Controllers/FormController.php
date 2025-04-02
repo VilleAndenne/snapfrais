@@ -41,7 +41,6 @@ class FormController extends Controller
             'costs.*.reimbursement_rates' => 'nullable|array',
             'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
             'costs.*.reimbursement_rates.*.end_date' => 'nullable|date|after_or_equal:costs.*.reimbursement_rates.*.start_date',
-            'costs.*.reimbursement_rates.*.end_date' => 'nullable|date|after_or_equal:costs.*.reimbursement_rates.*.start_date',
             'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
 
             'costs.*.requirements' => 'nullable|array',
@@ -148,7 +147,7 @@ class FormController extends Controller
             'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
 
             'costs.*.requirements' => 'nullable|array',
-            'costs.*.requirements.*.id' => 'nullable|exists:form_costs_requirements,id',
+            'costs.*.requirements.*.id' => 'nullable|exists:form_cost_requirements,id',
             'costs.*.requirements.*.name' => 'required_with:costs.*.requirements|string|max:255',
             'costs.*.requirements.*.type' => 'required_with:costs.*.requirements|string|in:file,text',
         ]);
@@ -168,14 +167,12 @@ class FormController extends Controller
         // ✅ Traiter chaque coût
         foreach ($validated['costs'] as $costData) {
             if (!empty($costData['id'])) {
-                // ✅ Si le coût existe, on le met à jour
                 $cost = $form->costs()->find($costData['id']);
                 $cost->update([
                     'name' => $costData['name'],
                     'type' => $costData['type'],
                 ]);
             } else {
-                // ✅ Si le coût n'existe pas, on le crée
                 $cost = $form->costs()->create([
                     'name' => $costData['name'],
                     'type' => $costData['type'],
@@ -184,13 +181,10 @@ class FormController extends Controller
 
             // ✅ Mise à jour des taux de remboursement
             $incomingRateIds = collect($costData['reimbursement_rates'])->pluck('id')->filter()->toArray();
-
-            // ➡️ Supprimer les taux non existants
             $cost->reimbursementRates()->whereNotIn('id', $incomingRateIds)->delete();
 
             foreach ($costData['reimbursement_rates'] as $rateData) {
                 if (!empty($rateData['id'])) {
-                    // ✅ Si le taux existe, mise à jour
                     $rate = $cost->reimbursementRates()->find($rateData['id']);
                     $rate->update([
                         'start_date' => $rateData['start_date'],
@@ -198,7 +192,6 @@ class FormController extends Controller
                         'value' => $rateData['value'],
                     ]);
                 } else {
-                    // ✅ Si le taux n'existe pas, création
                     $cost->reimbursementRates()->create([
                         'start_date' => $rateData['start_date'],
                         'end_date' => $rateData['end_date'],
@@ -207,31 +200,47 @@ class FormController extends Controller
                 }
             }
 
-            // ✅ Mise à jour des prérequis
+            // ✅ Mise à jour des prérequis (requirements)
             $incomingRequirementIds = collect($costData['requirements'])->pluck('id')->filter()->toArray();
-
-            // ➡️ Supprimer les prérequis non existants
             $cost->requirements()->whereNotIn('id', $incomingRequirementIds)->delete();
 
             foreach ($costData['requirements'] as $requirementData) {
                 if (!empty($requirementData['id'])) {
-                    // ✅ Si le prérequis existe, mise à jour
                     $requirement = $cost->requirements()->find($requirementData['id']);
+                    $requirementContent = [];
+
+                    if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
+                        $path = $requirementData['file']->store('requirements', 'public');
+                        $requirementContent = ['file' => $path];
+                    } elseif ($requirementData['type'] === 'text' && isset($requirementData['value'])) {
+                        $requirementContent = ['value' => $requirementData['value']];
+                    }
+
                     $requirement->update([
                         'name' => $requirementData['name'],
                         'type' => $requirementData['type'],
+                        'content' => json_encode($requirementContent),
                     ]);
                 } else {
-                    // ✅ Si le prérequis n'existe pas, création
+                    $content = [];
+
+                    if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
+                        $path = $requirementData['file']->store('requirements', 'public');
+                        $content = ['file' => $path];
+                    } elseif ($requirementData['type'] === 'text' && isset($requirementData['value'])) {
+                        $content = ['value' => $requirementData['value']];
+                    }
+
                     $cost->requirements()->create([
                         'name' => $requirementData['name'],
                         'type' => $requirementData['type'],
+                        'content' => json_encode($content),
                     ]);
                 }
             }
         }
 
-        return redirect()->route('forms.index')->with('success', 'Formulaire créé avec succès!');
+        return redirect()->route('forms.index')->with('success', 'Formulaire mis à jour avec succès!');
     }
 
     /**

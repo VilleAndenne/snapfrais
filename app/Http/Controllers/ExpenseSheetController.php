@@ -183,7 +183,7 @@ class ExpenseSheetController extends Controller
     public function show($id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
-        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
+//        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
         $canApprove = auth()->user()->can('approve', $expenseSheet);
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
