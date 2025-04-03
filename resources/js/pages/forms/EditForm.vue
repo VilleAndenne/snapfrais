@@ -79,6 +79,17 @@
                                     </div>
                                 </div>
 
+                                <!--                                Input description of cost -->
+                                <div class="space-y-2">
+                                    <Label :for="`cost-description-${costIndex}`">Description</Label>
+                                    <Textarea :id="`cost-description-${costIndex}`" v-model="cost.description"
+                                              rows="3"
+                                              :class="{ 'border-destructive': form.errors[`costs.${costIndex}.description`] }" />
+                                    <p v-if="form.errors[`costs.${costIndex}.description`]">
+                                        {{ form.errors[`costs.${costIndex}.description`] }}
+                                    </p>
+                                </div>
+
                                 <!-- Reimbursement Rates -->
                                 <div class="space-y-4">
                                     <div class="flex justify-between items-center">
@@ -112,7 +123,7 @@
                                 <div class="space-y-4">
                                     <div class="flex justify-between items-center">
                                         <h4 class="text-md font-medium">Prérequis du coût</h4>
-                                        <Button type="button" @click="addRequierement(costIndex)" variant="outline"
+                                        <Button type="button" @click="addRequirement(costIndex)" variant="outline"
                                                 size="sm">
                                             <PlusIcon class="h-4 w-4 mr-1" />
                                             Ajouter un prérequis
@@ -137,7 +148,7 @@
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <Button type="button" @click="removeRequierement(costIndex, requirementIndex)"
+                                        <Button type="button" @click="removeRequirement(costIndex, requirementIndex)"
                                                 class="text-destructive">
                                             <Trash2Icon class="h-4 w-4" />
                                         </Button>
@@ -237,7 +248,7 @@ const removeReimbursementRate = (costIndex, rateIndex) => {
     form.costs[costIndex].reimbursement_rates.splice(rateIndex, 1);
 };
 
-const addRequierement = (costIndex) => {
+const addRequirement = (costIndex) => {
     form.costs[costIndex].requirements.push({
         name: '',
         type: '' // ✅ Champ lié au v-model
@@ -250,13 +261,13 @@ const addCost = () => {
         description: '',
         type: '',
         reimbursement_rates: [],
-        requierements: []
+        requirements: []
     });
 };
 
 
-const removeRequierement = (costIndex, requierementIndex) => {
-    form.costs[costIndex].requirements.splice(requierementIndex, 1);
+const removeRequirement = (costIndex, requirementIndex) => {
+    form.costs[costIndex].requirements.splice(requirementIndex, 1);
 };
 
 const submitForm = () => {

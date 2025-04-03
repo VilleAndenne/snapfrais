@@ -1,5 +1,5 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`Note de frais #${expenseSheet.id}`" />
 
         <div class="container mx-auto p-4 space-y-6">
@@ -88,7 +88,7 @@
                             <div class="flex justify-between items-center">
                                 <h3 class="text-xl font-bold">{{ cost.form_cost.name }}</h3>
                                 <span
-                                    class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }}€ / {{ cost.type
+                                    class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }} / {{ cost.type
                                     }}</span>
                             </div>
                             <p class="text-sm text-gray-600">{{ cost.description }}</p>
@@ -163,9 +163,14 @@
                                 </ul>
                             </div>
 
+                            <div v-if="cost.amount">
+                                <h4 class="text-sm font-medium text-muted-foreground">Montant payé :</h4>
+                                <p class="font-bold">{{ formatCurrency(cost.amount) }}</p>
+                            </div>
+
                             <!-- Affichage du montant -->
                             <div>
-                                <h4 class="text-sm font-medium text-muted-foreground">Montant :</h4>
+                                <h4 class="text-sm font-medium text-muted-foreground">Montant dû estimé :</h4>
                                 <p class="font-bold">{{ formatCurrency(cost.total) }}</p>
                             </div>
                         </div>
@@ -235,7 +240,7 @@ import {
     XIcon,
     PencilIcon
 } from 'lucide-vue-next';
-import { formatDate, formatCurrency, formatRate, getActiveRate } from '@/utils/formatters';
+import { formatDate, formatCurrency, formatRate, getStatusLabel, getActiveRate } from '@/utils/formatters';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -259,6 +264,17 @@ const props = defineProps({
         default: false
     }
 });
+
+const breadcrumbs = [
+    {
+        title: 'Tableau de bord',
+        href: '/dashboard'
+    },
+    {
+        title: `Note de frais #${props.expenseSheet.id}`,
+        href: `/expense-sheet/${props.expenseSheet.id}`
+    }
+];
 
 // État pour le modal de rejet
 const isRejectModalOpen = ref(false);
@@ -310,33 +326,6 @@ const downloadPdf = () => {
 };
 
 // Obtenir le libellé du statut
-const getStatusLabel = (expenseSheet) => {
-    if (expenseSheet.approved == true) {
-        return {
-            label: 'Approuvée',
-            variant: 'success'
-        };
-    }
-    if (expenseSheet.approved == false) {
-        return {
-            label: 'Rejetée',
-            variant: 'destructive'
-        };
-    }
-    // Vérifiez si le statut est indéfini ou nul
-    if (expenseSheet.approved === null || expenseSheet.approved === undefined) {
-        return {
-            label: 'En attente',
-            variant: 'outline'
-        };
-    }
-
-    // Par défaut (si aucun des cas précédents ne s'applique)
-    return {
-        label: 'Statut inconnu',
-        variant: 'secondary'
-    };
-};
 
 
 // Obtenir les initiales d'un nom

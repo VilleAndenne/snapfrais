@@ -129,6 +129,7 @@ class FormController extends Controller
             'costs' => 'required|array|min:1',
             'costs.*.id' => 'nullable|exists:form_costs,id',
             'costs.*.name' => 'required|string|max:255',
+            'costs.*.description' => 'required|string|max:255',
             'costs.*.type' => 'required|string|in:km,fixed,percentage',
 
             'costs.*.reimbursement_rates' => 'nullable|array',
@@ -167,15 +168,18 @@ class FormController extends Controller
         // ✅ Traiter chaque coût
         foreach ($validated['costs'] as $costData) {
             if (!empty($costData['id'])) {
+                // ✅ Mise à jour du coût existant
                 $cost = $form->costs()->find($costData['id']);
                 $cost->update([
                     'name' => $costData['name'],
                     'type' => $costData['type'],
                 ]);
             } else {
+                // ✅ Création d'un nouveau coût
                 $cost = $form->costs()->create([
                     'name' => $costData['name'],
                     'type' => $costData['type'],
+                    'description' => $costData['description'],
                 ]);
             }
 
@@ -185,6 +189,7 @@ class FormController extends Controller
 
             foreach ($costData['reimbursement_rates'] as $rateData) {
                 if (!empty($rateData['id'])) {
+                    // ✅ Mise à jour d'un taux existant
                     $rate = $cost->reimbursementRates()->find($rateData['id']);
                     $rate->update([
                         'start_date' => $rateData['start_date'],
@@ -192,6 +197,7 @@ class FormController extends Controller
                         'value' => $rateData['value'],
                     ]);
                 } else {
+                    // ✅ Création d'un nouveau taux
                     $cost->reimbursementRates()->create([
                         'start_date' => $rateData['start_date'],
                         'end_date' => $rateData['end_date'],
@@ -200,30 +206,31 @@ class FormController extends Controller
                 }
             }
 
-            // ✅ Mise à jour des prérequis (requirements)
+            // ✅ Mise à jour des requirements (prérequis)
             $incomingRequirementIds = collect($costData['requirements'])->pluck('id')->filter()->toArray();
             $cost->requirements()->whereNotIn('id', $incomingRequirementIds)->delete();
 
             foreach ($costData['requirements'] as $requirementData) {
+                $content = [];
                 if (!empty($requirementData['id'])) {
+                    // ✅ Mise à jour d'un requirement existant
                     $requirement = $cost->requirements()->find($requirementData['id']);
-                    $requirementContent = [];
 
+                    // Vérifier si le requirement est un fichier
                     if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
                         $path = $requirementData['file']->store('requirements', 'public');
-                        $requirementContent = ['file' => $path];
+                        $content = ['file' => $path];
                     } elseif ($requirementData['type'] === 'text' && isset($requirementData['value'])) {
-                        $requirementContent = ['value' => $requirementData['value']];
+                        $content = ['value' => $requirementData['value']];
                     }
 
                     $requirement->update([
                         'name' => $requirementData['name'],
                         'type' => $requirementData['type'],
-                        'content' => json_encode($requirementContent),
+                        'content' => json_encode($content),
                     ]);
                 } else {
-                    $content = [];
-
+                    // ✅ Création d'un nouveau requirement
                     if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
                         $path = $requirementData['file']->store('requirements', 'public');
                         $content = ['file' => $path];
@@ -242,6 +249,7 @@ class FormController extends Controller
 
         return redirect()->route('forms.index')->with('success', 'Formulaire mis à jour avec succès!');
     }
+
 
     /**
      * Remove the specified resource from storage.

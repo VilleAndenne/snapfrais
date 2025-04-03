@@ -158,6 +158,7 @@ class ExpenseSheetController extends Controller
                 'route' => $route,
                 'total' => $total,
                 'date' => $date,
+                'amount' => $data['paidAmount'] ?? null,
                 'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
             ]);
 
@@ -249,8 +250,14 @@ class ExpenseSheetController extends Controller
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
-            'costs.*.date' => 'required|date',  // Validation de la date
+            'costs.*.date' => 'required|date',
             'costs.*.requirements' => 'nullable|array',
+            'department_id' => 'required|exists:departments,id',
+        ]);
+
+        // Mettre à jour les informations de la note de frais
+        $expenseSheet->update([
+            'department_id' => $validated['department_id'],
         ]);
 
         // Supprimer les coûts existants pour les recréer
@@ -333,7 +340,22 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
-            // Création du coût avec la date fournie
+            // Gestion des requirements
+            $requirements = [];
+            if (isset($costItem['requirements'])) {
+                foreach ($costItem['requirements'] as $key => $requirement) {
+                    if ($requirement instanceof \Illuminate\Http\UploadedFile) {
+                        // C'est un fichier, on le stocke
+                        $path = $requirement->store('requirements', 'public');
+                        $requirements[$key] = $path;
+                    } elseif (is_string($requirement)) {
+                        // C'est du texte ou autre
+                        $requirements[$key] = $requirement;
+                    }
+                }
+            }
+
+            // Création du coût avec les données mises à jour
             $createdCost = $expenseSheet->costs()->create([
                 'form_cost_id' => $formCost->id,
                 'type' => $type,
@@ -341,9 +363,11 @@ class ExpenseSheetController extends Controller
                 'google_distance' => $googleDistance,
                 'route' => $route,
                 'total' => $total,
-                'date' => $date,  // Enregistrement de la date
+                'date' => $date,
+                'requirements' => json_encode($requirements),
             ]);
 
+            // Ajout des étapes pour le type "km"
             if ($type === 'km') {
                 foreach ($steps as $index => $address) {
                     $createdCost->steps()->create([
@@ -356,11 +380,11 @@ class ExpenseSheetController extends Controller
             $globalTotal += $total;
         }
 
+        // Mettre à jour le total global
         $expenseSheet->update(['total' => $globalTotal]);
 
         return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
     }
-
 
     /**
      * Remove the specified resource from storage.

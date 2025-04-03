@@ -33,3 +33,31 @@ export const getActiveRate = (cost, date) => {
 
     return activeRate ? activeRate.value : 'N/A';
 };
+
+export const getStatusLabel = (expenseSheet) => {
+    if (expenseSheet.approved == true) {
+        return {
+            label: 'Approuvée',
+            variant: 'success'
+        };
+    }
+    if (expenseSheet.approved == false) {
+        return {
+            label: 'Rejetée',
+            variant: 'destructive'
+        };
+    }
+    // Vérifiez si le statut est indéfini ou nul
+    if (expenseSheet.approved === null || expenseSheet.approved === undefined) {
+        return {
+            label: 'En attente',
+            variant: 'outline'
+        };
+    }
+
+    // Par défaut (si aucun des cas précédents ne s'applique)
+    return {
+        label: 'Statut inconnu',
+        variant: 'secondary'
+    };
+};

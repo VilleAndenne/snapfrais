@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -21,6 +20,7 @@ return new class extends Migration
             $table->json('route')->nullable(); // itinéraire complet
             $table->json('requirements')->nullable(); // JSON des besoins
             $table->decimal('total', 10, 2); // montant du remboursement
+            $table->decimal('amount', 10, 2)->nullable(); // montant de la dépense
             $table->date('date');
             $table->timestamps();
         });

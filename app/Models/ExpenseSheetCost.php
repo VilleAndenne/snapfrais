@@ -15,6 +15,7 @@ class ExpenseSheetCost extends Model
         'route',
         'requirements',
         'total',
+        'amount',
         'date',
     ];
 
