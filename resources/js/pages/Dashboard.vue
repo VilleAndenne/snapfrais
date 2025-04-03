@@ -90,19 +90,20 @@ const goToForm = (formId) => {
                             {{ sheet.total.toFixed(2) + ' €' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <Badge
-                        :variant="getStatusLabel(sheet).variant"
-                    >
-                        {{getStatusLabel(sheet).label}}
-                    </Badge>
+                            <Badge
+                                :variant="getStatusLabel(sheet).variant"
+                            >
+                                {{ getStatusLabel(sheet).label }}
+                            </Badge>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {{ new Date(sheet.created_at).toLocaleDateString('fr-FR') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                            <Link :href="'/expense-sheet/' + sheet.id"
-                                  class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                Voir la note de frais
+                            <Link :href="'/expense-sheet/' + sheet.id">
+                                <Button variant="secondary">
+                                    Voir
+                                </Button>
                             </Link>
                         </td>
                     </tr>
