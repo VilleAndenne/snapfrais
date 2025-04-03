@@ -101,7 +101,7 @@ const goToForm = (formId) => {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                             <Link :href="'/expense-sheet/' + sheet.id">
-                                <Button variant="secondary">
+                                <Button variant="outline">
                                     Voir
                                 </Button>
                             </Link>
