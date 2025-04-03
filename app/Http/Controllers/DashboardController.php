@@ -14,7 +14,7 @@ class DashboardController extends Controller
 
         return inertia('Dashboard', [
             'forms' => $forms,
-            'expenseSheets' => ExpenseSheet::with('form', 'costs')->get(),
+            'expenseSheets' => ExpenseSheet::with('form', 'costs')->orderBy('created_at', 'desc')->get(),
         ]);
     }
 }
