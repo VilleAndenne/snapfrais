@@ -43,12 +43,12 @@ const footerNavItems: NavItem[] = [
     {
         title: 'Github Repo',
         href: 'https://github.com/VilleAndenne/snapfrais',
-        icon: Folder
+        icon: Folder,
     },
     {
         title: 'Documentation',
         href: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen
+        icon: BookOpen,
     }
 ];
 </script>
