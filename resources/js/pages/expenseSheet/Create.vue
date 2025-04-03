@@ -120,7 +120,7 @@ import CostPicker from '@/components/expense/CostPicker.vue';
 import KmCostInput from '@/components/expense/KmCostInput.vue';
 import FixedCostDisplay from '@/components/expense/FixedCostDisplay.vue';
 import PercentageCostInput from '@/components/expense/PercentageCostInput.vue';
-import CostrequirementInput from '@/components/expense/require.vue';
+import CostrequirementInput from '@/components/expense/CostRequirementInput.vue';
 
 const costs = ref([]);
 const selectedCosts = ref([]);
