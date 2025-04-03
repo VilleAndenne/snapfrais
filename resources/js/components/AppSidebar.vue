@@ -2,27 +2,40 @@
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem
+} from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Library, Users } from 'lucide-vue-next';
+import { BookOpen, Building2, Folder, LayoutGrid, Library, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Tableau de bord',
         href: '/dashboard',
-        icon: LayoutGrid,
+        icon: LayoutGrid
     },
     {
         title: 'Formulaires',
         href: '/forms',
-        icon: Library,
+        icon: Library
+    },
+    {
+        title: 'Utilisateurs',
+        href: '/users',
+        icon: Users
     },
     {
         title: 'Départements',
         href: '/departments',
-        icon: Users,
+        icon: Building2
     }
 ];
 
@@ -30,13 +43,13 @@ const footerNavItems: NavItem[] = [
     {
         title: 'Github Repo',
         href: 'https://github.com/VilleAndenne/snapfrais',
-        icon: Folder,
+        icon: Folder
     },
     {
         title: 'Documentation',
         href: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen,
-    },
+        icon: BookOpen
+    }
 ];
 </script>
 

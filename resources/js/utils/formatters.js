@@ -38,7 +38,7 @@ export const getStatusLabel = (expenseSheet) => {
     if (expenseSheet.approved == true) {
         return {
             label: 'Approuvée',
-            variant: 'success'
+            variant: 'primary'
         };
     }
     if (expenseSheet.approved == false) {
