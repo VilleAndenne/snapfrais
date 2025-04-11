@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ExpenseSheet;
 use App\Models\Form;
 use App\Models\FormCost;
+use App\Notifications\ApprovalExpenseSheet;
 use App\Notifications\ReceiptExpenseSheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -413,9 +414,14 @@ class ExpenseSheetController extends Controller
 
         $expenseSheet->approved = $validated['approval'];
         $expenseSheet->refusal_reason = $validated['reason'] ?? null;
+        $expenseSheet->validated_by = auth()->id();
         $expenseSheet->validated_at = now();
         $expenseSheet->validated_by = auth()->id();
         $expenseSheet->save();
+
+        if ($validated['approval']) {
+            $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
+        }
 
         return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
     }

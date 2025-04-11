@@ -16,8 +16,8 @@ class ExpenseSheet extends Model
         'status',
         'form_id',
         'department_id',
-        'approved_by',
-        'approved_at',
+        'validated_by',
+        'validated_at',
         'approved',
         'refusal_reason',
     ];
@@ -59,5 +59,10 @@ class ExpenseSheet extends Model
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(User::class, 'validated_by');
     }
 }
