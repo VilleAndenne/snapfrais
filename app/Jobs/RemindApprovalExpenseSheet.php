@@ -27,7 +27,7 @@ class RemindApprovalExpenseSheet implements ShouldQueue
         $users = User::all();
 
         foreach ($users as $user) {
-            // Count the number of pending expense sheets to validate for the user
+            // TODO: Count the number of pending expense sheets to validate for the user
         }
 
     }
