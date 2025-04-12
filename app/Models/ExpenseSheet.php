@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\CostCast;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ExpenseSheet extends Model
@@ -22,16 +23,20 @@ class ExpenseSheet extends Model
         'refusal_reason',
     ];
 
-    // Add global scopes to the model
-    protected static function boot()
+    protected static function booted()
     {
-        parent::boot();
-        static::addGlobalScope('canView', function ($query) {
+        static::addGlobalScope('canView', function (Builder $builder) {
             $user = auth()->user();
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('department', function ($q) use ($user) {
-                    $q->where('manager_id', $user->id);
-                })->orWhere('user_id', $user->id);
+
+            if (!$user) {
+                return;
+            }
+
+            $builder->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id) // propriétaire
+                ->orWhereHas('department.heads', function ($q) use ($user) {
+                    $q->where('users.id', $user->id); // est chef du département
+                });
             });
         });
     }

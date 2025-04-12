@@ -9,6 +9,7 @@ use App\Notifications\ApprovalExpenseSheet;
 use App\Notifications\ReceiptExpenseSheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 
@@ -142,7 +143,7 @@ class ExpenseSheetController extends Controller
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
                         // Stockage du fichier
-                        $path = $requirement['file']->store('requirements', 'public');
+                        $path = Storage::putFile('requirements', $requirement['file']);
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
@@ -347,7 +348,7 @@ class ExpenseSheetController extends Controller
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if ($requirement instanceof \Illuminate\Http\UploadedFile) {
                         // C'est un fichier, on le stocke
-                        $path = $requirement->store('requirements', 'public');
+                        $path = Storage::put('requirements', $requirement);
                         $requirements[$key] = $path;
                     } elseif (is_string($requirement)) {
                         // C'est du texte ou autre
