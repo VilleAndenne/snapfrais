@@ -1,17 +1,19 @@
 <template>
-  <input
+  <Input
+    ref="inputWrapper"
+    v-model="internalValue"
+    class="w-full"
     type="text"
-    ref="inputRef"
-    :value="modelValue"
-    @input="onInput"
-    class="input w-full"
     placeholder="Commencez à taper une adresse..."
   />
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { loadGoogleMaps } from "@/utils/googleMapsService";
+import Input from "../ui/input/Input.vue";
+
+const inputWrapper = ref(null);
 
 const props = defineProps({
   modelValue: String,
@@ -19,25 +21,34 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
-const inputRef = ref(null);
-let autocomplete = null;
+// Internal mirror of modelValue
+const internalValue = ref(props.modelValue || "");
 
-const onInput = (e) => {
-  emit("update:modelValue", e.target.value);
-};
+// Sync vers parent
+watch(internalValue, (val) => {
+  emit("update:modelValue", val);
+});
+
+// Si le parent change la valeur externement
+watch(() => props.modelValue, (val) => {
+  internalValue.value = val;
+});
 
 onMounted(async () => {
   const google = await loadGoogleMaps();
 
-  autocomplete = new google.maps.places.Autocomplete(inputRef.value, {
+  const inputElement = inputWrapper.value?.$el;
+  if (!inputElement) return;
+
+  const autocomplete = new google.maps.places.Autocomplete(inputElement, {
     types: ["geocode"],
-    componentRestrictions: { country: "be" }, // 🇧🇪 si tu veux restreindre à la Belgique
+    componentRestrictions: { country: "be" },
   });
 
   autocomplete.addListener("place_changed", () => {
     const place = autocomplete.getPlace();
     if (place && place.formatted_address) {
-      emit("update:modelValue", place.formatted_address);
+      internalValue.value = place.formatted_address;
     }
   });
 });

@@ -3,7 +3,7 @@
         <Head title="Nouvelle note de frais" />
 
         <div class="container mx-auto p-4 space-y-6">
-            <h1 class="text-2xl font-semibold">Créer une note de frais</h1>
+            <h1 class="text-2xl font-semibold text-foreground">Créer une note de frais</h1>
 
             <!-- Sélection du département -->
             <div class="flex items-center space-x-4">
@@ -13,7 +13,11 @@
                         <SelectValue placeholder="Sélectionner un département" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem v-for="dep in props.departments" :key="dep.id" :value="dep.id">
+                        <SelectItem
+                            v-for="dep in props.departments"
+                            :key="dep.id"
+                            :value="dep.id"
+                        >
                             {{ dep.name }}
                         </SelectItem>
                     </SelectContent>
@@ -21,13 +25,13 @@
             </div>
 
             <!-- Coûts ajoutés -->
-            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t">
-                <h2 class="text-lg font-medium">Votre demande</h2>
+            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t border-border">
+                <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-4 border rounded space-y-4 bg-white relative"
+                    class="p-4 border border-border rounded bg-card text-card-foreground relative space-y-4"
                 >
                     <!-- Bouton de suppression -->
                     <Button
@@ -42,9 +46,9 @@
                     <!-- Détails du coût -->
                     <div class="flex justify-between items-center">
                         <h3 class="text-xl font-bold">{{ cost.name }}</h3>
-                        <span class="text-sm italic text-muted">{{ cost.type }}</span>
+                        <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
-                    <p class="text-sm text-gray-600">{{ cost.description }}</p>
+                    <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
                     <!-- Champ de date -->
                     <div class="mt-2">
@@ -52,7 +56,7 @@
                         <input
                             type="date"
                             v-model="costData[index].date"
-                            class="border rounded p-2 w-full"
+                            class="border border-border rounded p-2 w-full bg-background text-foreground"
                             @change="updateRate(index, cost)"
                         />
                     </div>
@@ -79,8 +83,8 @@
 
             <!-- Coûts disponibles -->
             <div>
-                <h2 class="text-lg font-medium mb-2">Types de coûts disponibles</h2>
-                <p class="text-sm text-gray-600 mb-4">
+                <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
+                <p class="text-sm text-muted-foreground mb-4">
                     Coûts ajoutés : {{ selectedCosts.length }}/7
                 </p>
                 <CostPicker

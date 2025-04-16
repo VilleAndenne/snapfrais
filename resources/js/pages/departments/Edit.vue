@@ -1,5 +1,6 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <Head title="Modifier le département" />
         <div class="p-6 space-y-6">
             <header class="flex items-center justify-between">
                 <h2 class="text-2xl font-semibold tracking-tight">Modifier le département</h2>
@@ -30,31 +31,42 @@
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
-                        <!-- Département parent -->
-                        <div class="space-y-2">
-                            <Label for="parent">Service supérieur</Label>
-                            <div class="relative">
-                                <select
-                                    id="parent"
-                                    v-model="form.parent_id"
-                                    class="w-full h-10 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                    :class="{ 'border-destructive': form.errors.parent_id }"
-                                >
-                                    <option :value="null">Aucun (département racine)</option>
-                                    <option
-                                        v-for="dept in availableParentDepartments"
-                                        :key="dept.id"
-                                        :value="dept.id"
-                                    >
-                                        {{ dept.name }}
-                                    </option>
-                                </select>
-                            </div>
-                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">{{ form.errors.parent_id }}</p>
-                            <p class="text-sm text-muted-foreground">
-                                Laissez vide si ce département est au plus haut niveau de la hiérarchie.
-                            </p>
-                        </div>
+<!-- Département parent -->
+<div class="space-y-2">
+    <Label for="parent">Service supérieur</Label>
+
+    <Select v-model="form.parent_id">
+        <SelectTrigger
+            id="parent"
+            class="w-full"
+            :class="{ 'border-destructive': form.errors.parent_id }"
+        >
+            <SelectValue
+                :placeholder="'Aucun (département racine)'"
+                :defaultValue="form.parent_id"
+            />
+        </SelectTrigger>
+
+        <SelectContent>
+            <SelectItem :value="'null'">Aucun (département racine)</SelectItem>
+            <SelectItem
+                v-for="dept in availableParentDepartments"
+                :key="dept.id"
+                :value="String(dept.id)"
+            >
+                {{ dept.name }}
+            </SelectItem>
+        </SelectContent>
+    </Select>
+
+    <p v-if="form.errors.parent_id" class="text-sm text-destructive">
+        {{ form.errors.parent_id }}
+    </p>
+    <p class="text-sm text-muted-foreground">
+        Laissez vide si ce département est au plus haut niveau de la hiérarchie.
+    </p>
+</div>
+
 
                         <!-- Liste des utilisateurs -->
                         <div class="space-y-4">
@@ -157,7 +169,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, Head } from '@inertiajs/vue3';
 import {
     ArrowLeftIcon,
     SearchIcon,
@@ -190,6 +202,16 @@ import {
     AvatarFallback
 } from '@/components/ui/avatar';
 import AppLayout from '@/layouts/AppLayout.vue';
+import Select from '@/components/ui/select/Select.vue';
+import SelectTrigger from '@/components/ui/select/SelectTrigger.vue';
+import SelectValue from '@/components/ui/select/SelectValue.vue';
+import SelectContent from '@/components/ui/select/SelectContent.vue';
+import SelectItem from '@/components/ui/select/SelectItem.vue';
+
+const breadcrumbs = [
+    { title: 'Départements', href: route('departments.index') },
+    { title: 'Modifier le département' }
+];
 
 // Props
 const props = defineProps({
