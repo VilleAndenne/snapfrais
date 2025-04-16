@@ -36,7 +36,7 @@ class ExpenseSheetCost extends Model
 
     public function steps()
     {
-        return $this->hasMany(ExpenseSheetStep::class)->orderBy('order');
+        //
     }
 
 }
