@@ -194,7 +194,7 @@ class ExpenseSheetController extends Controller
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
         return Inertia::render('expenseSheet/Show', [
-            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']),
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates']),
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canEdit' => $canEdit,
