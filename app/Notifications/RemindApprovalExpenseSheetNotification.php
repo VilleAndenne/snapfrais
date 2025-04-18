@@ -44,7 +44,8 @@ class RemindApprovalExpenseSheetNotification extends Notification
             ->greeting('Bonjour,')
             ->line('Vous avez encore ' . $this->count . ' note(s) de frais à valider.')
             ->action('Voir les notes de frais', url('/dashboard'))
-            ->line('Merci de traiter ces demandes dès que possible.');
+            ->line('Merci de traiter ces demandes dès que possible.')
+            ->salutation('Bien cordialement,');
     }
 
     /**
