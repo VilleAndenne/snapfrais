@@ -2,5 +2,6 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-\Illuminate\Support\Facades\Schedule::job(\App\Jobs\RemindApprovalExpenseSheet::class)->daily();
+Schedule::job(new App\Jobs\RemindApprovalExpenseSheet)->everyMinute();
