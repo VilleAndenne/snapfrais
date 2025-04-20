@@ -217,7 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -310,9 +310,7 @@ const approveExpenseSheet = () => {
 };
 
 const editExpenseSheet = () => {
-    // Implement edit logic here
-    console.log('Editing expense sheet', props.expenseSheet.id);
-    // You might want to navigate to an edit page or open a modal
+    router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
 
 // Existing methods for printing and downloading
