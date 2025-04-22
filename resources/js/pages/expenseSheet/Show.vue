@@ -5,7 +5,7 @@
         <div class="container mx-auto p-4 space-y-6">
             <div class="flex justify-between items-start">
                 <div>
-                    <h1 class="text-2xl font-semibold">Note de frais #{{ expenseSheet.id }}</h1>
+                    <h1 class="text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
                     <p class="text-sm text-muted-foreground">
                         Créée le {{ formatDate(expenseSheet.created_at) }}
                     </p>
@@ -50,7 +50,7 @@
             </div>
 
             <!-- Informations générales -->
-            <Card>
+            <Card class="bg-card text-card-foreground">
                 <CardHeader>
                     <CardTitle>Informations générales</CardTitle>
                 </CardHeader>
@@ -74,7 +74,7 @@
             </Card>
 
             <!-- Détails des coûts -->
-            <Card>
+            <Card class="bg-card text-card-foreground">
                 <CardHeader>
                     <CardTitle>Détails des coûts</CardTitle>
                 </CardHeader>
@@ -83,15 +83,15 @@
                         <div
                             v-for="(cost, index) in expenseSheet.costs"
                             :key="index"
-                            class="p-4 border rounded space-y-4 bg-white"
+                            class="p-4 border rounded space-y-4 bg-background"
                         >
                             <div class="flex justify-between items-center">
-                                <h3 class="text-xl font-bold">{{ cost.form_cost.name }}</h3>
+                                <h3 class="text-xl font-bold text-foreground">{{ cost.form_cost.name }}</h3>
                                 <span
                                     class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }} / {{ cost.type
                                     }}</span>
                             </div>
-                            <p class="text-sm text-gray-600">{{ cost.description }}</p>
+                            <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
                             <!-- Date du coût -->
                             <div class="flex items-center gap-2">
@@ -146,18 +146,18 @@
                                     <li
                                         v-for="(requirement, key) in parseRequirements(cost.requirements)"
                                         :key="key"
-                                        class="text-gray-800"
+                                        class="text-foreground"
                                     >
                                         <span class="font-semibold">{{ key }} :</span>
                                         <span v-if="requirement.file">
-                                <a
-                                    :href="getFileUrl(requirement.file)"
-                                    target="_blank"
-                                    class="text-blue-600 underline"
-                                >
-                                    Visualiser le fichier
-                                </a>
-                            </span>
+                                            <a
+                                                :href="getFileUrl(requirement.file)"
+                                                target="_blank"
+                                                class="text-primary underline"
+                                            >
+                                                Visualiser le fichier
+                                            </a>
+                                        </span>
                                         <span v-else>{{ requirement.value }}</span>
                                     </li>
                                 </ul>
@@ -217,7 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -310,9 +310,7 @@ const approveExpenseSheet = () => {
 };
 
 const editExpenseSheet = () => {
-    // Implement edit logic here
-    console.log('Editing expense sheet', props.expenseSheet.id);
-    // You might want to navigate to an edit page or open a modal
+    router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
 
 // Existing methods for printing and downloading

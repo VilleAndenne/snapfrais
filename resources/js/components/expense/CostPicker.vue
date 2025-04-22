@@ -1,5 +1,5 @@
 <script setup>
-import {Button} from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps({
   availableCosts: Array,
@@ -22,15 +22,15 @@ const addCost = (cost) => {
     <div
       v-for="(cost, index) in availableCosts"
       :key="index"
-      class="border rounded-lg p-4 shadow-sm space-y-2 bg-white"
+      class="border border-border rounded-lg p-4 shadow-sm space-y-2 bg-card text-card-foreground"
     >
       <div class="flex justify-between items-center">
         <h3 class="text-lg font-semibold">{{ cost.name }}</h3>
-        <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">
+        <span class="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground capitalize">
           {{ cost.type }}
         </span>
       </div>
-      <p class="text-sm text-gray-600">{{ cost.description }}</p>
+      <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
       <div class="flex justify-end">
         <Button size="sm" @click="addCost(cost)">

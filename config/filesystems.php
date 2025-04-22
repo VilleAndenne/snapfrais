@@ -32,19 +32,33 @@ return [
 
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app/private'),
-            'serve' => true,
-            'throw' => false,
-            'report' => false,
+            'root' => storage_path('app/public'),
+            'url' => env('APP_URL') . '/storage',
+            'visibility' => 'public',
+        ],
+        'public' => [
+            'driver' => env('FILESYSTEM_DISK', 'local') === 'local' ? 'local' : 's3',
+            'key' => env('LARAVEL_CLOUD_ACCESS_KEY_ID'),
+            'secret' => env('LARAVEL_CLOUD_ACCESS_KEY_SECRET'),
+            'region' => env('LARAVEL_CLOUD_REGION', 'auto'),
+            'bucket' => env('LARAVEL_CLOUD_BUCKET'),
+            'url' => env('LARAVEL_CLOUD_URL'),
+            'endpoint' => env('LARAVEL_CLOUD_ENDPOINT'),
+            'use_path_style_endpoint' => env('LARAVEL_CLOUD_USE_PATH_STYLE_ENDPOINT', false),
+            'root' => 'app/public',
+            'visibility' => 'public',
         ],
 
-        'public' => [
-            'driver' => 'local',
-            'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+        'laravel_cloud' => [
+            'driver' => 's3',
+            'key' => env('LARAVEL_CLOUD_ACCESS_KEY_ID'),
+            'secret' => env('LARAVEL_CLOUD_ACCESS_KEY_SECRET'),
+            'region' => env('LARAVEL_CLOUD_REGION', 'auto'),
+            'bucket' => env('LARAVEL_CLOUD_BUCKET'),
+            'url' => env('LARAVEL_CLOUD_URL'),
+            'endpoint' => env('LARAVEL_CLOUD_ENDPOINT'),
+            'use_path_style_endpoint' => env('LARAVEL_CLOUD_USE_PATH_STYLE_ENDPOINT', false),
             'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
         ],
 
         's3' => [
@@ -57,7 +71,6 @@ return [
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
-            'report' => false,
         ],
 
     ],

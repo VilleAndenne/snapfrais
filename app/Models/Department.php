@@ -21,7 +21,13 @@ class Department extends Model
         return $this->belongsToMany(User::class, 'department_user', 'department_id', 'user_id')->wherePivot('is_head', true);
     }
 
-    public function parent(){
+    public function parent()
+    {
         return $this->belongsTo(Department::class, 'parent_id');
+    }
+
+    public function expenseSheets()
+    {
+        return $this->hasMany(ExpenseSheet::class);
     }
 }

@@ -24,7 +24,7 @@
 
     <!-- Arrivée -->
     <div>
-      <label class="block font-medium text-sm mb-1">Adresse d’arrivée</label>
+      <label class="block font-medium text-sm mb-1">Adresse d'arrivée</label>
       <GoogleAddressInput v-model="arrival" />
     </div>
 
@@ -95,6 +95,18 @@ const removeStep = (i) => steps.value.splice(i, 1)
 
 let directionsService = null
 
+// Initialisation des valeurs depuis les props
+watch(() => props.modelValue, (newValue) => {
+  if (newValue) {
+    departure.value = newValue.departure || newValue.route?.departure || ""
+    arrival.value = newValue.arrival || newValue.route?.arrival || ""
+    steps.value = newValue.steps || []
+    manualKm.value = Number(newValue.manualKm || newValue.route?.manual_km || 0)
+    justification.value = newValue.justification || newValue.route?.justification || ""
+    googleKm.value = Number(newValue.route?.google_km || 0)
+  }
+}, { immediate: true })
+
 onMounted(async () => {
   const google = await loadGoogleMaps()
   directionsService = new google.maps.DirectionsService()
@@ -113,7 +125,6 @@ watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
     departure: departure.value,
     arrival: arrival.value,
     steps: steps.value.filter(e => e),
-    googleKm: googleKm.value,
     manualKm: manualKm.value,
     justification: manualKm.value !== 0 ? justification.value : null,
     totalKm: totalKm.value

@@ -1,5 +1,6 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <Head title="Créer un département" />
         <div class="p-6 space-y-6">
             <header class="flex items-center justify-between">
                 <h2 class="text-2xl font-semibold tracking-tight">Créer un département</h2>
@@ -21,61 +22,48 @@
                         <!-- Nom du département -->
                         <div class="space-y-2">
                             <Label for="name">Nom du département</Label>
-                            <Input
-                                id="name"
-                                v-model="form.name"
-                                placeholder="Nom du département"
-                                :class="{ 'border-destructive': form.errors.name }"
-                            />
+                            <Input id="name" v-model="form.name" placeholder="Nom du département"
+                                :class="{ 'border-destructive': form.errors.name }" />
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
                         <!-- Département parent -->
                         <div class="space-y-2">
                             <Label for="parent">Service supérieur</Label>
-                            <div class="relative">
-                                <select
-                                    id="parent"
-                                    v-model="form.parent_id"
-                                    class="w-full h-10 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                    :class="{ 'border-destructive': form.errors.parent_id }"
-                                >
-                                    <option :value="null">Aucun (département racine)</option>
-                                    <option
-                                        v-for="dept in props.departments"
-                                        :key="dept.id"
-                                        :value="dept.id"
-                                    >
+
+                            <Select v-model="form.parent_id">
+                                <SelectTrigger id="parent" class="w-full">
+                                    <SelectValue :placeholder="'Aucun (département racine)'"
+                                        :defaultValue="form.parent_id" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="null">Aucun (département racine)</SelectItem>
+                                    <SelectItem v-for="dept in props.departments" :key="dept.id" :value="dept.id">
                                         {{ dept.name }}
-                                    </option>
-                                </select>
-                            </div>
-                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">{{ form.errors.parent_id }}</p>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">{{ form.errors.parent_id }}
+                            </p>
                             <p class="text-sm text-muted-foreground">
                                 Laissez vide si ce département est au plus haut niveau de la hiérarchie.
                             </p>
                         </div>
+
 
                         <!-- Liste des utilisateurs -->
                         <div class="space-y-4">
                             <div class="flex items-center justify-between">
                                 <Label>Utilisateurs du département</Label>
                                 <div class="flex items-center gap-2">
-                                    <Input
-                                        v-model="userSearch"
-                                        placeholder="Rechercher un utilisateur..."
-                                        class="w-[200px]"
-                                    >
-                                        <template #leading>
-                                            <SearchIcon class="h-4 w-4 text-muted-foreground" />
-                                        </template>
+                                    <Input v-model="userSearch" placeholder="Rechercher un utilisateur..."
+                                        class="w-[200px]">
+                                    <template #leading>
+                                        <SearchIcon class="h-4 w-4 text-muted-foreground" />
+                                    </template>
                                     </Input>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        @click="toggleSelectAll"
-                                    >
+                                    <Button type="button" variant="outline" size="sm" @click="toggleSelectAll">
                                         {{ allSelected ? 'Désélectionner tout' : 'Sélectionner tout' }}
                                     </Button>
                                 </div>
@@ -96,15 +84,12 @@
                                         <TableBody>
                                             <TableRow v-for="user in filteredUsers" :key="user.id">
                                                 <TableCell>
-                                                    <Checkbox
-                                                        :id="`user-${user.id}`"
-                                                        :checked="isUserSelected(user.id)"
-                                                        @update:checked="toggleUser(user.id)"
-                                                    />
+                                                    <Checkbox :id="`user-${user.id}`" :checked="isUserSelected(user.id)"
+                                                        @update:checked="toggleUser(user.id)" />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Label :for="`user-${user.id}`"
-                                                           class="flex items-center gap-2 cursor-pointer">
+                                                        class="flex items-center gap-2 cursor-pointer">
                                                         <Avatar class="h-8 w-8">
                                                             <AvatarImage :src="user.avatar" :alt="user.name" />
                                                             <AvatarFallback>{{ getUserInitials(user.name) }}
@@ -117,12 +102,10 @@
                                                 <TableCell>{{ user.role }}</TableCell>
                                                 <TableCell>
                                                     <div class="flex justify-center">
-                                                        <Checkbox
-                                                            :id="`head-${user.id}`"
+                                                        <Checkbox :id="`head-${user.id}`"
                                                             :disabled="!isUserSelected(user.id)"
                                                             :checked="isUserHead(user.id)"
-                                                            @update:checked="toggleUserHead(user.id, $event)"
-                                                        />
+                                                            @update:checked="toggleUserHead(user.id, $event)" />
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -137,7 +120,8 @@
                             </Card>
                             <p v-if="form.errors.users" class="text-sm text-destructive">{{ form.errors.users }}</p>
                             <p class="text-sm text-muted-foreground">
-                                Cochez la case "Responsable" pour désigner un utilisateur comme responsable du département.
+                                Cochez la case "Responsable" pour désigner un utilisateur comme responsable du
+                                département.
                             </p>
                         </div>
 
@@ -163,6 +147,7 @@ import {
     SearchIcon,
     LoaderIcon
 } from 'lucide-vue-next';
+import { Head } from '@inertiajs/vue3';
 
 // Import explicite des composants shadcn/ui
 import { Button } from '@/components/ui/button';
@@ -190,6 +175,16 @@ import {
     AvatarFallback
 } from '@/components/ui/avatar';
 import AppLayout from '@/layouts/AppLayout.vue';
+import Select from '@/components/ui/select/Select.vue';
+import SelectTrigger from '@/components/ui/select/SelectTrigger.vue';
+import SelectValue from '@/components/ui/select/SelectValue.vue';
+import SelectContent from '@/components/ui/select/SelectContent.vue';
+import SelectItem from '@/components/ui/select/SelectItem.vue';
+
+const breadcrumbs = [
+    { title: 'Départements', href: route('departments.index') },
+    { title: 'Créer un département' }
+];
 
 // Props
 const props = defineProps({

@@ -34,10 +34,9 @@ class ExpenseSheetCost extends Model
         return $this->belongsTo(FormCost::class);
     }
 
-    public function steps()
-    {
-        return $this->hasMany(ExpenseSheetStep::class)->orderBy('order');
-    }
-
+    // public function steps()
+    // {
+    //     // In route array, you have a key called "steps" which is an array of objects
+    //     return collect($this->route)->pluck('steps')->flatten();
+    // }
 }
-

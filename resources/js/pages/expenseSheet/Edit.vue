@@ -38,9 +38,20 @@
                         <PercentageCostInput v-model="costData[index].percentageData" />
                     </div>
 
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700">Date du coût</label>
+                        <input 
+                            type="date" 
+                            v-model="costData[index].date"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            required
+                        />
+                    </div>
+
                     <CostRequierementInput
                         v-if="cost.requirements?.length"
-                        :requirements="cost.requierements"
+                        :requirements="cost.requirements"
+                        :existing-files="getExistingFiles(cost.requirements_data)"
                         v-model="costData[index].requirements"
                     />
                 </div>
@@ -103,17 +114,55 @@ const getActiveRate = (cost) => {
 };
 
 onMounted(() => {
+    console.log('Form costs:', props.form.costs);
+    console.log('Expense sheet costs:', props.expenseSheet.costs);
+    
     costs.value = props.form.costs;
     selectedCosts.value = props.expenseSheet.costs.map((item) => {
-        return costs.value.find((c) => c.id === item.cost_id);
+        const foundCost = costs.value.find((c) => c.id === item.cost_id);
+        if (!foundCost) {
+            console.warn('Cost not found:', item.cost_id);
+            return null;
+        }
+        return {
+            ...foundCost,
+            ...item
+        };
+    }).filter(Boolean);
+
+    costData.value = props.expenseSheet.costs.map((item) => {
+        let data = {};
+        if (item.type === 'km') {
+            data = {
+                departure: item.data.route?.departure || '',
+                arrival: item.data.route?.arrival || '',
+                steps: item.data.route?.steps || [],
+                manualKm: item.data.route?.manual_km || 0,
+                justification: item.data.route?.justification || '',
+            };
+        } else if (item.type === 'percentage') {
+            data = {
+                paidAmount: item.data.paidAmount || 0,
+                percentage: getActiveRate(item),
+                reimbursedAmount: item.total || 0,
+            };
+        } else if (item.type === 'fixed') {
+            data = {
+                amount: item.total || getActiveRate(item),
+            };
+        }
+
+        return {
+            kmData: item.type === 'km' ? data : {},
+            percentageData: item.type === 'percentage' ? data : { paidAmount: null, percentage: getActiveRate(item), reimbursedAmount: 0 },
+            fixedAmount: item.type === 'fixed' ? data.amount : getActiveRate(item),
+            requirements: item.requirements_data || {},
+            date: item.date || new Date().toISOString().split('T')[0],
+        };
     });
 
-    costData.value = props.expenseSheet.costs.map((item) => ({
-        kmData: item.type === 'km' ? item.data : {},
-        percentageData: item.type === 'percentage' ? item.data : { paidAmount: null, percentage: getActiveRate(item), reimbursedAmount: 0 },
-        fixedAmount: item.type === 'fixed' ? item.data.amount : getActiveRate(item),
-        requirements: item.requirements || {},
-    }));
+    console.log('Selected costs:', selectedCosts.value);
+    console.log('Cost data:', costData.value);
 });
 
 const addToRequest = (cost) => {
@@ -125,6 +174,7 @@ const addToRequest = (cost) => {
         percentageData: { paidAmount: null, percentage: getActiveRate(cost), reimbursedAmount: 0 },
         requirements: {},
         fixedAmount: getActiveRate(cost),
+        date: new Date().toISOString().split('T')[0],
     });
 };
 
@@ -134,23 +184,76 @@ const removeCost = (index) => {
 };
 
 const submit = () => {
-    form.costs = selectedCosts.value.map((cost, index) => ({
-        cost_id: cost.id,
-        data: cost.type === "km"
-            ? costData.value[index].kmData
-            : cost.type === "percentage"
-                ? costData.value[index].percentageData
-                : { amount: costData.value[index].fixedAmount },
-        requirements: costData.value[index].requirements,
-    }));
+    form.costs = selectedCosts.value.map((cost, index) => {
+        const data =
+            cost.type === 'km' ? costData.value[index].kmData :
+                cost.type === 'percentage' ? costData.value[index].percentageData :
+                    { amount: costData.value[index].fixedAmount };
+
+        const requirements = {};
+        if (costData.value[index].requirements) {
+            Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
+                if (req instanceof File) {
+                    requirements[reqId] = { file: req };
+                } else if (req !== null && req !== undefined && req !== '') {
+                    requirements[reqId] = { value: req };
+                }
+            });
+        }
+
+        return {
+            cost_id: cost.id,
+            date: costData.value[index].date,
+            data,
+            requirements
+        };
+    });
 
     form.put("/expense-sheet/" + props.expenseSheet.id, {
         onSuccess: () => {
-            alert("Note de frais mise à jour avec succès !");
+            window.location.href = '/dashboard';
         },
         onError: (errors) => {
-            console.error("Erreurs à la mise à jour :", errors);
+            alert("Une erreur est survenue lors de la mise à jour : " + Object.values(errors).join(', '));
         },
+        transform: (data) => {
+            const formData = new FormData();
+            formData.append('department_id', form.department_id);
+
+            data.costs.forEach((cost, index) => {
+                formData.append(`costs[${index}][cost_id]`, cost.cost_id);
+                formData.append(`costs[${index}][date]`, cost.date);
+
+                // Ajouter les données du coût
+                Object.entries(cost.data).forEach(([key, value]) => {
+                    formData.append(`costs[${index}][data][${key}]`, value);
+                });
+
+                // Ajouter les requirements correctement
+                if (cost.requirements) {
+                    Object.entries(cost.requirements).forEach(([reqId, req]) => {
+                        if (req.file instanceof File) {
+                            formData.append(`costs[${index}][requirements][${reqId}][file]`, req.file);
+                        } else if (req.value) {
+                            formData.append(`costs[${index}][requirements][${reqId}][value]`, req.value);
+                        }
+                    });
+                }
+            });
+
+            return formData;
+        }
     });
+};
+
+const getExistingFiles = (requirementsData) => {
+    if (!requirementsData) return {};
+    const files = {};
+    Object.entries(requirementsData).forEach(([key, value]) => {
+        if (value?.file) {
+            files[key] = value.file;
+        }
+    });
+    return files;
 };
 </script>

@@ -2,22 +2,25 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class RemindApprovalExpenseSheet extends Notification
+class RemindApprovalExpenseSheetNotification extends Notification
 {
     use Queueable;
 
     public int $count;
+    public User $user;
 
     /**
      * Create a new notification instance.
      */
-    public function __construct(int $count)
+    public function __construct(User $user, int $count)
     {
+        $this->user = $user;
         $this->count = $count;
     }
 
@@ -40,8 +43,9 @@ class RemindApprovalExpenseSheet extends Notification
             ->subject('Rappel : Notes de frais en attente de validation')
             ->greeting('Bonjour,')
             ->line('Vous avez encore ' . $this->count . ' note(s) de frais à valider.')
-            ->action('Voir les notes de frais', url('/expense-sheets/pending'))
-            ->line('Merci de traiter ces demandes dès que possible.');
+            ->action('Voir les notes de frais', url('/dashboard'))
+            ->line('Merci de traiter ces demandes dès que possible.')
+            ->salutation('Bien cordialement,');
     }
 
     /**

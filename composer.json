@@ -13,7 +13,9 @@
         "alexpechkarev/google-maps": "^12.0",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "3.0",
         "tightenco/ziggy": "^2.4"
     },
     "require-dev": {
