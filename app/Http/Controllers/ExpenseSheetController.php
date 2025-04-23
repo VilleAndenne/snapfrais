@@ -142,7 +142,7 @@ class ExpenseSheetController extends Controller
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = Storage::putFile('requirements', $requirement['file']);
+                        $path = Storage::putFile($requirement['file']);
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
@@ -219,7 +219,7 @@ class ExpenseSheetController extends Controller
             'department_id' => $expenseSheet->department_id,
             'costs' => $expenseSheet->costs->map(function ($cost) {
                 $requirementsData = json_decode($cost->requirements, true) ?? [];
-                
+
                 return [
                     'id' => $cost->form_cost_id,
                     'cost_id' => $cost->form_cost_id,
@@ -243,7 +243,7 @@ class ExpenseSheetController extends Controller
                 ];
             })->toArray(),
         ];
-        
+
 
         return Inertia::render('expenseSheet/Edit', [
             'form' => [
@@ -283,7 +283,7 @@ class ExpenseSheetController extends Controller
 
             // Mettre à jour les informations de la note de frais
             $expenseSheet->update([
-                'approved' => null, 
+                'approved' => null,
                 'status' => 'En attente',
             ]);
 
