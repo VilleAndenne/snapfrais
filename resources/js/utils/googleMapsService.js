@@ -4,17 +4,17 @@ let loaderInstance = null
 let isLoaded = false
 
 export const loadGoogleMaps = async () => {
-  if (isLoaded) return window.google
+    if (isLoaded) return window.google
 
-  if (!loaderInstance) {
-    loaderInstance = new Loader({
-      apiKey: import.meta.env.VITE_API_GOOGLE,
-      version: 'weekly',
-      libraries: ['places'],
-    })
-  }
+    if (!loaderInstance) {
+        loaderInstance = new Loader({
+            apiKey: import.meta.env.VITE_API_GOOGLE,
+            version: 'weekly',
+            libraries: ['places'],
+        })
+    }
 
-  await loaderInstance.load()
-  isLoaded = true
-  return window.google
+    await loaderInstance.load()
+    isLoaded = true
+    return window.google
 }
