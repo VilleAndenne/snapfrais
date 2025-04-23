@@ -6,7 +6,7 @@
 
             <!-- En-tête avec titre et bouton d'ajout -->
             <div class="flex items-center justify-between mb-4">
-                <Heading title="Formulaires" />
+                <h2 class="text-2xl font-semibold tracking-tight">Formulaires</h2>
                 <Button @click="addForm" class="flex items-center">
                     <PlusIcon class="mr-2 h-4 w-4" />
                     Ajouter un formulaire

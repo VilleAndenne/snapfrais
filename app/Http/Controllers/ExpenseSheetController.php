@@ -20,7 +20,9 @@ class ExpenseSheetController extends Controller
      */
     public function index()
     {
-        //
+        return Inertia::render('expenseSheet/Index', [
+            'expenseSheets' => ExpenseSheet::with('form', 'costs', 'department.heads', 'user')->orderBy('created_at', 'desc')->get(),
+        ]);
     }
 
     /**
