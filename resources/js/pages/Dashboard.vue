@@ -293,7 +293,7 @@ const getStatusIcon = (status) => {
                     <div class="text-sm text-foreground">{{ sheet.user?.name || 'Utilisateur inconnu' }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-semibold text-foreground">{{ sheet.total.toFixed(2) }} €</div>
+                    <div class="text-sm font-semibold text-foreground">{{ sheet.total }} €</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <Badge :variant="getStatusLabel(sheet).variant">
