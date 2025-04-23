@@ -7,14 +7,14 @@ import { Link } from '@inertiajs/vue3';
 import { Badge } from '@/components/ui/badge';
 import { getStatusLabel } from '../utils/formatters';
 import { ref, computed } from 'vue';
-import { 
-  FileText, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  ChevronRight, 
-  Eye, 
-  Filter, 
+import {
+  FileText,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  ChevronRight,
+  Eye,
+  Filter,
   Search,
   Calendar
 } from 'lucide-vue-next';
@@ -116,7 +116,7 @@ const getStatusIcon = (status) => {
         <div class="flex items-center justify-between">
           <h2 class="text-2xl font-bold">Formulaires disponibles</h2>
         </div>
-        
+
         <div class="grid auto-rows-min gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           <div v-for="form in forms" :key="form.id" @click="goToForm(form.id)"
             class="group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md">
@@ -166,7 +166,7 @@ const getStatusIcon = (status) => {
             {{ filteredExpenseSheets.length }} note(s)
           </Badge>
         </div>
-        
+
         <div class="rounded-xl border border-border bg-card overflow-hidden">
           <div v-if="filteredExpenseSheets.length > 0" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-border">
@@ -190,12 +190,12 @@ const getStatusIcon = (status) => {
                 </tr>
               </thead>
               <tbody class="divide-y divide-border bg-card">
-                <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" 
+                <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id"
                     class="hover:bg-muted/50 transition-colors">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
-                      <component :is="getStatusIcon(sheet.status)" 
-                                class="mr-2 h-5 w-5" 
+                      <component :is="getStatusIcon(sheet.status)"
+                                class="mr-2 h-5 w-5"
                                 :class="{
                                   'text-warning': sheet.status === 'pending',
                                   'text-success': sheet.status === 'approved',
@@ -206,7 +206,7 @@ const getStatusIcon = (status) => {
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-semibold text-card-foreground">{{ sheet.total.toFixed(2) }} €</div>
+                    <div class="text-sm font-semibold text-card-foreground">{{ sheet.total }} €</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <Badge :variant="getStatusLabel(sheet).variant">
@@ -247,7 +247,7 @@ const getStatusIcon = (status) => {
             {{ filteredExpenseToValidate.length }} en attente
           </Badge>
         </div>
-        
+
         <div class="rounded-xl border border-secondary/50 bg-secondary/10 overflow-hidden">
           <div v-if="filteredExpenseToValidate.length > 0" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-secondary/20">
@@ -274,12 +274,12 @@ const getStatusIcon = (status) => {
                 </tr>
               </thead>
               <tbody class="divide-y divide-secondary/20 bg-background/80">
-                <tr v-for="sheet in filteredExpenseToValidate" :key="sheet.id" 
+                <tr v-for="sheet in filteredExpenseToValidate" :key="sheet.id"
                     class="hover:bg-secondary/10 transition-colors">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
-                      <component :is="getStatusIcon(sheet.status)" 
-                                class="mr-2 h-5 w-5" 
+                      <component :is="getStatusIcon(sheet.status)"
+                                class="mr-2 h-5 w-5"
                                 :class="{
                                   'text-warning': sheet.status === 'pending',
                                   'text-success': sheet.status === 'approved',
