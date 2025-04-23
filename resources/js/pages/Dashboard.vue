@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +92,12 @@ const formatDate = (dateString) => {
   });
 };
 
+const approveExpenseSheet = (id) => {
+    useForm({
+        approval: true
+    }).post('/expense-sheet/' + id + '/approve');
+};
+
 const getStatusIcon = (status) => {
   switch (status) {
     case 'approved':
@@ -152,7 +158,7 @@ const getStatusIcon = (status) => {
           >
             <option value="all">Tous les statuts</option>
             <option value="pending">En attente</option>
-            <option value="approved">Approuvé</option>
+            <option value="approved">Approuvée</option>
             <option value="rejected">Rejeté</option>
           </select>
         </div>
@@ -308,10 +314,10 @@ const getStatusIcon = (status) => {
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div class="flex justify-end gap-2">
-                      <Link :href="'/expense-sheet/' + sheet.id + '/validate'" class="inline-flex items-center rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground shadow-sm hover:bg-secondary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary">
+                      <Button @click="approveExpenseSheet(sheet.id)" class="inline-flex items-center rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground shadow-sm hover:bg-secondary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary">
                         <CheckCircle class="mr-1.5 h-4 w-4" />
                         Valider
-                      </Link>
+                      </Button>
                       <Link :href="'/expense-sheet/' + sheet.id" class="inline-flex items-center rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground shadow-sm hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                         <Eye class="mr-1.5 h-4 w-4" />
                         Voir
