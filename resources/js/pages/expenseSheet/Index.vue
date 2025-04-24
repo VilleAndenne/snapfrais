@@ -48,10 +48,14 @@ const isFilterOpen = ref(false);
 // Fonctions utilitaires
 const getStatusIcon = (status) => {
     switch (status) {
-        case 'approved': return CheckCircle;
-        case 'pending': return Clock;
-        case 'rejected': return AlertTriangle;
-        default: return FileText;
+        case 'approved':
+            return CheckCircle;
+        case 'pending':
+            return Clock;
+        case 'rejected':
+            return AlertTriangle;
+        default:
+            return FileText;
     }
 };
 
@@ -241,7 +245,8 @@ const hasActiveFilters = computed(() => {
                     </tr>
                     </thead>
                     <tbody class="divide-y">
-                    <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
+                    <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id"
+                        class="hover:bg-muted/50 transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-center">
                                 <component :is="getStatusIcon(sheet.status)" class="mr-2 h-5 w-5" />
@@ -265,8 +270,8 @@ const hasActiveFilters = computed(() => {
                             {{ formatDate(sheet.created_at) }}
                         </td>
                         <td class="px-6 py-4 text-right text-sm">
-                            <Link :href="'/expense-sheet/' + sheet.id" class="bg-primary text-white px-3 py-1.5 rounded-md text-sm hover:bg-primary/90 transition-colors">
-                                Voir
+                            <Link :href="'/expense-sheet/' + sheet.id">
+                                <Button size="sm" variant="outline">Voir</Button>
                             </Link>
                         </td>
                     </tr>
