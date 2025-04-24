@@ -167,7 +167,7 @@ const getStatusIcon = (status) => {
       <!-- Mes notes de frais -->
       <section class="space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-2xl font-bold">Mes notes de frais</h2>
+          <h2 class="text-2xl font-bold">Mes notes de frais ce mois-ci</h2>
           <Badge variant="outline" class="px-3 py-1">
             {{ filteredExpenseSheets.length }} note(s)
           </Badge>
