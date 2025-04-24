@@ -45,6 +45,11 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
+                'can' => [
+                    'departments' => $request->user()?->can('viewAny', \App\Models\Department::class),
+                    'users' => $request->user()?->can('viewAny', \App\Models\User::class),
+                    'forms' => $request->user()?->can('viewAny', \App\Models\Form::class),
+                ]
             ],
             'ziggy' => [
                 ...(new Ziggy)->toArray(),

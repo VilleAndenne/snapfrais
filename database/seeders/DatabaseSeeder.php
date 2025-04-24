@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'admin@ac.andenne.be',
             'password' => bcrypt('password'),
+            'is_admin' => true,
         ]);
 
         $orga = Organization::create([

@@ -68,6 +68,18 @@
                     />
                 </div>
 
+                <div class="flex items-center space-x-2">
+                    <input
+                        id="is-admin"
+                        type="checkbox"
+                        v-model="form.is_admin"
+                        class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <label for="is-admin" class="text-sm font-medium text-foreground">
+                        Administrateur de l'application
+                    </label>
+                </div>
+
                 <!-- Boutons d'action -->
                 <div class="flex items-center gap-4 pt-4">
                     <Button
@@ -106,6 +118,7 @@ const form = useForm({
     email: '',
     password: '',
     password_confirmation: '',
+    is_admin: false,
 });
 
 // Définition des breadcrumbs pour la navigation

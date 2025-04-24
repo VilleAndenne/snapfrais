@@ -13,6 +13,9 @@ class UserController extends Controller
      */
     public function index()
     {
+        if (!auth()->user()->can('viewAny', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $users = User::query()
             ->when(request('search'), function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -32,6 +35,9 @@ class UserController extends Controller
      */
     public function create()
     {
+        if (!auth()->user()->can('create', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         return Inertia::render('users/Create');
     }
 
@@ -40,16 +46,21 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        if (!auth()->user()->can('create', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'is_admin' => 'boolean',
         ]);
 
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
+            'is_admin' => $validated['is_admin'] ?? false,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
@@ -68,6 +79,9 @@ class UserController extends Controller
      */
     public function edit(string $id)
     {
+        if (!auth()->user()->can('update', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $user = User::findOrFail($id);
 
         return Inertia::render('users/Edit', [
@@ -80,15 +94,20 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        if (!auth()->user()->can('update', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
             'password' => 'nullable|string|min:8|confirmed',
+            'is_admin' => 'boolean',
         ]);
 
         $user = User::findOrFail($id);
         $user->name = $validated['name'];
         $user->email = $validated['email'];
+        $user->is_admin = $validated['is_admin'] ?? false;
         if ($validated['password']) {
             $user->password = bcrypt($validated['password']);
         }

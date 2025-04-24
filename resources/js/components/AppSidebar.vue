@@ -16,6 +16,17 @@ import { Link } from '@inertiajs/vue3';
 import { BookOpen, Building2, FileText, Folder, LayoutGrid, Library, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const can = page.props.auth.can as {
+    departments: boolean;
+    users: boolean;
+    forms: boolean;
+    // Ajoute d'autres sections ici si tu veux gérer plus de droits
+};
+
+
 const mainNavItems: NavItem[] = [
     {
         title: 'Tableau de bord',
@@ -27,38 +38,34 @@ const mainNavItems: NavItem[] = [
         href: '/expense-sheet',
         icon: FileText
     },
-    // {
-    //     title: 'Rapports',
-    //     href: '/reports',
-    //     icon: Calendar
-    // },
-    {
+    ...(can.forms ? [{
         title: 'Formulaires',
         href: '/forms',
         icon: Library
-    },
-    {
+    }] : []),
+    ...(can.users ? [{
         title: 'Utilisateurs',
         href: '/users',
         icon: Users
-    },
-    {
+    }] : []),
+    ...(can.departments ? [{
         title: 'Départements',
         href: '/departments',
         icon: Building2
-    }
+    }] : [])
 ];
+
 
 const footerNavItems: NavItem[] = [
     {
         title: 'Github Repo',
         href: 'https://github.com/VilleAndenne/snapfrais',
-        icon: Folder,
+        icon: Folder
     },
     {
         title: 'Documentation',
         href: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen,
+        icon: BookOpen
     }
 ];
 </script>

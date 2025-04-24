@@ -13,6 +13,9 @@ class DepartmentController extends Controller
      */
     public function index()
     {
+        if (!auth()->user()->can('viewAny', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         return Inertia::render('departments/Index', [
             'departments' => Department::all(),
         ]);
@@ -24,6 +27,9 @@ class DepartmentController extends Controller
     public
     function create()
     {
+        if (!auth()->user()->can('create', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         return Inertia::render('departments/Create', [
             'users' => \App\Models\User::all(),
             'departments' => Department::all(),
@@ -36,6 +42,9 @@ class DepartmentController extends Controller
     public
     function store(Request $request)
     {
+        if (!auth()->user()->can('create', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $validated = $request->validate([
             'name' => 'required',
             'parent_id' => 'nullable',
@@ -75,6 +84,9 @@ class DepartmentController extends Controller
     public
     function edit(string $id)
     {
+        if (!auth()->user()->can('update', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         return Inertia::render('departments/Edit', [
             'department' => Department::with(['users' => function ($query) {
                 $query->withPivot('is_head');
@@ -90,6 +102,9 @@ class DepartmentController extends Controller
     public
     function update(Request $request, string $id)
     {
+        if (!auth()->user()->can('update', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         $validated = $request->validate([
             'name' => 'required',
             'parent_id' => 'nullable',
@@ -121,6 +136,9 @@ class DepartmentController extends Controller
     public
     function destroy(string $id)
     {
+        if (!auth()->user()->can('destroy', Department::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
         Department::destroy($id);
 
         return redirect()->route('departments.index');
