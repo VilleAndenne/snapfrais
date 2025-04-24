@@ -3,6 +3,7 @@
 use App\Http\Controllers\ExpenseSheetController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/expense-sheet', [ExpenseSheetController::class, 'index'])->name('expense-sheet.index')->middleware('auth');
 Route::get('/expense-sheet/{id}', [ExpenseSheetController::class, 'show'])->name('expense-sheet.show')->middleware('auth');
 Route::get('/expense-sheet/{id}/create', [ExpenseSheetController::class, 'create'])->name('expense-sheet.create')->middleware('auth');
 Route::post('/expense-sheet/{id}', [ExpenseSheetController::class, 'store'])->name('expense-sheet.create')->middleware('auth');
