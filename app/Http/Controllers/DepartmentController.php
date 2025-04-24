@@ -84,7 +84,7 @@ class DepartmentController extends Controller
     public
     function edit(string $id)
     {
-        if (!auth()->user()->can('update', Department::class)) {
+        if (!auth()->user()->can('update', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         return Inertia::render('departments/Edit', [
@@ -102,7 +102,7 @@ class DepartmentController extends Controller
     public
     function update(Request $request, string $id)
     {
-        if (!auth()->user()->can('update', Department::class)) {
+        if (!auth()->user()->can('update', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
@@ -136,7 +136,7 @@ class DepartmentController extends Controller
     public
     function destroy(string $id)
     {
-        if (!auth()->user()->can('destroy', Department::class)) {
+        if (!auth()->user()->can('destroy', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         Department::destroy($id);

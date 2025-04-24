@@ -79,7 +79,7 @@ class UserController extends Controller
      */
     public function edit(string $id)
     {
-        if (!auth()->user()->can('update', User::class)) {
+        if (!auth()->user()->can('update', User::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $user = User::findOrFail($id);
@@ -94,7 +94,7 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        if (!auth()->user()->can('update', User::class)) {
+        if (!auth()->user()->can('update', User::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
