@@ -108,11 +108,17 @@ const hasActiveFilters = computed(() => {
         dateEnd.value !== '';
 });
 
+const breadcrumbs = [
+    {
+        title: 'Feuilles de frais',
+        href: route('expense-sheet.index')
+    }
+];
 
 </script>
 
 <template>
-    <AppLayout title="Historique des notes de frais" description="Consultez l'historique de vos notes de frais.">
+    <AppLayout title="Historique des notes de frais" description="Consultez l'historique de vos notes de frais." :breadcrumbs="breadcrumbs">
         <Head title="Historique des notes de frais" />
 
         <div class="p-4 md:p-6 space-y-6">
