@@ -5,3 +5,5 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::job(new App\Jobs\RemindApprovalExpenseSheet)->everyMinute();
+
+Schedule::command('telescope:prune --hours=48')->daily();

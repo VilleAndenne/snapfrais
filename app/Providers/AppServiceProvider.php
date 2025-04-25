@@ -29,6 +29,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ExpenseSheet::class, ExpenseSheetPolicy::class);
         Gate::policy(Department::class, DepartmentPolicy::class);
 
+        if ($this->app->environment('local') && class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
+            $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
+            $this->app->register(TelescopeServiceProvider::class);
+        }
+
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
             return (new MailMessage())
                 ->subject('Vérifiez votre adresse email')
