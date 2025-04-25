@@ -48,13 +48,13 @@ const mainNavItems: NavItem[] = [
 
 const rightNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
+        title: 'Github repo',
+        href: 'https://github.com/VilleAndenne/snapfrais',
         icon: Folder,
     },
     {
         title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits',
+        href: 'https://github.com/VilleAndenne/snapfrais/wiki',
         icon: BookOpen,
     },
 ];

@@ -64,7 +64,7 @@ const footerNavItems: NavItem[] = [
     },
     {
         title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits',
+        href: 'https://github.com/VilleAndenne/snapfrais/wiki',
         icon: BookOpen
     }
 ];
