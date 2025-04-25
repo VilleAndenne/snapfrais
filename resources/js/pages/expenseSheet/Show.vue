@@ -108,10 +108,10 @@
                                         {{ cost.route.departure }}
                                     </li>
 
-                                    <li v-if="cost.steps && cost.steps.length > 0">
+                                    <li v-if="cost.route.steps && cost.route.steps.length > 0">
                                         <span class="font-semibold">Étapes :</span>
                                         <ul class="list-decimal pl-5">
-                                            <li v-for="(step, stepIndex) in cost.steps" :key="step.id">
+                                            <li v-for="(step, stepIndex) in cost.route.steps" :key="step.id">
                                                 {{ step.address }}
                                             </li>
                                         </ul>

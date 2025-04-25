@@ -27,6 +27,10 @@ class ExpenseSheet extends Model
         'route' => 'array',
     ];
 
+    protected $appends = [
+        'steps',
+    ];
+
 
     public function costs()
     {
@@ -51,5 +55,10 @@ class ExpenseSheet extends Model
     public function validatedBy()
     {
         return $this->belongsTo(User::class, 'validated_by');
+    }
+
+    public function getStepsAttribute()
+    {
+        return collect($this->route)->pluck('steps')->flatten();
     }
 }

@@ -135,6 +135,18 @@ class ExpenseSheetController extends Controller
                     'manual_km' => $manualKm,
                     'justification' => $data['justification'] ?? null,
                 ];
+
+                // In route, we can also save the steps if needed
+                if (count($steps) > 0) {
+                    $route['steps'] = [];
+                    foreach ($steps as $index => $address) {
+                        $route['steps'][] = [
+                            'address' => $address,
+                            'order' => $index + 1,
+                        ];
+                    }
+                }
+
             } elseif ($type === 'fixed') {
                 $total = round($rate->value, 2);
             } elseif ($type === 'percentage') {
@@ -168,15 +180,6 @@ class ExpenseSheetController extends Controller
                 'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
                 'expense_sheet_id' => $expenseSheet->id
             ]);
-
-            if ($type === 'km') {
-                foreach ($steps as $index => $address) {
-                    $createdCost->steps()->create([
-                        'address' => $address,
-                        'order' => $index + 1,
-                    ]);
-                }
-            }
 
             $globalTotal += $total;
         }
