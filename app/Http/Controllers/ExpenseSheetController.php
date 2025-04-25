@@ -147,7 +147,7 @@ class ExpenseSheetController extends Controller
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = Storage::putFile($requirement['file']);
+                        $path = Storage::url(Storage::putFile($requirement['file']));
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
