@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Department;
 use App\Models\ExpenseSheet;
+use App\Models\User;
 use App\Policies\DepartmentPolicy;
 use App\Policies\ExpenseSheetPolicy;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -33,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
             $this->app->register(TelescopeServiceProvider::class);
         }
+
+        Gate::define('viewPulse', function (User $user) {
+            return (bool)$user->is_admin;
+        });
 
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
             return (new MailMessage())
