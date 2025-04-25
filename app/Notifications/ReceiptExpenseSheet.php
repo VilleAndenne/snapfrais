@@ -39,6 +39,7 @@ class ReceiptExpenseSheet extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject('Nouvelle note de frais reçue')
+            ->greeting('Bonjour,')
             ->line('Nous avons bien reçu votre note de frais.')
             ->action('Voir la note de frais', url('/expense-sheet/' . $this->expenseSheet->id))
             ->line('Merci d\'utiliser notre application !')
