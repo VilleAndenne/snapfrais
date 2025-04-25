@@ -4,7 +4,7 @@
         ref="inputRef"
         :value="modelValue"
         @input="onInput"
-        class="input w-full"
+        class="form-input w-full rounded-md shadow-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
         placeholder="Commencez à taper une adresse..."
     />
 </template>
@@ -31,7 +31,7 @@ onMounted(async () => {
 
     autocomplete = new google.maps.places.Autocomplete(inputRef.value, {
         types: ['geocode'],
-        componentRestrictions: { country: 'be' } // 🇧🇪 si tu veux restreindre à la Belgique
+        componentRestrictions: { country: 'be' }
     })
 
     autocomplete.addListener('place_changed', () => {
