@@ -151,7 +151,7 @@
                                         <span class="font-semibold">{{ key }} :</span>
                                         <span v-if="requirement.file">
                                             <a
-                                                :href="getFileUrl(requirement.file)"
+                                                :href="requirement.file"
                                                 target="_blank"
                                                 class="text-primary underline"
                                             >
