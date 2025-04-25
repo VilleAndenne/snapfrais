@@ -3,6 +3,9 @@
         <Head :title="`Note de frais #${expenseSheet.id}`" />
 
         <div class="container mx-auto p-4 space-y-6">
+
+
+
             <div class="flex justify-between items-start">
                 <div>
                     <h1 class="text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
@@ -11,12 +14,13 @@
                     </p>
                 </div>
 
+
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-2 mr-2">
-                        <Button v-if="canEdit" variant="outline" size="sm" @click="editExpenseSheet">
-                            <PencilIcon class="h-4 w-4 mr-1" />
-                            Modifier
-                        </Button>
+                        <!--                        <Button v-if="canEdit" variant="outline" size="sm" @click="editExpenseSheet">-->
+                        <!--                            <PencilIcon class="h-4 w-4 mr-1" />-->
+                        <!--                            Modifier-->
+                        <!--                        </Button>-->
                         <Button v-if="canApprove" variant="success" size="sm" @click="approveExpenseSheet">
                             <CheckIcon class="h-4 w-4 mr-1" />
                             Approuver
@@ -48,6 +52,31 @@
                     </DropdownMenu>
                 </div>
             </div>
+
+            <!-- Bannière de refus moderne -->
+            <div v-if="expenseSheet.approved == false"
+                 class="bg-gradient-to-r from-destructive/10 to-destructive/5 border-l-4 border-destructive shadow-sm px-5 py-4 rounded-lg flex items-start gap-3 transition-all duration-200 hover:shadow-md">
+                <div class="bg-destructive/10 p-2 rounded-full flex-shrink-0">
+                    <AlertCircleIcon class="h-5 w-5 text-destructive" />
+                </div>
+                <div class="space-y-1.5">
+                    <h3 class="font-medium text-destructive flex items-center gap-2">
+                        Note de frais refusée
+                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-destructive/70 animate-pulse"></span>
+                    </h3>
+                    <div class="text-sm text-destructive/90 space-y-1">
+                        <p class="flex items-baseline gap-1.5">
+                            <span class="font-semibold">Refusée par :</span>
+                            <span>{{expenseSheet.validated_by.name}}</span>
+                        </p>
+                        <p class="flex items-baseline gap-1.5">
+                            <span class="font-semibold">Motif du refus :</span>
+                            <span>{{expenseSheet.refusal_reason}}</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
 
             <!-- Informations générales -->
             <Card class="bg-card text-card-foreground">
@@ -238,7 +267,8 @@ import {
     DownloadIcon,
     CheckIcon,
     XIcon,
-    PencilIcon
+    PencilIcon,
+    AlertCircleIcon
 } from 'lucide-vue-next';
 import { formatDate, formatCurrency, formatRate, getStatusLabel, getActiveRate } from '@/utils/formatters';
 import {
@@ -339,11 +369,6 @@ const parseRequirements = (requirements) => {
         console.error('Erreur lors du parsing des requirements:', e);
         return {};
     }
-};
-
-// Obtenir l'URL complète du fichier à partir du chemin
-const getFileUrl = (path) => {
-    return `/storage/${path}`;
 };
 
 </script>
