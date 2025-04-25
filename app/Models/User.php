@@ -134,5 +134,9 @@ class User extends Authenticatable
         return $subordonates->all();
     }
 
+    public function isHead()
+    {
+        return $this->departments()->where('is_head', true)->exists();
+    }
 
 }

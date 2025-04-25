@@ -29,10 +29,13 @@ class DashboardController extends Controller
             return $sheet->user_id === auth()->id();
         })->values();
 
+        $isHead = auth()->user()->isHead();
+
         return inertia('Dashboard', [
             'forms' => $forms,
             'expenseSheets' => $myExpenseSheets,
             'expenseToValidate' => $expenseToValidate,
+            'isHead' => $isHead,
         ]);
     }
 
