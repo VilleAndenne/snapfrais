@@ -69,6 +69,8 @@ class ExpenseSheetPolicy
     {
         if ($expenseSheet->user_id === $user->id) {
             return true;
+        } elseif ($user->is_admin === true) {
+            return true;
         }
         // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;
