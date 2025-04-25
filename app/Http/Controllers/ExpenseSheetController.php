@@ -38,7 +38,7 @@ class ExpenseSheetController extends Controller
 
         return inertia('expenseSheet/Create', [
             'form' => $form,
-            'departments' => auth()->user()->departments,
+            'departments' => auth()->user()->departments()->with('heads')->get(),
         ]);
     }
 
