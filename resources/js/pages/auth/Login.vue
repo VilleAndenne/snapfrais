@@ -30,7 +30,7 @@ const submit = () => {
 <template>
     <AuthBase title="Connectez-vous à votre compte"
               description="Ceci est une zone sécurisée de l'application. Veuillez vous connecter avant de continuer.">
-        <Head title="Log in" />
+        <Head title="Connexion" />
 
         <div v-if="status" class="mb-4 text-center text-sm font-medium text-green-600">
             {{ status }}
