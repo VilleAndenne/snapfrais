@@ -194,6 +194,9 @@ class ExpenseSheetController extends Controller
     public function show($id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
+        if (!auth()->user()->can('view', $expenseSheet)) {
+            abort(403);
+        }
         //        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
         $canApprove = auth()->user()->can('approve', $expenseSheet);
         $canReject = auth()->user()->can('reject', $expenseSheet);
@@ -212,6 +215,9 @@ class ExpenseSheetController extends Controller
     public function edit($id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
+        if (!auth()->user()->can('edit', $expenseSheet)) {
+            abort(403);
+        }
         // Charger tous les coûts disponibles avec leurs taux et prérequis
         $formCosts = FormCost::with(['reimbursementRates', 'requirements'])->get();
 
@@ -274,6 +280,9 @@ class ExpenseSheetController extends Controller
     public function update(Request $request, $id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
+        if (!auth()->user()->can('edit', $expenseSheet)) {
+            abort(403);
+        }
         $validated = $request->validate([
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',

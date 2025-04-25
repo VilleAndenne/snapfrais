@@ -23,24 +23,6 @@ class ExpenseSheet extends Model
         'refusal_reason',
     ];
 
-    protected static function booted()
-    {
-        static::addGlobalScope('canView', function (Builder $builder) {
-            $user = auth()->user();
-
-            if (!$user) {
-                return;
-            }
-
-            $builder->where(function ($query) use ($user) {
-                $query->where('user_id', $user->id) // propriétaire
-                ->orWhereHas('department.heads', function ($q) use ($user) {
-                    $q->where('users.id', $user->id); // est chef du département
-                });
-            });
-        });
-    }
-
     protected $casts = [
         'route' => 'array',
     ];
