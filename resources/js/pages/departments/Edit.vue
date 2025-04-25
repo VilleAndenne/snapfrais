@@ -31,41 +31,41 @@
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
-<!-- Département parent -->
-<div class="space-y-2">
-    <Label for="parent">Service supérieur</Label>
+                        <!-- Département parent -->
+                        <div class="space-y-2">
+                            <Label for="parent">Service supérieur</Label>
 
-    <Select v-model="form.parent_id">
-        <SelectTrigger
-            id="parent"
-            class="w-full"
-            :class="{ 'border-destructive': form.errors.parent_id }"
-        >
-            <SelectValue
-                :placeholder="'Aucun (département racine)'"
-                :defaultValue="form.parent_id"
-            />
-        </SelectTrigger>
+                            <Select v-model="form.parent_id">
+                                <SelectTrigger
+                                    id="parent"
+                                    class="w-full"
+                                    :class="{ 'border-destructive': form.errors.parent_id }"
+                                >
+                                    <SelectValue
+                                        :placeholder="'Aucun (département racine)'"
+                                        :defaultValue="form.parent_id"
+                                    />
+                                </SelectTrigger>
 
-        <SelectContent>
-            <SelectItem :value="'null'">Aucun (département racine)</SelectItem>
-            <SelectItem
-                v-for="dept in availableParentDepartments"
-                :key="dept.id"
-                :value="String(dept.id)"
-            >
-                {{ dept.name }}
-            </SelectItem>
-        </SelectContent>
-    </Select>
+                                <SelectContent>
+                                    <SelectItem :value="'null'">Aucun (département racine)</SelectItem>
+                                    <SelectItem
+                                        v-for="dept in availableParentDepartments"
+                                        :key="dept.id"
+                                        :value="String(dept.id)"
+                                    >
+                                        {{ dept.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
 
-    <p v-if="form.errors.parent_id" class="text-sm text-destructive">
-        {{ form.errors.parent_id }}
-    </p>
-    <p class="text-sm text-muted-foreground">
-        Laissez vide si ce département est au plus haut niveau de la hiérarchie.
-    </p>
-</div>
+                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">
+                                {{ form.errors.parent_id }}
+                            </p>
+                            <p class="text-sm text-muted-foreground">
+                                Laissez vide si ce département est au plus haut niveau de la hiérarchie.
+                            </p>
+                        </div>
 
 
                         <!-- Liste des utilisateurs -->
@@ -149,7 +149,8 @@
                             </Card>
                             <p v-if="form.errors.users" class="text-sm text-destructive">{{ form.errors.users }}</p>
                             <p class="text-sm text-muted-foreground">
-                                Cochez la case "Responsable" pour désigner un utilisateur comme responsable du département.
+                                Cochez la case "Responsable" pour désigner un utilisateur comme responsable du
+                                département.
                             </p>
                         </div>
 
@@ -240,7 +241,7 @@ const transformDepartmentUsers = () => {
         // Vérifier toutes les formes possibles de is_head
         const isHead = user.pivot?.is_head === 1 ||
             user.pivot?.is_head === true ||
-            user.pivot?.is_head === "1";
+            user.pivot?.is_head === '1';
 
         return {
             id: user.id,
@@ -322,14 +323,8 @@ const toggleUser = (userId) => {
 const toggleUserHead = (userId, isHead) => {
     const index = form.users.findIndex(user => user.id === userId);
     if (index !== -1) {
-        // Si on active un responsable, désactiver les autres
-        if (isHead) {
-            form.users.forEach(user => {
-                user.is_head = user.id === userId;
-            });
-        } else {
-            form.users[index].is_head = false;
-        }
+        // Permettre à plusieurs utilisateurs d'être responsables
+        form.users[index].is_head = isHead;
     }
 };
 

@@ -23,7 +23,7 @@
                         <div class="space-y-2">
                             <Label for="name">Nom du département</Label>
                             <Input id="name" v-model="form.name" placeholder="Nom du département"
-                                :class="{ 'border-destructive': form.errors.name }" />
+                                   :class="{ 'border-destructive': form.errors.name }" />
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
@@ -34,7 +34,7 @@
                             <Select v-model="form.parent_id">
                                 <SelectTrigger id="parent" class="w-full">
                                     <SelectValue :placeholder="'Aucun (département racine)'"
-                                        :defaultValue="form.parent_id" />
+                                                 :defaultValue="form.parent_id" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem :value="null">Aucun (département racine)</SelectItem>
@@ -58,10 +58,10 @@
                                 <Label>Utilisateurs du département</Label>
                                 <div class="flex items-center gap-2">
                                     <Input v-model="userSearch" placeholder="Rechercher un utilisateur..."
-                                        class="w-[200px]">
-                                    <template #leading>
-                                        <SearchIcon class="h-4 w-4 text-muted-foreground" />
-                                    </template>
+                                           class="w-[200px]">
+                                        <template #leading>
+                                            <SearchIcon class="h-4 w-4 text-muted-foreground" />
+                                        </template>
                                     </Input>
                                     <Button type="button" variant="outline" size="sm" @click="toggleSelectAll">
                                         {{ allSelected ? 'Désélectionner tout' : 'Sélectionner tout' }}
@@ -85,11 +85,11 @@
                                             <TableRow v-for="user in filteredUsers" :key="user.id">
                                                 <TableCell>
                                                     <Checkbox :id="`user-${user.id}`" :checked="isUserSelected(user.id)"
-                                                        @update:checked="toggleUser(user.id)" />
+                                                              @update:checked="toggleUser(user.id)" />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Label :for="`user-${user.id}`"
-                                                        class="flex items-center gap-2 cursor-pointer">
+                                                           class="flex items-center gap-2 cursor-pointer">
                                                         <Avatar class="h-8 w-8">
                                                             <AvatarImage :src="user.avatar" :alt="user.name" />
                                                             <AvatarFallback>{{ getUserInitials(user.name) }}
@@ -103,9 +103,9 @@
                                                 <TableCell>
                                                     <div class="flex justify-center">
                                                         <Checkbox :id="`head-${user.id}`"
-                                                            :disabled="!isUserSelected(user.id)"
-                                                            :checked="isUserHead(user.id)"
-                                                            @update:checked="toggleUserHead(user.id, $event)" />
+                                                                  :disabled="!isUserSelected(user.id)"
+                                                                  :checked="isUserHead(user.id)"
+                                                                  @update:checked="toggleUserHead(user.id, $event)" />
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -256,14 +256,8 @@ const toggleUser = (userId) => {
 const toggleUserHead = (userId, isHead) => {
     const index = form.users.findIndex(user => user.id === userId);
     if (index !== -1) {
-        // Si on active un responsable, désactiver les autres
-        if (isHead) {
-            form.users.forEach(user => {
-                user.is_head = user.id === userId;
-            });
-        } else {
-            form.users[index].is_head = false;
-        }
+        // Permettre à plusieurs utilisateurs d'être responsables
+        form.users[index].is_head = isHead;
     }
 };
 
