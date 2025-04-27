@@ -8,7 +8,6 @@ class Organization extends Model
 {
     protected $fillable = [
         'name',
-        'slug',
     ];
 
     public function forms()

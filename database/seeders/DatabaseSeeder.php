@@ -14,20 +14,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        Organization::create([
+            'name' => 'Ville d\'Andenne',
+        ]);
 
         $user = User::create([
             'name' => 'Test User',
             'email' => 'admin@ac.andenne.be',
             'password' => bcrypt('password'),
             'is_admin' => true,
+            'organization_id' => 1,
         ]);
-
-        $orga = Organization::create([
-            'name' => 'Ville d\'Andenne',
-            'slug' => 'ville-andenne',
-        ]);
-
-        $user->organizations()->attach($orga->id);
     }
 }

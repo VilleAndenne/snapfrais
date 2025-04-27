@@ -52,7 +52,7 @@ class FormController extends Controller
         $form = Form::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? '',
-            'organization_id' => 1,
+            'organization_id' => auth()->user()->organization_id,
         ]);
 
         foreach ($validated['costs'] as $costData) {

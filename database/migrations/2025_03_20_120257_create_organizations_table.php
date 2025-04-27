@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('organizations', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug');
             $table->timestamps();
         });
 
@@ -22,11 +21,8 @@ return new class extends Migration
             $table->foreignId('organization_id')->constrained();
         });
 
-        Schema::create('organization_user', function (Blueprint $table) {
-            $table->id();
+        Schema::table('users', function (Blueprint $table) {
             $table->foreignId('organization_id')->constrained();
-            $table->foreignId('user_id')->constrained();
-            $table->timestamps();
         });
     }
 

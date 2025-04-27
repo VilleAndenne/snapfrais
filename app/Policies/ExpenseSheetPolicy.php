@@ -15,7 +15,11 @@ class ExpenseSheetPolicy
         if (isset($expenseSheet->approved)) {
             return false;
         } elseif ($user->is_admin == true) {
-            return true;
+            if ($expenseSheet->organization_id == $user->organization_id) {
+                return true;
+            } else {
+                return false;
+            }
         }
         // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;
@@ -40,7 +44,11 @@ class ExpenseSheetPolicy
         if (isset($expenseSheet->approved)) {
             return false;
         } elseif ($user->is_admin == true) {
-            return true;
+            if ($expenseSheet->organization_id == $user->organization_id) {
+                return true;
+            } else {
+                return false;
+            }
         }
         // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;
@@ -74,7 +82,11 @@ class ExpenseSheetPolicy
         if ($expenseSheet->user_id === $user->id) {
             return true;
         } elseif ($user->is_admin == true) {
-            return true;
+            if ($expenseSheet->organization_id == $user->organization_id) {
+                return true;
+            } else {
+                return false;
+            }
         }
         // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;

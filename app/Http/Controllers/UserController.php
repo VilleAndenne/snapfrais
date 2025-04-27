@@ -61,6 +61,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
             'is_admin' => $validated['is_admin'] ?? false,
+            'organization_id' => auth()->user()->organization_id,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');

@@ -63,6 +63,7 @@ class ExpenseSheetController extends Controller
             'total' => 0,
             'form_id' => $id,
             'department_id' => $validated['department_id'],
+            'organization_id' => auth()->user()->organization_id,
         ]);
 
         $globalTotal = 0;
