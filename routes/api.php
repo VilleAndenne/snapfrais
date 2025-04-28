@@ -12,3 +12,4 @@ Route::get('/forms', [\App\Http\Controllers\API\FormController::class, 'index'])
 Route::get('/forms/{id}', [\App\Http\Controllers\API\FormController::class, 'show'])->middleware('auth:sanctum');
 Route::get('/expense-sheets', [\App\Http\Controllers\API\ExpenseSheetController::class, 'index'])->middleware('auth:sanctum');
 Route::get('/expense-sheets/validate', [\App\Http\Controllers\API\ExpenseSheetController::class, 'validateIndex'])->middleware('auth:sanctum');
+Route::get('/expense-sheets/{id}', [\App\Http\Controllers\API\ExpenseSheetController::class, 'show'])->middleware('auth:sanctum');

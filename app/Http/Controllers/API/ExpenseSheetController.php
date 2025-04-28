@@ -48,9 +48,22 @@ class ExpenseSheetController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id): JsonResponse
     {
-        //
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+        if (!auth()->user()->can('view', $expenseSheet)) {
+            abort(403);
+        }
+        //        return $expenseSheet->load(['costs.formCost', 'costs.steps', 'user', 'department', 'costs.formCost.reimbursementRates']);
+        $canApprove = auth()->user()->can('approve', $expenseSheet);
+        $canReject = auth()->user()->can('reject', $expenseSheet);
+        $canEdit = auth()->user()->can('edit', $expenseSheet);
+        return response()->json([
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy']),
+            'canApprove' => $canApprove,
+            'canReject' => $canReject,
+            'canEdit' => $canEdit,
+        ]);
     }
 
     /**
