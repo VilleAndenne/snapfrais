@@ -18,4 +18,18 @@ class FormController extends Controller
             'forms' => Form::all(),
         ]);
     }
+
+    /**
+     * Display a specified resource.
+     */
+    public function show($id): JsonResponse
+    {
+        $form = Form::with('costs.reimbursementRates', 'costs.requirements')->findOrFail($id);
+
+        return response()->json([
+            'form' => $form,
+            'departments' => auth()->user()->departments()->with('heads')->get(),
+        ]);
+    }
+
 }

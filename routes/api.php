@@ -9,5 +9,6 @@ Route::get('/verify', [\App\Http\Controllers\API\Auth\AuthController::class, 've
     ->name('api.verify')->middleware('auth:sanctum');
 
 Route::get('/forms', [\App\Http\Controllers\API\FormController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/forms/{id}', [\App\Http\Controllers\API\FormController::class, 'show'])->middleware('auth:sanctum');
 Route::get('/expense-sheets', [\App\Http\Controllers\API\ExpenseSheetController::class, 'index'])->middleware('auth:sanctum');
 Route::get('/expense-sheets/validate', [\App\Http\Controllers\API\ExpenseSheetController::class, 'validateIndex'])->middleware('auth:sanctum');
