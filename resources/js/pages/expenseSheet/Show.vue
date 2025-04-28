@@ -5,7 +5,6 @@
         <div class="container mx-auto p-4 space-y-6">
 
 
-
             <div class="flex justify-between items-start">
                 <div>
                     <h1 class="text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
@@ -67,11 +66,11 @@
                     <div class="text-sm text-destructive/90 space-y-1">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Refusée par :</span>
-                            <span>{{expenseSheet.validated_by.name}}</span>
+                            <span>{{ expenseSheet.validated_by.name }}</span>
                         </p>
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Motif du refus :</span>
-                            <span>{{expenseSheet.refusal_reason}}</span>
+                            <span>{{ expenseSheet.refusal_reason }}</span>
                         </p>
                     </div>
                 </div>
@@ -242,6 +241,9 @@
             </DialogContent>
         </Dialog>
     </AppLayout>
+
+    <ExpenseSheetPdf ref="pdfContent" :expenseSheet="expenseSheet" class="hidden" />
+
 </template>
 
 <script setup lang="ts">
@@ -253,6 +255,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import ExpenseSheetPdf from '@/pages/expenseSheet/Pdf.vue';
 import {
     Dialog,
     DialogContent,
@@ -278,6 +281,7 @@ import {
     DropdownMenuItem
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import html2pdf from 'html2pdf.js';
 
 const props = defineProps({
     expenseSheet: Object,
@@ -309,6 +313,9 @@ const breadcrumbs = [
 // État pour le modal de rejet
 const isRejectModalOpen = ref(false);
 const rejectionReason = ref('');
+
+const pdfContent = ref();
+
 
 // Ouvrir le modal de rejet
 const openRejectModal = () => {
@@ -343,15 +350,45 @@ const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
 
-// Existing methods for printing and downloading
-const printExpenseSheet = () => {
-    window.print();
+const downloadPdf = () => {
+    html2pdf()
+        .set({
+            margin: 10,
+            filename: `note-frais-${props.expenseSheet.id}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        })
+        .from(pdfContent.value.$el) // Attention : .value.$el car c'est un composant enfant
+        .save();
 };
 
-const downloadPdf = () => {
-    // Implement PDF download logic
-    console.log('Downloading PDF for expense sheet', props.expenseSheet.id);
+const printExpenseSheet = () => {
+    if (!pdfContent.value) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Impression Note de frais</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                </style>
+            </head>
+            <body>
+                ${pdfContent.value.$el.outerHTML}
+            </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
 };
+
 
 // Obtenir le libellé du statut
 
