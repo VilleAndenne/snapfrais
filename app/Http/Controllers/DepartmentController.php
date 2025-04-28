@@ -17,9 +17,7 @@ class DepartmentController extends Controller
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
 
-        $departments = Department::with(['users' => function ($query) {
-            $query->withPivot('is_head');
-        }])->where('organization_id', auth()->user()->organization_id)->get();
+        $departments = Department::with('users')->get();
 
         return Inertia::render('departments/Index', [
             'departments' => $departments,
@@ -61,7 +59,6 @@ class DepartmentController extends Controller
         $dep = Department::create([
             'name' => $validated['name'],
             'parent_id' => $validated['parent_id'],
-            'organization_id' => auth()->user()->organization_id,
         ]);
 
         $syncData = [];
