@@ -1,5 +1,5 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Nouvelle note de frais" />
 
         <div class="container mx-auto p-4 space-y-6">
@@ -254,6 +254,12 @@ const submit = () => {
         }
     });
 };
+
+const breadcrumbs = [
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Notes de frais', href: '/expense-sheet' },
+    { title: 'Créer une note de frais' }
+];
 
 
 </script>
