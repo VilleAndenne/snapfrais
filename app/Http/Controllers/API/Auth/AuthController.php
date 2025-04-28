@@ -28,4 +28,18 @@ class AuthController extends Controller
         ]);
     }
 
+    public function verify(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json([
+            'message' => 'User is authenticated',
+            'user' => $user,
+        ]);
+    }
+
 }
