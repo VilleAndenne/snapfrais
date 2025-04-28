@@ -76,18 +76,20 @@
                 </div>
             </div>
 
-            <!-- Bannière d'approbation moderne -->
+            <!-- Bannière d'approbation moderne avec vert Tailwind -->
             <div v-if="expenseSheet.approved == true"
-                 class="bg-green-700 border-l-4 border-green-500 shadow-sm px-5 py-4 rounded-lg flex items-start gap-3 transition-all duration-200 hover:shadow-md">
-                <div class="bg-success/10 p-2 rounded-full flex-shrink-0">
-                    <CheckIcon class="h-5 w-5 text-success" />
+                 class="border-l-4 shadow-sm px-5 py-4 rounded-lg flex items-start gap-3 transition-all duration-200 hover:shadow-md
+            bg-green-100 border-green-400 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200">
+                <div class="bg-green-200 dark:bg-green-700 p-2 rounded-full flex-shrink-0">
+                    <CheckIcon class="h-5 w-5 text-green-600 dark:text-green-300" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="font-medium text-success flex items-center gap-2">
+                    <h3 class="font-medium flex items-center gap-2">
                         Note de frais approuvée
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-success/70 animate-pulse"></span>
+                        <span
+                            class="inline-block h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300 animate-pulse"></span>
                     </h3>
-                    <div class="text-sm text-success/90 space-y-1">
+                    <div class="text-sm space-y-1">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Approuvée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -95,6 +97,7 @@
                     </div>
                 </div>
             </div>
+
 
             <!-- Informations générales -->
             <Card class="bg-card text-card-foreground">
