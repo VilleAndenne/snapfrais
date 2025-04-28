@@ -21,7 +21,7 @@ class FormPolicy
      */
     public function view(User $user, Form $form): bool
     {
-        return $user->is_admin == true && $user->organization_id === $form->organization_id;
+        return $user->is_admin == true;
     }
 
     /**
@@ -37,7 +37,7 @@ class FormPolicy
      */
     public function update(User $user, Form $form): bool
     {
-        return $user->is_admin == true && $user->organization_id === $form->organization_id;
+        return $user->is_admin == true;
     }
 
     /**
@@ -45,7 +45,7 @@ class FormPolicy
      */
     public function delete(User $user, Form $form): bool
     {
-        return $user->is_admin == true && $user->organization_id === $form->organization_id;
+        return $user->is_admin == true;
     }
 
     /**
@@ -53,7 +53,7 @@ class FormPolicy
      */
     public function restore(User $user, Form $form): bool
     {
-        return $user->is_admin == true && $user->organization_id === $form->organization_id;
+        return $user->is_admin == true;
     }
 
     /**
@@ -61,6 +61,6 @@ class FormPolicy
      */
     public function forceDelete(User $user, Form $form): bool
     {
-        return $user->is_admin == true && $user->organization_id === $form->organization_id;
+        return $user->is_admin == true;
     }
 }
