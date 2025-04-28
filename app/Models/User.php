@@ -28,6 +28,8 @@ class User extends Authenticatable
         'is_admin',
     ];
 
+    protected $appends = ['is_head'];
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -54,6 +56,11 @@ class User extends Authenticatable
     public function organizations()
     {
         return $this->belongsToMany(Organization::class);
+    }
+
+    public function getIsHeadAttribute(): bool
+    {
+        return $this->isHead() ? true : false;
     }
 
     public function departments()
