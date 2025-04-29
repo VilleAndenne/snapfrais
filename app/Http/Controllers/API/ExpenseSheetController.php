@@ -18,7 +18,9 @@ class ExpenseSheetController extends Controller
             'expenseSheets' => ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet)),
+                ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet))
+                ->values()
+                ->all(),
         ]);
     }
 
