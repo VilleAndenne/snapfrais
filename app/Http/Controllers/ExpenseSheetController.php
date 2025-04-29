@@ -27,7 +27,7 @@ class ExpenseSheetController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('ExpenseSheet/Index', [
+        return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,
         ]);
     }
