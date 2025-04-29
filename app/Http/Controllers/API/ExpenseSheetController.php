@@ -25,6 +25,24 @@ class ExpenseSheetController extends Controller
     }
 
     /**
+     * Display all resource which user have access to.
+     */
+
+    public function all()
+    {
+        $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet))
+            ->values()
+            ->all();
+
+        return response()->json([
+            'expenseSheets' => $expenseSheets,
+        ]);
+    }
+
+    /**
      * Display a listing of the resource to validate by the user.
      */
 
