@@ -90,4 +90,9 @@ class ExpenseSheetPolicy
         // Si aucun service parent ne donne l'autorisation, renvoyer false
         return false;
     }
+
+    public function export(User $user)
+    {
+        return $user->is_admin == true;
+    }
 }

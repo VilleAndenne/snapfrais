@@ -61,4 +61,9 @@ class ExpenseSheet extends Model
     {
         return collect($this->route)->pluck('steps')->flatten();
     }
+
+    public function expenseSheetCosts()
+    {
+        return $this->hasMany(ExpenseSheetCost::class);
+    }
 }

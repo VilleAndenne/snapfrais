@@ -147,4 +147,9 @@ class User extends Authenticatable
         return $this->departments()->where('is_head', true)->exists();
     }
 
+    public function expenseSheets(): HasMany
+    {
+        return $this->hasMany(ExpenseSheet::class);
+    }
+
 }
