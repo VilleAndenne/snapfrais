@@ -177,10 +177,16 @@ const updateRate = (index, cost) => {
 
     if (cost.type === 'percentage') {
         costData.value[index].percentageData.percentage = rate;
+
+        const paidAmount = costData.value[index].percentageData.paidAmount;
+        if (paidAmount !== null && paidAmount !== undefined) {
+            costData.value[index].percentageData.reimbursedAmount = (paidAmount * rate) / 100;
+        }
     } else if (cost.type === 'fixed') {
         costData.value[index].fixedAmount = rate;
     }
 };
+
 
 const removeCost = (index) => {
     selectedCosts.value.splice(index, 1);

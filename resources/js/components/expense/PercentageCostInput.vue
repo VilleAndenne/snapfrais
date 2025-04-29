@@ -36,17 +36,32 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
+// Local copy
 const local = reactive({
     paidAmount: props.modelValue?.paidAmount ?? 0,
     percentage: props.modelValue?.percentage ?? 0
 });
 
+// Recalcule local si le parent modifie modelValue
+watch(
+    () => props.modelValue,
+    (newValue) => {
+        if (newValue) {
+            local.paidAmount = newValue.paidAmount ?? 0;
+            local.percentage = newValue.percentage ?? 0;
+        }
+    },
+    { immediate: true, deep: true }
+);
+
+// Montant remboursé
 const reimbursedAmount = computed(() => {
     return (local.paidAmount * local.percentage) / 100;
 });
 
+// Réémission des valeurs modifiées
 watch(
-    () => local,
+    local,
     () => {
         emit('update:modelValue', {
             paidAmount: local.paidAmount,

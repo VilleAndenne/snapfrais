@@ -52,7 +52,6 @@ class FormController extends Controller
         $form = Form::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? '',
-            'organization_id' => auth()->user()->organization_id,
         ]);
 
         foreach ($validated['costs'] as $costData) {
@@ -139,11 +138,6 @@ class FormController extends Controller
                 'nullable',
                 'date',
                 'after_or_equal:costs.*.reimbursement_rates.*.start_date',
-                function ($attribute, $value, $fail) {
-                    if ($value && now()->gt($value)) {
-                        $fail('La date de fin doit être dans le futur.');
-                    }
-                }
             ],
             'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
 
