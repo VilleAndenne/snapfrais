@@ -20,11 +20,15 @@ class ExpenseSheetController extends Controller
      */
     public function index()
     {
-        return Inertia::render('expenseSheet/Index', [
-            'expenseSheets' => ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet)),
+        $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet))
+            ->values()
+            ->all();
+
+        return Inertia::render('ExpenseSheet/Index', [
+            'expenseSheets' => $expenseSheets,
         ]);
     }
 
