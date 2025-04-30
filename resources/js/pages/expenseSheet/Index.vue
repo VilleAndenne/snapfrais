@@ -118,29 +118,42 @@ const breadcrumbs = [
 </script>
 
 <template>
-    <AppLayout title="Historique des notes de frais" description="Consultez l'historique de vos notes de frais." :breadcrumbs="breadcrumbs">
+    <AppLayout title="Historique des notes de frais" description="Consultez l'historique de vos notes de frais."
+               :breadcrumbs="breadcrumbs">
         <Head title="Historique des notes de frais" />
 
         <div class="p-4 md:p-6 space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <h2 class="text-2xl font-semibold tracking-tight">Notes de frais</h2>
 
-                <!-- Barre de recherche toujours visible -->
-                <div class="relative w-full sm:max-w-xs">
-                    <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                        v-model="searchQuery"
-                        type="text"
-                        placeholder="Rechercher une note de frais..."
-                        class="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <button
-                        v-if="searchQuery"
-                        @click="searchQuery = ''"
-                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                <div class="flex gap-2">
+                    <!-- Bouton d'exportation -->
+                    <Link
+                        :href="route('export')"
+                        class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center gap-2"
                     >
-                        <X class="h-4 w-4" />
-                    </button>
+                        <FileText class="h-4 w-4" />
+                        Exporter
+                    </Link>
+
+                    <!-- Barre de recherche toujours visible -->
+                    <div class="relative w-full sm:max-w-xs">
+                        <Search
+                            class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            placeholder="Rechercher une note de frais..."
+                            class="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                        />
+                        <button
+                            v-if="searchQuery"
+                            @click="searchQuery = ''"
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
