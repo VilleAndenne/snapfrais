@@ -14,16 +14,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        Organization::create([
-            'name' => 'Ville d\'Andenne',
-        ]);
-
         $user = User::create([
             'name' => 'Test User',
             'email' => 'admin@ac.andenne.be',
             'password' => bcrypt('password'),
             'is_admin' => true,
-            'organization_id' => 1,
         ]);
     }
 }

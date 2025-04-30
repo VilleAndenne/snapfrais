@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->foreignId('parent_id')->nullable()->constrained('departments');
-            $table->foreignId('organization_id')->constrained();
             $table->timestamps();
             $table->softDeletes();
         });
