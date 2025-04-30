@@ -6,10 +6,10 @@
             <h1 class="text-2xl font-semibold text-foreground">Créer une note de frais</h1>
 
             <!-- Sélection du département -->
-            <div class="flex items-center space-x-4">
-                <Label for="department" class="w-1/4">Département</Label>
+            <div class="flex flex-col space-y-2">
+                <Label for="department">Département</Label>
                 <Select v-model="form.department_id">
-                    <SelectTrigger id="department" class="w-3/4">
+                    <SelectTrigger id="department">
                         <SelectValue placeholder="Sélectionner un département" />
                     </SelectTrigger>
                     <SelectContent>
@@ -22,6 +22,9 @@
                         </SelectItem>
                     </SelectContent>
                 </Select>
+                <span v-if="form.errors.department_id" class="text-sm text-red-600">
+                    {{ form.errors.department_id }}
+                </span>
             </div>
 
             <!-- Coûts ajoutés -->
@@ -59,6 +62,12 @@
                             class="border border-border rounded p-2 w-full bg-background text-foreground"
                             @change="updateRate(index, cost)"
                         />
+                        <span
+                            v-if="form.errors[`costs.${index}.date`]"
+                            class="text-sm text-red-600"
+                        >
+                            {{ form.errors[`costs.${index}.date`] }}
+                        </span>
                     </div>
 
                     <!-- Champs dynamiques selon le type de coût -->
@@ -177,7 +186,6 @@ const updateRate = (index, cost) => {
 
     if (cost.type === 'percentage') {
         costData.value[index].percentageData.percentage = rate;
-
         const paidAmount = costData.value[index].percentageData.paidAmount;
         if (paidAmount !== null && paidAmount !== undefined) {
             costData.value[index].percentageData.reimbursedAmount = (paidAmount * rate) / 100;
@@ -186,7 +194,6 @@ const updateRate = (index, cost) => {
         costData.value[index].fixedAmount = rate;
     }
 };
-
 
 const removeCost = (index) => {
     selectedCosts.value.splice(index, 1);
@@ -220,7 +227,7 @@ const submit = () => {
     });
 
     form.post(`/expense-sheet/${props.form.id}`, {
-        preserveState: false,
+        preserveState: true,
         onSuccess: () => {
             alert('Note de frais enregistrée avec succès !');
             form.reset();
@@ -228,8 +235,7 @@ const submit = () => {
             costData.value = [];
         },
         onError: (errors) => {
-            alert('Une erreur est survenue lors de l\'envoi.');
-            console.error(errors);
+            console.warn('Validation error(s)', errors);
         },
         transform: (data) => {
             const formData = new FormData();
@@ -239,12 +245,10 @@ const submit = () => {
                 formData.append(`costs[${index}][cost_id]`, cost.cost_id);
                 formData.append(`costs[${index}][date]`, cost.date);
 
-                // Ajouter les données du coût
                 Object.entries(cost.data).forEach(([key, value]) => {
                     formData.append(`costs[${index}][data][${key}]`, value);
                 });
 
-                // Ajouter les requirements correctement
                 if (cost.requirements) {
                     Object.entries(cost.requirements).forEach(([reqId, req]) => {
                         if (req.file instanceof File) {
@@ -266,6 +270,4 @@ const breadcrumbs = [
     { title: 'Notes de frais', href: '/expense-sheet' },
     { title: 'Créer une note de frais' }
 ];
-
-
 </script>
