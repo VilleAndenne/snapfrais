@@ -40,34 +40,6 @@
                     </p>
                 </div>
 
-                <!-- Champ Mot de passe -->
-                <div class="space-y-2">
-                    <Label for="password">Mot de passe</Label>
-                    <Input
-                        id="password"
-                        type="password"
-                        v-model="form.password"
-                        placeholder="Mot de passe"
-                        :error="form.errors.password"
-                        required
-                    />
-                    <p v-if="form.errors.password" class="text-sm text-destructive">
-                        {{ form.errors.password }}
-                    </p>
-                </div>
-
-                <!-- Champ Confirmation mot de passe -->
-                <div class="space-y-2">
-                    <Label for="password_confirmation">Confirmer le mot de passe</Label>
-                    <Input
-                        id="password_confirmation"
-                        type="password"
-                        v-model="form.password_confirmation"
-                        placeholder="Confirmer le mot de passe"
-                        required
-                    />
-                </div>
-
                 <div class="flex items-center space-x-2">
                     <input
                         id="is-admin"
@@ -116,8 +88,6 @@ import Heading from '@/components/Heading.vue';
 const form = useForm({
     name: '',
     email: '',
-    password: '',
-    password_confirmation: '',
     is_admin: false,
 });
 

@@ -3,7 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\UserCreated;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class UserController extends Controller
@@ -52,18 +57,33 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
             'is_admin' => 'boolean',
         ]);
 
-        User::create([
+        if ($request->has('password')) {
+            $validated['password'] = $request->validate([
+                'password' => 'required|string|min:8|confirmed',
+            ])['password'];
+        } else {
+            $validated['password'] = bcrypt(Str::random(10)); // Default password
+        }
+
+        $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
 
-        return redirect()->route('users.index')->with('success', 'User created successfully.');
+        if (!$request->has('password')) {
+            // generate a reset password token
+            $token = Password::broker()->createToken($user);
+        }
+
+        // Send email to user to set their password
+        $user->notify(new UserCreated($token, $validated['email']));
+
+        return redirect()->route('users.index')->with('success', 'Utilisatuer créé avec succès.');
     }
 
     /**
@@ -113,7 +133,7 @@ class UserController extends Controller
         }
         $user->save();
 
-        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+        return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour avec succès.');
     }
 
     /**
@@ -121,6 +141,12 @@ class UserController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        if (!auth()->user()->can('delete', User::findOrFail($id))) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
+        $user = User::findOrFail($id);
+        $user->delete();
+
+        return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès.');
     }
 }
