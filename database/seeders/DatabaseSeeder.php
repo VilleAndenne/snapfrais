@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@ac.andenne.be',
             'password' => bcrypt('password'),
             'is_admin' => true,
+            'email_verified_at' => now(),
         ]);
     }
 }
