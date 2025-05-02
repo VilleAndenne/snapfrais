@@ -26,28 +26,36 @@ class RemindApprovalExpenseSheet implements ShouldQueue
 
         $notified = collect(); // éviter les doublons
 
-        $departments = Department::with('heads')->get();
+        $departments = Department::with(['heads', 'expenseSheets' => function ($query) {
+            $query->whereNull('validated_at');
+        }, 'parent.heads'])->get();
 
         foreach ($departments as $dept) {
-            foreach ($dept->heads as $manager) {
-                if ($notified->contains($manager->id)) {
-                    continue; // on a déjà traité ce responsable
+            foreach ($dept->expenseSheets as $sheet) {
+                $localHeads = $dept->heads;
+
+                foreach ($localHeads as $localHead) {
+                    // Si l'agent est responsable de son propre service...
+                    if ($sheet->created_by === $localHead->id) {
+                        // Et que ce service a un parent...
+                        if ($dept->parent && $dept->parent->heads->isNotEmpty()) {
+                            foreach ($dept->parent->heads as $parentHead) {
+                                if (!$notified->contains($parentHead->id)) {
+                                    $parentHead->notify(new Reminder($parentHead, 1)); // 1 car 1 note ici
+                                    Log::info("Notification envoyée au responsable parent {$parentHead->name} pour 1 note de frais.");
+                                    $notified->push($parentHead->id);
+                                }
+                            }
+                        }
+                    } else {
+                        // Cas normal : ce n’est pas le responsable du service de la note
+                        if (!$notified->contains($localHead->id)) {
+                            $localHead->notify(new Reminder($localHead, 1));
+                            Log::info("Notification envoyée à {$localHead->name} pour 1 note de frais.");
+                            $notified->push($localHead->id);
+                        }
+                    }
                 }
-
-                $headsDepartments = $manager->departments()->wherePivot('is_head', true)->get();
-
-                $pendingSheets = $headsDepartments->flatMap(function ($d) {
-                    return $d->expenseSheets()->whereNull('validated_at')->get();
-                });
-
-                $count = $pendingSheets->count();
-
-                if ($count > 0) {
-                    $manager->notify(new Reminder($manager, $count));
-                    Log::info("Notification envoyée à {$manager->name} pour {$count} note(s) de frais.");
-                }
-
-                $notified->push($manager->id);
             }
         }
     }

@@ -194,6 +194,21 @@ class ExpenseSheetController extends Controller
 
         $expenseSheet->update(['total' => $globalTotal]);
 
+        $user = auth()->user();
+        $department = $expenseSheet->department;
+
+// Récupère les responsables
+        $heads = $department->heads;
+
+// Si l'agent est lui-même head du service, alors on passe au parent
+        if ($heads->contains($user) && $department->parent) {
+            $heads = $department->parent->heads;
+        }
+
+        $heads->each(function ($head) use ($expenseSheet) {
+            $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+        });
+
         $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
 
         return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
