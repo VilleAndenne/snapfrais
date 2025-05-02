@@ -46,7 +46,8 @@ class UserCreated extends Notification implements ShouldQueue
             ->line('Nous vous informons que votre compte a été créé avec succès.')
             ->action('Réinitialiser le mot de passe', url('/reset-password/' . $this->token . '?email=' . $this->email))
             ->line('Cette application vous permet de gérer vos notes de frais de manière plus efficace.')
-            ->line('Merci d\'utiliser notre application !');
+            ->line('Merci d\'utiliser notre application !')
+            ->salutation('Cordialement,');
     }
 
     /**
