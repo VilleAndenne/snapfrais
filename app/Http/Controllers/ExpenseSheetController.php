@@ -31,6 +31,7 @@ class ExpenseSheetController extends Controller
 
         return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,
+            'canExport' => auth()->user()->can('export', ExpenseSheet::class),
         ]);
     }
 

@@ -34,7 +34,8 @@ const props = defineProps<{
         user?: {
             name: string;
         };
-    }>;
+    }>,
+    canExport: boolean;
 }>();
 
 // État des filtres
@@ -128,7 +129,7 @@ const breadcrumbs = [
 
                 <div class="flex gap-2">
                     <!-- Bouton d'exportation -->
-                    <Link
+                    <Link v-if="canExport"
                         :href="route('export')"
                         class="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center gap-2"
                     >
