@@ -30,15 +30,16 @@ class ExpenseSheetPolicy
             return false;
         }
 
+        // Administrateur → toujours autorisé (sauf pour sa propre note déjà gérée ci-dessus)
+        if ($user->is_admin) {
+            return true;
+        }
+
         // L'utilisateur tente de valider sa propre note
         if ($expenseSheet->user_id === $user->id) {
             return false;
         }
 
-        // Administrateur → toujours autorisé (sauf pour sa propre note déjà gérée ci-dessus)
-        if ($user->is_admin) {
-            return true;
-        }
 
         // Département lié à la note de frais
         $department = $expenseSheet->department;
@@ -80,7 +81,7 @@ class ExpenseSheetPolicy
         if ($expenseSheet->user_id === $user->id) {
             return true;
         } elseif ($user->is_admin == true) {
-                return true;
+            return true;
         }
         // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;
