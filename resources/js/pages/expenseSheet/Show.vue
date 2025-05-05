@@ -43,10 +43,10 @@
                                 <PrinterIcon class="mr-2 h-4 w-4" />
                                 Imprimer
                             </DropdownMenuItem>
-                            <DropdownMenuItem @click="downloadPdf">
-                                <DownloadIcon class="mr-2 h-4 w-4" />
-                                Télécharger PDF
-                            </DropdownMenuItem>
+<!--                            <DropdownMenuItem @click="downloadPdf">-->
+<!--                                <DownloadIcon class="mr-2 h-4 w-4" />-->
+<!--                                Télécharger PDF-->
+<!--                            </DropdownMenuItem>-->
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
