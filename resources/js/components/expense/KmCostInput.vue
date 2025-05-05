@@ -34,7 +34,7 @@
             <div>{{ googleKm.toFixed(1) }} km</div>
         </div>
 
-        <!-- Km manuels -->
+        <!-- Km manuels sécurisés -->
         <div>
             <label class="block font-medium text-sm mb-1">Kilomètres à ajouter (±5 max)</label>
             <Input
@@ -44,6 +44,9 @@
                 max="5"
                 v-model.number="manualKm"
                 class="input w-full"
+                @wheel.prevent
+                @blur="onManualKmBlur"
+                @input="onManualKmInput"
             />
         </div>
 
@@ -72,42 +75,50 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import GoogleAddressInput from "./GoogleAddressInput.vue";
 import { Button } from "@/components/ui/button";
-import { loadGoogleMaps } from "@/utils/googleMapsService"; // ✅
+import { loadGoogleMaps } from "@/utils/googleMapsService";
 
-const props = defineProps({ modelValue: Object })
-const emit = defineEmits(["update:modelValue"])
+const props = defineProps({ modelValue: Object });
+const emit = defineEmits(["update:modelValue"]);
 
-// Adresse
-const departure = ref("")
-const arrival = ref("")
-const steps = ref([])
+const departure = ref("");
+const arrival = ref("");
+const steps = ref([]);
 
-const googleKm = ref(0)
-const manualKm = ref(0)
-const justification = ref("")
+const googleKm = ref(0);
+const manualKm = ref(0);
+const justification = ref("");
 
-// Total
-const totalKm = computed(() => googleKm.value + manualKm.value)
+const totalKm = computed(() => googleKm.value + manualKm.value);
 
-// Ajout étape
-const addStep = () => steps.value.push("")
-const removeStep = (i) => steps.value.splice(i, 1)
+const addStep = () => steps.value.push("");
+const removeStep = (i) => steps.value.splice(i, 1);
 
-let directionsService = null
+let directionsService = null;
 
 onMounted(async () => {
-    const google = await loadGoogleMaps()
-    directionsService = new google.maps.DirectionsService()
-})
+    const google = await loadGoogleMaps();
+    directionsService = new google.maps.DirectionsService();
+});
 
-// Recalcul distance à chaque changement
+// Empêche le champ manuelKm d'être vidé
+const onManualKmInput = (e) => {
+    if (e.target.value === '') {
+        manualKm.value = 0;
+    }
+};
+
+const onManualKmBlur = () => {
+    if (manualKm.value === null || manualKm.value === '') {
+        manualKm.value = 0;
+    }
+};
+
 watch([departure, arrival, steps], async () => {
     if (departure.value && arrival.value) {
-        await calculateDistance()
+        await calculateDistance();
     }
-}, { deep: true })
+}, { deep: true });
 
-// Émission des données
 watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
     emit("update:modelValue", {
         departure: departure.value,
@@ -117,15 +128,15 @@ watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
         manualKm: manualKm.value,
         justification: manualKm.value !== 0 ? justification.value : null,
         totalKm: totalKm.value
-    })
-}, { deep: true })
+    });
+}, { deep: true });
 
 const calculateDistance = async () => {
-    if (!directionsService) return
+    if (!directionsService) return;
 
     const waypoints = steps.value
         .filter(s => s)
-        .map(address => ({ location: address, stopover: true }))
+        .map(address => ({ location: address, stopover: true }));
 
     directionsService.route(
         {
@@ -136,16 +147,16 @@ const calculateDistance = async () => {
         },
         (result, status) => {
             if (status === "OK") {
-                let distanceMeters = 0
+                let distanceMeters = 0;
                 result.routes[0].legs.forEach(leg => {
-                    distanceMeters += leg.distance.value
-                })
-                googleKm.value = distanceMeters / 1000
+                    distanceMeters += leg.distance.value;
+                });
+                googleKm.value = distanceMeters / 1000;
             } else {
-                googleKm.value = 0
-                console.warn("Erreur Google Maps API :", status)
+                googleKm.value = 0;
+                console.warn("Erreur Google Maps API :", status);
             }
         }
-    )
-}
+    );
+};
 </script>
