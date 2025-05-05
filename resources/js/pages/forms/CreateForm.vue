@@ -275,11 +275,9 @@ const removerequirement = (costIndex, requirementIndex) => {
 const submitForm = () => {
     form.post('/forms', {
         onSuccess: () => {
-            alert('Formulaire enregistré avec succès!');
             form.reset();
         },
         onError: (errors) => {
-            console.error('Erreur lors de l\'envoi du formulaire', errors);
         }
     });
 };
