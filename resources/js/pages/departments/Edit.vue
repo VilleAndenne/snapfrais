@@ -322,14 +322,7 @@ const toggleUser = (userId) => {
 const toggleUserHead = (userId, isHead) => {
     const index = form.users.findIndex(user => user.id === userId);
     if (index !== -1) {
-        // Si on active un responsable, désactiver les autres
-        if (isHead) {
-            form.users.forEach(user => {
-                user.is_head = user.id === userId;
-            });
-        } else {
-            form.users[index].is_head = false;
-        }
+        form.users[index].is_head = isHead;
     }
 };
 
