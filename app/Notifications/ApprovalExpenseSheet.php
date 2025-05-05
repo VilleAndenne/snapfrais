@@ -41,7 +41,7 @@ class ApprovalExpenseSheet extends Notification implements ShouldQueue
             ->subject('Votre note de frais #' . $this->expenseSheet->id . ' a été approuvée')
             ->greeting('Bonjour,')
             ->line($this->expenseSheet->validatedBy->name . ' a approuvé votre note de frais #' . $this->expenseSheet->id)
-            ->action('Voir la note de frais', url('/expense-sheets/' . $this->expenseSheet->id))
+            ->action('Voir la note de frais', url('/expense-sheet/' . $this->expenseSheet->id))
             ->line('Merci d\'utiliser notre application !')
             ->salutation('Bien cordialement,');
     }
