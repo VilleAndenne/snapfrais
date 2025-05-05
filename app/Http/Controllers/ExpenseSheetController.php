@@ -438,6 +438,8 @@ class ExpenseSheetController extends Controller
 
         if ($validated['approval']) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
+        } else {
+            $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
         }
 
         return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
