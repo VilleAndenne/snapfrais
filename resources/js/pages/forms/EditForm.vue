@@ -169,7 +169,8 @@
                                 <Button type="button" variant="outline" @click="cancelEdit">
                                     Annuler
                                 </Button>
-                                <Button type="submit">
+                                <Button type="submit" :disabled="form.processing">
+                                    <Loader2Icon v-if="form.processing" class="h-4 w-4 mr-2 animate-spin" />
                                     Enregistrer
                                 </Button>
                             </div>
@@ -213,6 +214,7 @@ import {
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useForm } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
 
 const props = defineProps({
     form: Object
@@ -272,7 +274,6 @@ const removeRequirement = (costIndex, requirementIndex) => {
 
 const submitForm = () => {
     form.put(route('forms.update', props.form.id), {
-        onSuccess: () => alert('Formulaire mis à jour avec succès!')
     });
 };
 </script>
