@@ -31,7 +31,7 @@ class ExpenseSheetToApproval extends Notification implements ShouldQueue
             ->greeting("Bonjour,")
             ->line("Une nouvelle note de frais a été soumise par : **{$this->sheet->user->name}**.")
             ->line("Date de création : {$this->sheet->created_at->format('d/m/Y')}")
-            ->action('Voir la note de frais', url("/expense-sheets/{$this->sheet->id}"))
+            ->action('Voir la note de frais', url("/expense-sheet/{$this->sheet->id}"))
             ->line("Merci de valider ou refuser cette note dès que possible.");
     }
 
