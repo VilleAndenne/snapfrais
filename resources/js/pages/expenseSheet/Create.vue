@@ -229,7 +229,6 @@ const submit = () => {
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
-            alert('Note de frais enregistrée avec succès !');
             form.reset();
             selectedCosts.value = [];
             costData.value = [];
