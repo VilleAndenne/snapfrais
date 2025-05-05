@@ -43,7 +43,7 @@ const submit = () => {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="password">Mot de asse</Label>
+                    <Label for="password">Mot de passe</Label>
                     <Input
                         id="password"
                         type="password"
