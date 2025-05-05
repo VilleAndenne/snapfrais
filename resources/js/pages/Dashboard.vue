@@ -2,10 +2,8 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/vue3';
-import { router } from '@inertiajs/vue3';
-import { Link } from '@inertiajs/vue3';
+import { router, Link } from '@inertiajs/vue3';
 import { Badge } from '@/components/ui/badge';
-import { getStatusLabel } from '../utils/formatters';
 import { ref, computed } from 'vue';
 import {
     FileText,
@@ -32,7 +30,7 @@ const props = defineProps<{
         distance: number;
         route: string;
         total: number;
-        status: string;
+        approved: boolean | null;
         created_at: string;
         form: {
             name: string;
@@ -44,7 +42,7 @@ const props = defineProps<{
         distance: number;
         route: string;
         total: number;
-        status: string;
+        approved: boolean | null;
         created_at: string;
         form: {
             name: string;
@@ -69,10 +67,48 @@ const goToForm = (formId) => {
 const searchQuery = ref('');
 const statusFilter = ref('all');
 
+// 🔁 Conversion approved → status
+const getStatusFromApproved = (approved: boolean | null): 'approved' | 'pending' | 'rejected' => {
+    if (approved == true) return 'approved';
+    if (approved == false) return 'rejected';
+    return 'pending';
+};
+
+// ✅ Label + variant (Badge)
+const getStatusLabel = (sheet: { approved: boolean | null }) => {
+    const status = getStatusFromApproved(sheet.approved);
+    switch (status) {
+        case 'approved':
+            return { label: 'Approuvée', variant: 'success' };
+        case 'pending':
+            return { label: 'En attente', variant: 'warning' };
+        case 'rejected':
+            return { label: 'Rejetée', variant: 'destructive' };
+        default:
+            return { label: 'Inconnu', variant: 'default' };
+    }
+};
+
+// ✅ Icône correspondante
+const getStatusIcon = (approved: boolean | null) => {
+    const status = getStatusFromApproved(approved);
+    switch (status) {
+        case 'approved':
+            return CheckCircle;
+        case 'pending':
+            return Clock;
+        case 'rejected':
+            return AlertTriangle;
+        default:
+            return FileText;
+    }
+};
+
 const filteredExpenseSheets = computed(() => {
     return props.expenseSheets.filter(sheet => {
         const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesStatus = statusFilter.value === 'all' || sheet.status === statusFilter.value;
+        const status = getStatusFromApproved(sheet.approved);
+        const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
         return matchesSearch && matchesStatus;
     });
 });
@@ -80,7 +116,8 @@ const filteredExpenseSheets = computed(() => {
 const filteredExpenseToValidate = computed(() => {
     return props.expenseToValidate.filter(sheet => {
         const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesStatus = statusFilter.value === 'all' || sheet.status === statusFilter.value;
+        const status = getStatusFromApproved(sheet.approved);
+        const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
         return matchesSearch && matchesStatus;
     });
 });
@@ -93,23 +130,10 @@ const formatDate = (dateString) => {
     });
 };
 
-const approveExpenseSheet = (id) => {
+const approveExpenseSheet = (id: number) => {
     useForm({
         approval: true
     }).post('/expense-sheet/' + id + '/approve');
-};
-
-const getStatusIcon = (status) => {
-    switch (status) {
-        case 'approved':
-            return CheckCircle;
-        case 'pending':
-            return Clock;
-        case 'rejected':
-            return AlertTriangle;
-        default:
-            return FileText;
-    }
 };
 </script>
 
@@ -203,14 +227,16 @@ const getStatusIcon = (status) => {
                                 class="hover:bg-muted/50 transition-colors">
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <component :is="getStatusIcon(sheet.status)"
+                                        <!-- Exemple dans <component :is="..."> -->
+                                        <component :is="getStatusIcon(sheet.approved)"
                                                    class="mr-2 h-5 w-5"
                                                    :class="{
-                                  'text-warning': sheet.status === 'pending',
-                                  'text-success': sheet.status === 'approved',
-                                  'text-destructive': sheet.status === 'rejected',
-                                  'text-muted-foreground': !sheet.status
-                                }" />
+             'text-warning': getStatusFromApproved(sheet.approved) === 'pending',
+             'text-success': getStatusFromApproved(sheet.approved) === 'approved',
+             'text-destructive': getStatusFromApproved(sheet.approved) === 'rejected',
+             'text-muted-foreground': sheet.approved === undefined
+           }" />
+
                                         <span class="text-sm font-medium text-card-foreground">{{ sheet.form.name
                                             }}</span>
                                     </div>
@@ -219,6 +245,7 @@ const getStatusIcon = (status) => {
                                     <div class="text-sm font-semibold text-card-foreground">{{ sheet.total }} €</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    <!-- Exemple dans <Badge> -->
                                     <Badge :variant="getStatusLabel(sheet).variant">
                                         {{ getStatusLabel(sheet).label }}
                                     </Badge>
