@@ -2,7 +2,8 @@
 name: 🔧 Tâche technique
 about: Décrire une tâche technique (refacto, setup, optimisation…)
 title: "[TECH] "
-labels: chore
+labels: 
+    - 🖥️ Stack
 assignees: ''
 ---
 

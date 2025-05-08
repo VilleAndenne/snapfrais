@@ -2,7 +2,8 @@
 name: ✨ Feature request
 about: Proposer une nouvelle fonctionnalité
 title: "[FEATURE] "
-labels: enhancement
+labels: 
+    - 🔨 Demande de fonctionnalité
 assignees: 
     - sebastienmerv
 ---

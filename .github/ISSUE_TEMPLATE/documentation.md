@@ -2,7 +2,8 @@
 name: 📝 Documentation
 about: Proposer ou mettre à jour de la documentation
 title: "[DOC] "
-labels: documentation
+labels: 
+    - 📖 Documentation
 assignees: 
     - sebastienmerv
 ---

@@ -4,7 +4,8 @@ about: Signaler un comportement inattendu ou un dysfonctionnement
 title: "[BUG] "
 labels: 
     - 🐛Bug
-assignees: ''
+assignees:
+    - sebastienmerv
 ---
 
 ## Description du bug
