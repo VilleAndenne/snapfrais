@@ -6,7 +6,7 @@ Nous assurons actuellement la prise en charge des versions suivantes :
 
 | Version        | Support de sécurité |
 |----------------|---------------------|
-| Dernière `main` | ✅                  |
+| `V1.0.0` | ✅                  |
 
 ## Signalement de vulnérabilités
 
