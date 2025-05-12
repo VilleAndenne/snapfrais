@@ -31,39 +31,12 @@
         <!-- Km Google -->
         <div>
             <label class="block font-medium text-sm mb-1">Distance Google Maps</label>
-            <div>{{ googleKm.toFixed(1) }} km</div>
-        </div>
-
-        <!-- Km manuels sécurisés -->
-        <div>
-            <label class="block font-medium text-sm mb-1">Kilomètres à ajouter (±5 max)</label>
-            <Input
-                type="number"
-                step="0.1"
-                min="-5"
-                max="5"
-                v-model.number="manualKm"
-                class="input w-full"
-                @wheel.prevent
-                @blur="onManualKmBlur"
-                @input="onManualKmInput"
-            />
-        </div>
-
-        <!-- Justification -->
-        <div v-if="manualKm !== 0">
-            <label class="block font-medium text-sm mb-1">Justification</label>
-            <Textarea
-                v-model="justification"
-                class="textarea w-full"
-                rows="2"
-                placeholder="Ex: détour imposé, zone en travaux…"
-            />
+            <div>{{ Math.round(googleKm.toFixed(1)) }} km</div>
         </div>
 
         <!-- Total -->
         <div class="pt-2 border-t mt-4">
-            <div class="font-semibold">Total : {{ totalKm.toFixed(1) }} km</div>
+            <div class="font-semibold">Total : {{ Math.round(totalKm.toFixed(1)) }} km</div>
         </div>
     </div>
 </template>
@@ -124,8 +97,8 @@ watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
         departure: departure.value,
         arrival: arrival.value,
         steps: steps.value.filter(e => e),
-        googleKm: googleKm.value,
-        manualKm: manualKm.value,
+        googleKm: Math.round(googleKm.value),
+        manualKm: Math.round(manualKm.value),
         justification: manualKm.value !== 0 ? justification.value : null,
         totalKm: totalKm.value
     });
