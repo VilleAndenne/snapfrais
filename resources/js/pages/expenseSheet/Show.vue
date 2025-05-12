@@ -174,17 +174,22 @@
 
                                     <li>
                                         <span class="font-semibold">Distance Google :</span>
-                                        {{ cost.route.google_km }} km
+                                        {{ Math.round(cost.route.google_km) }} km
                                     </li>
 
-                                    <li v-if="cost.route.manual_km">
-                                        <span class="font-semibold">Distance manuelle :</span>
-                                        {{ cost.route.manual_km }} km
-                                    </li>
+<!--                                    <li v-if="cost.route.manual_km">-->
+<!--                                        <span class="font-semibold">Distance manuelle :</span>-->
+<!--                                        {{ cost.route.manual_km }} km-->
+<!--                                    </li>-->
 
                                     <li v-if="cost.route.justification">
                                         <span class="font-semibold">Justification :</span>
                                         {{ cost.route.justification }}
+                                    </li>
+
+                                    <li class="font-semibold">
+                                        <span class="font-semibold">Total des KM :</span>
+                                        {{ Math.round(cost.route.google_km + cost.route.manual_km) }} km
                                     </li>
                                 </ul>
                             </div>
