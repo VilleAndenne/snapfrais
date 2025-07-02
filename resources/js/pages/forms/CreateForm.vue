@@ -170,10 +170,12 @@
 
                         <!-- Form Submission -->
                         <div class="pt-4 border-t">
-                            <div class="flex justify-end space-x-3">
-                                <Button type="button" variant="outline">
+                            <div class="flex justify-end space-x-3 items-center">
+                                <Link
+                                    :href="route('forms.index')"
+                                    type="button">
                                     Annuler
-                                </Button>
+                                </Link>
                                 <Button type="submit" :disabled="form.processing">
                                     <Loader2Icon v-if="form.processing" class="animate-spin mr-2 h-4 w-4" />
                                     {{ form.processing ? 'Envoi en cours...' : 'Enregistrer' }}
@@ -188,9 +190,9 @@
 </template>
 
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { ref, reactive } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     Card,
     CardHeader,

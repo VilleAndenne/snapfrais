@@ -85,10 +85,12 @@ const addForm = () => {
 };
 
 function deleteForm(id) {
-    router.delete(route('forms.destroy', id), {
-        onSuccess: () => {
-            forms.value = forms.value.filter(form => form.id !== id);
-        }
-    })
+    if (window.confirm("Es-tu sûr de vouloir supprimer ce formulaire ?")) {
+        router.delete(route('forms.destroy', id), {
+            onSuccess: () => {
+                forms.value = forms.value.filter(form => form.id !== id);
+            }
+        });
+    }
 }
 </script>

@@ -165,10 +165,12 @@
 
                         <!-- Form Submission -->
                         <div class="pt-4 border-t">
-                            <div class="flex justify-end space-x-2">
-                                <Button type="button" variant="outline" @click="cancelEdit">
+                            <div class="flex justify-end space-x-2 items-center">
+                                <Link
+                                    :href="route('forms.index')"
+                                    type="button">
                                     Annuler
-                                </Button>
+                                </Link>
                                 <Button type="submit" :disabled="form.processing">
                                     <Loader2Icon v-if="form.processing" class="h-4 w-4 mr-2 animate-spin" />
                                     Enregistrer
@@ -186,7 +188,7 @@
 <script setup>
 
 import { ref, reactive } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     Card,
     CardHeader,
