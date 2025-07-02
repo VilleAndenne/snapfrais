@@ -27,12 +27,15 @@
                         <TableRow v-for="form in forms" :key="form.id">
                             <TableCell class="font-medium">{{ form.name }}</TableCell>
                             <TableCell>{{ form.description }}</TableCell>
-                            <TableCell class="text-right">
+                            <TableCell class="text-right space-x-2">
                                 <Link :href="'/forms/' + form.id + '/edit'">
                                     <Button variant="outline" size="sm">
                                         Modifier
                                     </Button>
                                 </Link>
+                                <Button @click="deleteForm(form.id)" variant="destructive" size="sm">
+                                    Supprimer
+                                </Button>
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="forms.length === 0">
@@ -80,4 +83,12 @@ const breadcrumbs = [
 const addForm = () => {
     router.visit('/forms/create');
 };
+
+function deleteForm(id) {
+    router.delete(route('forms.destroy', id), {
+        onSuccess: () => {
+            forms.value = forms.value.filter(form => form.id !== id);
+        }
+    })
+}
 </script>

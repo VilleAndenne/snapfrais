@@ -250,6 +250,10 @@ class FormController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $form = Form::findOrFail($id);
+
+        $form->delete();
+
+        return redirect()->back()->with('success', 'Formulaire supprimé avec succès.');
     }
 }
