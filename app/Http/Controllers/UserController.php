@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\UsersImport;
+use App\Models\Department;
 use App\Models\User;
 use App\Notifications\UserCreated;
 use Illuminate\Auth\Passwords\PasswordBroker;
@@ -10,6 +12,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
@@ -148,5 +151,24 @@ class UserController extends Controller
         $user->delete();
 
         return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès.');
+    }
+
+    public function import()
+    {
+        if (!auth()->user()->can('create', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
+        return Inertia::render('users/Import');
+    }
+
+    public function doImport(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,csv,txt',
+        ]);
+
+        Excel::import(new UsersImport, $request->file('file'));
+
+        return redirect()->route('users.index')->with('success', 'Import terminé avec succès.');
     }
 }

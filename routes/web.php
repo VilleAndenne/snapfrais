@@ -11,6 +11,8 @@ Route::get('/', function () {
 Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('auth');
 
 Route::resource('departments', \App\Http\Controllers\DepartmentController::class)->middleware(['auth', 'verified']);
+Route::get('/users/import', [\App\Http\Controllers\UserController::class, 'import'])->middleware(['auth', 'verified'])->name('users.import.form');
+Route::post('/users/import', [\App\Http\Controllers\UserController::class, 'doImport'])->middleware(['auth', 'verified'])->name('users.import');
 Route::resource('users', \App\Http\Controllers\UserController::class)->middleware(['auth', 'verified']);
 
 Route::get('/export', [\App\Http\Controllers\ExpenseSheetController::class, 'exportForm'])->middleware(['auth', 'verified'])->name('export');
