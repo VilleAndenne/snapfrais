@@ -168,11 +168,12 @@ class UserController extends Controller
         ]);
 
         // 1) Sauver le fichier sur un disque persistant
-        $disk = env('FILESYSTEM_DISK');
-        $path = $request->file('file')->store('imports', $disk);
+        $file = \Storage::putFile('imports', $request->file('file'));
+
+        $path = \Storage::path($file);
 
         // 2) Lancer l'import en queue en précisant le disque
-        Excel::queueImport(new UsersImport, $path, $disk);
+        Excel::queueImport(new UsersImport, $path);
 
         return redirect()
             ->route('users.index')
