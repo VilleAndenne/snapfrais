@@ -164,16 +164,19 @@ class UserController extends Controller
     public function doImport(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,csv', // évite 'txt' sauf besoin spécifique
+            'file' => 'required|mimes:xlsx,csv',
         ]);
 
-        $path = $request->file('file')->store('imports');
+        // 1) Sauver le fichier sur un disque persistant
+        $disk = env('FILESYSTEM_DISK');
+        $path = $request->file('file')->store('imports', $disk);
 
-        // Nécessite un import qui implémente ShouldQueue
-        Excel::queueImport(new UsersImport, $path);
+        // 2) Lancer l'import en queue en précisant le disque
+        Excel::queueImport(new UsersImport, $path, $disk);
 
         return redirect()
             ->route('users.index')
-            ->with('success', 'Import démarré. Vous serez notifié à la fin.');
+            ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
     }
+
 }
