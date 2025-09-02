@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\UserCreated;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -173,7 +174,7 @@ class UserController extends Controller
         $path = \Storage::path($file);
 
         // 2) Lancer l'import en queue en précisant le disque
-        Excel::queueImport(new UsersImport, $path);
+        Excel::queueImport(new UsersImport, $file);
 
         return redirect()
             ->route('users.index')
