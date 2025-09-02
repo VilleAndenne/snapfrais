@@ -4,13 +4,15 @@ namespace App\Imports;
 
 use App\Models\User;
 use App\Models\Department;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Password;
 use App\Notifications\UserCreated;
 use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
-class UsersImport implements ToModel, WithHeadingRow
+class UsersImport implements ToModel, WithHeadingRow, ShouldQueue, WithChunkReading
 {
     public function model(array $row)
     {
@@ -39,4 +41,7 @@ class UsersImport implements ToModel, WithHeadingRow
 
         return $user;
     }
+
+    public function chunkSize(): int { return 1000; }
+    public function batchSize(): int { return 1000; }
 }
