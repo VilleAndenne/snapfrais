@@ -169,11 +169,8 @@ class UserController extends Controller
             'file' => 'required|mimes:xlsx,csv',
         ]);
 
-        // Sauvegarde le fichier sur un disque persistant (ex: s3 ou local)
-        $path = Storage::putFile('imports', $request->file('file'));
-
         // Lancer l'import en queue en précisant bien le disque
-        Excel::queueImport(new UsersImport, $path, env('FILESYSTEM_DISK', 'local'));
+        Excel::queueImport(new UsersImport, $request->file('file'));
 
         return redirect()
             ->route('users.index')
