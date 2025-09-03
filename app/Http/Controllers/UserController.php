@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -168,17 +169,14 @@ class UserController extends Controller
             'file' => 'required|mimes:xlsx,csv',
         ]);
 
-        // 1) Sauver le fichier sur un disque persistant
-        $file = \Storage::putFile('imports', $request->file('file'));
+        // Sauvegarde le fichier sur un disque persistant (ex: s3 ou local)
+        $path = Storage::putFile('imports', $request->file('file'));
 
-        $path = \Storage::path($file);
-
-        // 2) Lancer l'import en queue en précisant le disque
-        Excel::queueImport(new UsersImport, $file);
+        // Lancer l'import en queue en précisant bien le disque
+        Excel::queueImport(new UsersImport, $path, env('FILESYSTEM_DISK', 'local'));
 
         return redirect()
             ->route('users.index')
             ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
     }
-
 }
