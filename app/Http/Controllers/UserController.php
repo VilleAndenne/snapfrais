@@ -170,7 +170,7 @@ class UserController extends Controller
         ]);
 
         // Lancer l'import en queue en précisant bien le disque
-        Excel::queueImport(new UsersImport, \File::putFile($request->file('file')));
+        Excel::queueImport(new UsersImport, Storage::putFile($request->file('file')));
 
         return redirect()
             ->route('users.index')
