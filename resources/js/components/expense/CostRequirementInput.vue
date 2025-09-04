@@ -24,29 +24,6 @@
 
             <!-- FILE -->
             <div v-else-if="req.type === 'file'">
-                <!-- Fichier existant -->
-                <div v-if="existingFiles[req.name] && !localData[req.name]" class="mb-2">
-                    <p class="text-sm text-muted-foreground mb-1">Fichier actuel :</p>
-                    <div class="flex items-center gap-2">
-                        <a
-                            :href="getFileUrl(existingFiles[req.name])"
-                            target="_blank"
-                            class="text-sm text-primary hover:underline"
-                        >
-                            Voir le fichier
-                        </a>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            class="text-destructive"
-                            @click="removeExistingFile(req.name)"
-                        >
-                            Remplacer / retirer
-                        </Button>
-                    </div>
-                </div>
-
                 <!-- Input file -->
                 <Input
                     v-if="!existingFiles[req.name] || localData[req.name]"
