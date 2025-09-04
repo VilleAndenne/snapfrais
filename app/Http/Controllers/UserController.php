@@ -168,9 +168,10 @@ class UserController extends Controller
         $request->validate([
             'file' => 'required|mimes:xlsx,csv',
         ]);
+        $file = Storage::putFile('imports', $request->file('file'), 'public');
 
         // Lancer l'import en queue en précisant bien le disque
-        Excel::queueImport(new UsersImport, Storage::putFile($request->file('file')));
+        Excel::queueImport(new UsersImport, $file);
 
         return redirect()
             ->route('users.index')
