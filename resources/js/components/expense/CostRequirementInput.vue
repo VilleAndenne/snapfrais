@@ -50,6 +50,7 @@
                 <!-- Input file -->
                 <Input
                     v-if="!existingFiles[req.name] || localData[req.name]"
+                    :key="`${req.name}-${localData[req.name]}`"
                     :id="`req-${req.name}`"
                     type="file"
                     :accept="req.accept || undefined"
@@ -73,51 +74,49 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue';
+import { reactive, watch, nextTick, toRaw } from 'vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
 const props = defineProps({
-    requirements: {
-        type: Array,
-        default: () => [] // [{ name: 'Justif', type: 'file'|'text', placeholder?, accept? }]
-    },
-    modelValue: {
-        type: Object,
-        default: () => ({}) // { [req.name]: string | File }
-    },
-    existingFiles: {
-        type: Object,
-        default: () => ({}) // { [req.name]: 'path/to/file.pdf' }
-    },
-    storageBaseUrl: {
-        type: String,
-        default: '/storage' // préfixe pour les fichiers relatifs
-    },
-    submitted: {
-        type: Boolean,
-        default: false
-    }
+    requirements: { type: Array, default: () => [] },
+    modelValue: { type: Object, default: () => ({}) },   // { [req.name]: string | File }
+    existingFiles: { type: Object, default: () => ({}) },
+    storageBaseUrl: { type: String, default: '/storage' },
+    submitted: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['update:modelValue']);
 
+// --- état local
 const localData = reactive({ ...props.modelValue });
 
-// sync -> parent
+// --- garde pour éviter la boucle
+let isSyncing = false;
+
+// sync -> parent (seulement si ce n’est PAS une sync entrante)
 watch(
     localData,
-    (val) => emit('update:modelValue', { ...val }),
+    (val) => {
+        if (isSyncing) return;
+        // retire les proxies (notamment pour les File), et clone à plat
+        const raw = toRaw(val);
+        emit('update:modelValue', { ...raw });
+    },
     { deep: true }
 );
 
-// sync <- parent
+// sync <- parent (et ne réémet pas)
 watch(
     () => props.modelValue,
     (val) => {
+        isSyncing = true;
+        // Remplace proprement le contenu local
         Object.keys(localData).forEach((k) => delete localData[k]);
         Object.assign(localData, val || {});
+        // Laisse le temps au flush des watchers avant de réautoriser l’emit
+        nextTick(() => { isSyncing = false; });
     },
     { deep: true }
 );
@@ -125,16 +124,13 @@ watch(
 function onFileChange(event, key) {
     const file = event.target.files?.[0];
     if (file) {
-        localData[key] = file;
-        emit('update:modelValue', { ...localData });
+        localData[key] = file; // File reste natif (non proxyfié)
     }
 }
 
 function removeExistingFile(key) {
-    // Supprime la référence au fichier existant → l’input file devient obligatoire
     if (props.existingFiles[key]) {
         localData[key] = null;
-        emit('update:modelValue', { ...localData });
     }
 }
 
@@ -144,7 +140,7 @@ function isEmpty(req) {
         return !val || String(val).trim() === '';
     }
     if (req.type === 'file') {
-        const hasNew = val instanceof File;
+        const hasNew = val;
         const hasExisting = !!props.existingFiles[req.name];
         return !(hasNew || hasExisting);
     }
@@ -156,5 +152,3 @@ function getFileUrl(path) {
     return `${props.storageBaseUrl.replace(/\/$/, '')}/${String(path).replace(/^\//, '')}`;
 }
 </script>
-
-<style scoped></style>
