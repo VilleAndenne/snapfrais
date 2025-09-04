@@ -47,7 +47,7 @@
                     </div>
                 </div>
 
-                <!-- Input file (toujours visible si pas de fichier existant, ou si on remplace) -->
+                <!-- Input file -->
                 <Input
                     v-if="!existingFiles[req.name] || localData[req.name]"
                     :id="`req-${req.name}`"
@@ -58,12 +58,7 @@
                     :class="{ 'border-red-500': isEmpty(req) }"
                 />
 
-                <!-- Nom du nouveau fichier -->
-                <p v-if="localData[req.name]" class="text-sm text-muted-foreground">
-                    Nouveau fichier sélectionné : {{ localData[req.name]?.name }}
-                </p>
-
-                <!-- Erreur requise -->
+                <!-- Message d’erreur -->
                 <p v-if="isEmpty(req)" class="text-sm text-red-600">
                     Ce fichier est requis.
                 </p>
@@ -94,29 +89,26 @@ const props = defineProps({
     },
     existingFiles: {
         type: Object,
-        default: () => ({}) // { [req.name]: 'path/relative/ou/complete' }
+        default: () => ({}) // { [req.name]: 'path/to/file.pdf' }
     },
     storageBaseUrl: {
         type: String,
-        default: '/storage' // pour préfixer une path relative
+        default: '/storage' // préfixe pour les fichiers relatifs
     }
 });
 
 const emit = defineEmits(['update:modelValue']);
 
-// copie réactive locale pour v-model
 const localData = reactive({ ...props.modelValue });
 
 // sync -> parent
 watch(
     localData,
-    (val) => {
-        emit('update:modelValue', { ...val });
-    },
+    (val) => emit('update:modelValue', { ...val }),
     { deep: true }
 );
 
-// sync <- parent (si le parent remplace entièrement l'objet)
+// sync <- parent
 watch(
     () => props.modelValue,
     (val) => {
@@ -135,37 +127,28 @@ function onFileChange(event, key) {
 }
 
 function removeExistingFile(key) {
-    // Retire la référence au fichier existant (côté affichage)
-    // et force l'utilisateur à sélectionner un nouveau fichier
+    // Supprime la référence au fichier existant → l’input file devient obligatoire
     if (props.existingFiles[key]) {
-        // On ne modifie pas props.existingFiles (readonly), on se contente de
-        // mettre localData[key] à null => l'input file devient requis
         localData[key] = null;
         emit('update:modelValue', { ...localData });
     }
 }
 
-// Helper pour savoir si un requirement est vide
 function isEmpty(req) {
     const val = localData[req.name];
-
     if (req.type === 'text') {
         return !val || String(val).trim() === '';
     }
     if (req.type === 'file') {
-        // satisfait si un nouveau File est choisi OU s'il existe un fichier existant
         const hasNew = val instanceof File;
         const hasExisting = !!props.existingFiles[req.name];
         return !(hasNew || hasExisting);
     }
-    return true; // type inconnu => considéré vide
+    return true;
 }
 
-// Génère l'URL affichable du fichier existant
 function getFileUrl(path) {
-    // si path est déjà absolu (http/https), on le retourne tel quel
     if (/^https?:\/\//i.test(path)) return path;
-    // sinon on préfixe par storageBaseUrl (par ex. '/storage')
     return `${props.storageBaseUrl.replace(/\/$/, '')}/${String(path).replace(/^\//, '')}`;
 }
 </script>
