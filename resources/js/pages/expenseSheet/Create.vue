@@ -86,6 +86,7 @@
                         v-if="cost.requirements?.length"
                         :requirements="cost.requirements"
                         v-model="costData[index].requirements"
+                        :submitted="submitted"
                     />
                 </div>
             </div>
@@ -200,7 +201,10 @@ const removeCost = (index) => {
     costData.value.splice(index, 1);
 };
 
+const submitted = ref(false);
+
 const submit = () => {
+    submitted.value = true;
     // 1) Construire l'objet à poster (comme tu fais déjà)
     form.costs = selectedCosts.value.map((cost, index) => {
         const data =

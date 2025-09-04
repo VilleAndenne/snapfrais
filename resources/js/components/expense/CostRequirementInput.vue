@@ -15,9 +15,9 @@
                     type="text"
                     :placeholder="req.placeholder || ''"
                     :aria-invalid="isEmpty(req)"
-                    :class="{ 'border-red-500': isEmpty(req) }"
+                    :class="{ 'border-red-500': submitted && isEmpty(req) }"
                 />
-                <p v-if="isEmpty(req)" class="text-sm text-red-600">
+                <p v-if="submitted && isEmpty(req)" class="text-sm text-red-600">
                     Ce champ est requis.
                 </p>
             </div>
@@ -54,12 +54,12 @@
                     type="file"
                     :accept="req.accept || undefined"
                     @change="onFileChange($event, req.name)"
-                    :aria-invalid="isEmpty(req)"
-                    :class="{ 'border-red-500': isEmpty(req) }"
+                    :aria-invalid="submitted && isEmpty(req)"
+                    :class="{ 'border-red-500': submitted && isEmpty(req) }"
                 />
 
                 <!-- Message d’erreur -->
-                <p v-if="isEmpty(req)" class="text-sm text-red-600">
+                <p v-if="submitted && isEmpty(req)" class="text-sm text-red-600">
                     Ce fichier est requis.
                 </p>
             </div>
@@ -94,6 +94,10 @@ const props = defineProps({
     storageBaseUrl: {
         type: String,
         default: '/storage' // préfixe pour les fichiers relatifs
+    },
+    submitted: {
+        type: Boolean,
+        default: false
     }
 });
 
