@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     Table,
@@ -112,7 +112,7 @@ import Heading from '@/components/Heading.vue';
 import { usePage } from '@inertiajs/vue3';
 import { PlusIcon } from 'lucide-vue-next';
 
-const pageCtx = usePage()
+const page = usePage();
 
 // ✅ users reste synchronisé avec les props Inertia après chaque navigation
 const users = computed(() => pageCtx.props.users)
