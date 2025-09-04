@@ -169,14 +169,22 @@ class UserController extends Controller
             'file' => 'required|mimes:xlsx,csv',
         ]);
 
-        // Envoie le fichier sur un disque partagé (ex: s3)
-        $path = $request->file('file')->store('imports', ['disk' => 'laravel_cloud']);
+        // Envoie le fichier sur le disque partagé "laravel_cloud"
+        $path = $request->file('file')->store('imports', 'laravel_cloud');
 
-        // Très important : préciser le disque où se trouve le fichier
+        // (Optionnel mais utile) Forcer la config runtime au cas où le worker n'a pas la même env
+        config([
+            'excel.temporary_files.remote_disk' => 'laravel_cloud',
+            'excel.temporary_files.remote_prefix' => 'temp/excel',
+            'excel.temporary_files.force_resync_remote' => true,
+        ]);
+
+        // Très important : préciser le DISQUE où se trouve le fichier
         Excel::queueImport(new UsersImport, $path, 'laravel_cloud');
 
         return redirect()
             ->route('users.index')
             ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
     }
+
 }
