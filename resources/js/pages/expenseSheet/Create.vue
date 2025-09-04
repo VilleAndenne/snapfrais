@@ -2,7 +2,7 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Nouvelle note de frais" />
 
-        <div class="container mx-auto p-4 space-y-6">
+        <div class="container mx-auto space-y-6 p-4">
             <h1 class="text-2xl font-semibold text-foreground">Créer une note de frais</h1>
 
             <!-- Sélection du département -->
@@ -13,11 +13,7 @@
                         <SelectValue placeholder="Sélectionner un département" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem
-                            v-for="dep in props.departments"
-                            :key="dep.id"
-                            :value="dep.id"
-                        >
+                        <SelectItem v-for="dep in props.departments" :key="dep.id" :value="dep.id">
                             {{ dep.name }}
                         </SelectItem>
                     </SelectContent>
@@ -28,26 +24,21 @@
             </div>
 
             <!-- Coûts ajoutés -->
-            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t border-border">
+            <div v-if="selectedCosts.length" class="space-y-6 border-t border-border pt-6">
                 <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-4 border border-border rounded bg-card text-card-foreground relative space-y-4"
+                    class="relative space-y-4 rounded border border-border bg-card p-4 text-card-foreground"
                 >
                     <!-- Bouton de suppression -->
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        class="absolute top-2 right-2 text-destructive"
-                        @click="removeCost(index)"
-                    >
-                        <Trash2Icon class="w-5 h-5" />
+                    <Button variant="ghost" size="icon" class="absolute right-2 top-2 text-destructive" @click="removeCost(index)">
+                        <Trash2Icon class="h-5 w-5" />
                     </Button>
 
                     <!-- Détails du coût -->
-                    <div class="flex justify-between items-center">
+                    <div class="flex items-center justify-between">
                         <h3 class="text-xl font-bold">{{ cost.name }}</h3>
                         <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
@@ -59,13 +50,10 @@
                         <input
                             type="date"
                             v-model="costData[index].date"
-                            class="border border-border rounded p-2 w-full bg-background text-foreground"
+                            class="w-full rounded border border-border bg-background p-2 text-foreground"
                             @change="updateRate(index, cost)"
                         />
-                        <span
-                            v-if="form.errors[`costs.${index}.date`]"
-                            class="text-sm text-red-600"
-                        >
+                        <span v-if="form.errors[`costs.${index}.date`]" class="text-sm text-red-600">
                             {{ form.errors[`costs.${index}.date`] }}
                         </span>
                     </div>
@@ -73,6 +61,21 @@
                     <!-- Champs dynamiques selon le type de coût -->
                     <div v-if="cost.type === 'km'">
                         <KmCostInput v-model="costData[index].kmData" />
+
+                        <!-- Résumé remboursement km -->
+                        <div class="mt-3 rounded border border-border bg-muted/40 p-3">
+                            <div class="flex flex-col gap-x-4 gap-y-2 text-sm">
+                                <span class="font-medium">Estimation</span>
+                                <span>• Taux : {{ formatRate(getActiveRate(cost, costData[index].date)) }} / km</span>
+                                <span>• Distance : {{ roundKm(costData[index]?.kmData?.totalKm) }} km</span>
+                                <span>
+                                    • Remboursé :
+                                    <span class="font-semibold">
+                                        {{ formatCurrency(kmReimbursed(index, cost)) }}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div v-else-if="cost.type === 'fixed'">
                         <FixedCostDisplay v-model="costData[index]" />
@@ -93,21 +96,15 @@
 
             <!-- Coûts disponibles -->
             <div>
-                <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
-                <p class="text-sm text-muted-foreground mb-4">
-                    Coûts ajoutés : {{ selectedCosts.length }}/7
-                </p>
-                <CostPicker
-                    :available-costs="costs"
-                    :selected-costs="selectedCosts"
-                    @add="addToRequest"
-                />
+                <h2 class="mb-2 text-lg font-medium text-foreground">Types de coûts disponibles</h2>
+                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/7</p>
+                <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
             <!-- Bouton d'envoi -->
             <div class="flex justify-end pt-8">
                 <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
-                    <Loader2Icon v-if="form.processing" class="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                     {{ form.processing ? 'Envoi en cours...' : 'Envoyer la demande' }}
                 </Button>
             </div>
@@ -116,25 +113,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useForm, Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
-import { Loader2Icon, Trash2Icon } from 'lucide-vue-next';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { Head, useForm } from '@inertiajs/vue3';
+import { Loader2Icon, Trash2Icon } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
-import KmCostInput from '@/components/expense/KmCostInput.vue';
-import FixedCostDisplay from '@/components/expense/FixedCostDisplay.vue';
-import PercentageCostInput from '@/components/expense/PercentageCostInput.vue';
 import CostrequirementInput from '@/components/expense/CostRequirementInput.vue';
+import FixedCostDisplay from '@/components/expense/FixedCostDisplay.vue';
+import KmCostInput from '@/components/expense/KmCostInput.vue';
+import PercentageCostInput from '@/components/expense/PercentageCostInput.vue';
 
 const costs = ref([]);
 const selectedCosts = ref([]);
@@ -142,12 +133,12 @@ const costData = ref([]);
 
 const props = defineProps({
     form: { type: Object, required: true },
-    departments: { type: Array, required: true }
+    departments: { type: Array, required: true },
 });
 
 const form = useForm({
     costs: [],
-    department_id: null
+    department_id: null,
 });
 
 onMounted(() => {
@@ -155,9 +146,7 @@ onMounted(() => {
 });
 
 const getActiveRate = (cost, date) => {
-    const activeRate = cost.reimbursement_rates.find(
-        (rate) => rate.start_date <= date && (!rate.end_date || rate.end_date >= date)
-    );
+    const activeRate = cost.reimbursement_rates.find((rate) => rate.start_date <= date && (!rate.end_date || rate.end_date >= date));
     return activeRate?.value ?? 0;
 };
 
@@ -174,10 +163,10 @@ const addToRequest = (cost) => {
         percentageData: {
             paidAmount: null,
             percentage: getActiveRate(cost, new Date().toISOString().split('T')[0]),
-            reimbursedAmount: 0
+            reimbursedAmount: 0,
         },
         requirements: {},
-        fixedAmount: getActiveRate(cost, new Date().toISOString().split('T')[0])
+        fixedAmount: getActiveRate(cost, new Date().toISOString().split('T')[0]),
     });
 };
 
@@ -208,9 +197,11 @@ const submit = () => {
     // 1) Construire l'objet à poster (comme tu fais déjà)
     form.costs = selectedCosts.value.map((cost, index) => {
         const data =
-            cost.type === 'km' ? costData.value[index].kmData :
-                cost.type === 'percentage' ? costData.value[index].percentageData :
-                    { amount: costData.value[index].fixedAmount };
+            cost.type === 'km'
+                ? costData.value[index].kmData
+                : cost.type === 'percentage'
+                  ? costData.value[index].percentageData
+                  : { amount: costData.value[index].fixedAmount };
 
         // requirements "plats" (clé -> {file|value})
         const requirements = {};
@@ -228,14 +219,14 @@ const submit = () => {
             cost_id: cost.id,
             date: costData.value[index].date,
             data,
-            requirements
+            requirements,
         };
     });
 
     // 2) Valider les CostRequirementInput AVANT l’envoi
     if (!validateAllRequirements()) {
         // Optionnel : scroll jusqu’à la première erreur
-        const firstErrorKey = Object.keys(form.errors).find(k => k.includes('.requirements.'));
+        const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
         if (firstErrorKey) {
             // Essaie de scroller sur le container de la première carte coût
             const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
@@ -286,10 +277,9 @@ const submit = () => {
             });
 
             return fd;
-        }
+        },
     });
 };
-
 
 // Renvoie true/false et alimente form.errors pour chaque requirement manquant
 const validateRequirementsForCost = (cost, index) => {
@@ -344,10 +334,28 @@ const validateAllRequirements = () => {
     return allOk;
 };
 
+// Helpers d'affichage
+const roundKm = (v) => {
+    const n = Number(v) || 0;
+    return Math.round(n * 10) / 10; // 0.1 km près
+};
+
+const formatCurrency = (v) =>
+    (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' });
+
+const formatRate = (v) => `${v} €`;
+
+// Montant remboursé pour un coût "km" donné
+const kmReimbursed = (index, cost) => {
+    const km = Number(costData.value[index]?.kmData?.totalKm) || 0;
+    const rate = getActiveRate(cost, costData.value[index].date); // €/km
+    return Number((km * rate).toFixed(2));
+};
+
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Notes de frais', href: '/expense-sheet' },
-    { title: 'Créer une note de frais' }
+    { title: 'Créer une note de frais' },
 ];
 </script>

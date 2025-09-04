@@ -33,11 +33,6 @@
             <label class="block font-medium text-sm mb-1">Distance Google Maps</label>
             <div>{{ Math.round(googleKm.toFixed(1)) }} km</div>
         </div>
-
-        <!-- Total -->
-        <div class="pt-2 border-t mt-4">
-            <div class="font-semibold">Total : {{ Math.round(totalKm.toFixed(1)) }} km</div>
-        </div>
     </div>
 </template>
 
