@@ -162,6 +162,12 @@ const navigateToEdit = (departmentId) => {
 const confirmDelete = (department) => {
     departmentToDelete.value = department;
     showDeleteDialog.value = true;
+    const formDelete = useForm({
+        id: department.id
+    });
+
+    formDelete.delete(route('departments.destroy', department.id));
+
 };
 
 // Supprimer un département
