@@ -168,10 +168,12 @@ class UserController extends Controller
         $request->validate([
             'file' => 'required|mimes:xlsx,csv',
         ]);
-        $file = Storage::putFile('imports', $request->file('file'), 'public');
 
-        // Lancer l'import en queue en précisant bien le disque
-        Excel::queueImport(new UsersImport, $file);
+        // Envoie le fichier sur un disque partagé (ex: s3)
+        $path = $request->file('file')->store('imports', ['disk' => 'laravel_cloud']);
+
+        // Très important : préciser le disque où se trouve le fichier
+        Excel::queueImport(new UsersImport, $path, 'laravel_cloud');
 
         return redirect()
             ->route('users.index')
