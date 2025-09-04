@@ -114,9 +114,10 @@ import { PlusIcon } from 'lucide-vue-next';
 
 const page = usePage();
 
-// Récupération des données depuis les props
-const users = ref(page.props.users);
-const filters = ref(page.props.filters || { search: '' });
+// ✅ users reste synchronisé avec les props Inertia après chaque navigation
+const users = computed(() => pageCtx.props.users)
+
+const filters = ref({ search: pageCtx.props.filters?.search ?? '' })
 
 const breadcrumbs = [
     {
@@ -139,15 +140,12 @@ const search = () => {
 };
 
 // Fonction pour la pagination
-const goToPage = (page) => {
-    router.get('/users', {
-        ...filters.value,
-        page
-    }, {
+const goToPage = (targetPage) => {
+    router.get('/users', { ...filters.value, page: targetPage }, {
         preserveState: true,
         replace: true
-    });
-};
+    })
+}
 
 // Fonction pour confirmer la suppression
 const confirmDelete = (user) => {
