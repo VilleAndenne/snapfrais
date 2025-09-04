@@ -7,6 +7,7 @@ use App\Models\Form;
 use App\Models\FormCost;
 use App\Notifications\ApprovalExpenseSheet;
 use App\Notifications\ReceiptExpenseSheet;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -469,63 +470,71 @@ class ExpenseSheetController extends Controller
 
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date' => 'required|date',
+            'end_date'   => 'required|date',
         ]);
 
-        $startDate = $validated['start_date'];
-        $endDate = $validated['end_date'];
+        // On élargit end_date à la fin de journée pour inclure toute la date
+        $startDate = Carbon::parse($validated['start_date'])->startOfDay();
+        $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
 
-        // Récupérer tous les utilisateurs ayant au moins un ExpenseSheetCost entre ces dates
-        $users = \App\Models\User::whereHas('expenseSheets.expenseSheetCosts', function ($query) use ($startDate, $endDate) {
-            $query->whereBetween('date', [$startDate, $endDate]);
-        })->with(['expenseSheets.expenseSheetCosts.formCost.form'])->get();
+        // Récupérer les utilisateurs ayant au moins une note encodée dans l'intervalle
+        // et ne charger que ces notes + leurs coûts (avec formCost->form)
+        $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
+            $q->whereBetween('created_at', [$startDate, $endDate]);
+            // Si tu as une colonne dédiée : $q->whereBetween('encoded_at', [$startDate, $endDate]);
+        })
+            ->with([
+                'expenseSheets' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('created_at', [$startDate, $endDate]);
+                    // $q->whereBetween('encoded_at', [$startDate, $endDate]);
+                },
+                'expenseSheets.expenseSheetCosts.formCost.form'
+            ])
+            ->get();
 
-        // Création du tableau de données
-        $data = [];
-
-//        return 1;
-        // Préparer la première ligne : Username + liste des coûts (types de coût + formulaire)
+        // Préparer l'entête : Username + liste unique de tous les types de coûts rencontrés
         $headers = ['Username'];
-        $costTypes = []; // pour stocker tous les types de coût rencontrés
+        $costTypes = []; // 'Nom coût (Nom formulaire)' => type
 
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if ($cost->date >= $startDate && $cost->date <= $endDate) {
-                        $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
-                        $costTypes[$key] = $cost->formCost->type; // type: KM, FIXE, POURCENT
-                    }
+                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $costTypes[$key] = $cost->formCost->type; // 'km', 'fixe', 'pourcent' (adapter selon tes valeurs)
                 }
             }
         }
 
         $headers = array_merge($headers, array_keys($costTypes));
 
-        // Remplir les données utilisateur
-        foreach ($users as $user) {
-            $row = [];
-            $row[] = $user->name;
+        // Construire les lignes utilisateur
+        $data = [];
 
-            // Initialiser toutes les colonnes à zéro
+        foreach ($users as $user) {
+            $row = [$user->name];
+
+            // Initialiser toutes les colonnes à 0
             $costSums = array_fill_keys(array_keys($costTypes), 0);
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if ($cost->date >= $startDate && $cost->date <= $endDate) {
-                        $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
 
-                        if (isset($costTypes[$key])) {
-                            if ($cost->formCost->type === 'km') {
-                                $costSums[$key] += ($cost->route['google_km'] + $cost->route['manual_km']);
-                            } else {
-                                $costSums[$key] += $cost->amount;
-                            }
+                    if (isset($costTypes[$key])) {
+                        if (strtolower($cost->formCost->type) === 'km') {
+                            // Sécuriser l'accès à route (array ou cast)
+                            $route = is_array($cost->route) ? $cost->route : (array) $cost->route;
+                            $googleKm = isset($route['google_km']) ? (float)$route['google_km'] : 0;
+                            $manualKm = isset($route['manual_km']) ? (float)$route['manual_km'] : 0;
+                            $costSums[$key] += ($googleKm + $manualKm);
+                        } else {
+                            $costSums[$key] += (float) $cost->amount;
                         }
                     }
                 }
             }
 
-            // Ajouter les valeurs à la ligne
+            // Ajouter dans l'ordre des headers
             foreach (array_keys($costTypes) as $key) {
                 $row[] = $costSums[$key];
             }
@@ -533,18 +542,18 @@ class ExpenseSheetController extends Controller
             $data[] = $row;
         }
 
-        // Création du fichier Excel
+        // Générer l'Excel
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
-        // Ecriture de l'entête
+        // Ligne d'entête
         $col = 1;
         foreach ($headers as $header) {
             $sheet->setCellValueByColumnAndRow($col, 1, $header);
             $col++;
         }
 
-        // Ecriture des données
+        // Données
         $rowNumber = 2;
         foreach ($data as $rowData) {
             $col = 1;
@@ -555,7 +564,7 @@ class ExpenseSheetController extends Controller
             $rowNumber++;
         }
 
-// Téléchargement du fichier
+        // Téléchargement du fichier
         $fileName = 'export_expense_sheets_' . now()->format('Ymd_His') . '.xlsx';
         $writer = new Xlsx($spreadsheet);
         $temp_file = tempnam(sys_get_temp_dir(), $fileName);
