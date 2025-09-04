@@ -201,12 +201,14 @@ const removeCost = (index) => {
 };
 
 const submit = () => {
+    // 1) Construire l'objet à poster (comme tu fais déjà)
     form.costs = selectedCosts.value.map((cost, index) => {
         const data =
             cost.type === 'km' ? costData.value[index].kmData :
                 cost.type === 'percentage' ? costData.value[index].percentageData :
                     { amount: costData.value[index].fixedAmount };
 
+        // requirements "plats" (clé -> {file|value})
         const requirements = {};
         if (costData.value[index].requirements) {
             Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
@@ -226,6 +228,24 @@ const submit = () => {
         };
     });
 
+    // 2) Valider les CostRequirementInput AVANT l’envoi
+    if (!validateAllRequirements()) {
+        // Optionnel : scroll jusqu’à la première erreur
+        const firstErrorKey = Object.keys(form.errors).find(k => k.includes('.requirements.'));
+        if (firstErrorKey) {
+            // Essaie de scroller sur le container de la première carte coût
+            const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
+            if (m) {
+                const idx = Number(m[1]);
+                // si chaque carte a un id unique :
+                const el = document.getElementById(`cost-card-${idx}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        return; // on n’envoie pas
+    }
+
+    // 3) Envoi si tout est ok
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
@@ -237,32 +257,89 @@ const submit = () => {
             console.warn('Validation error(s)', errors);
         },
         transform: (data) => {
-            const formData = new FormData();
-            formData.append('department_id', form.department_id);
+            const fd = new FormData();
+            fd.append('department_id', form.department_id);
 
             data.costs.forEach((cost, index) => {
-                formData.append(`costs[${index}][cost_id]`, cost.cost_id);
-                formData.append(`costs[${index}][date]`, cost.date);
+                fd.append(`costs[${index}][cost_id]`, cost.cost_id);
+                fd.append(`costs[${index}][date]`, cost.date);
 
+                // ⚠️ Données du coût
                 Object.entries(cost.data).forEach(([key, value]) => {
-                    formData.append(`costs[${index}][data][${key}]`, value);
+                    fd.append(`costs[${index}][data][${key}]`, value ?? '');
                 });
 
+                // ✅ REQUIREMENTS AU BON NIVEAU (PAS dans data)
                 if (cost.requirements) {
                     Object.entries(cost.requirements).forEach(([reqId, req]) => {
                         if (req.file instanceof File) {
-                            formData.append(`costs[${index}][data][requirements][${reqId}][file]`, req.file);
-                        } else if (req.value) {
-                            formData.append(`costs[${index}][data][requirements][${reqId}][value]`, req.value);
+                            fd.append(`costs[${index}][requirements][${reqId}][file]`, req.file);
+                        } else if (req.value !== undefined && req.value !== null) {
+                            fd.append(`costs[${index}][requirements][${reqId}][value]`, req.value);
                         }
                     });
                 }
             });
 
-            return formData;
+            return fd;
         }
     });
 };
+
+
+// Renvoie true/false et alimente form.errors pour chaque requirement manquant
+const validateRequirementsForCost = (cost, index) => {
+    let ok = true;
+    const reqMeta = cost.requirements || [];
+    const reqValues = costData.value[index]?.requirements || {};
+
+    reqMeta.forEach((req) => {
+        const key = req.name; // même clé que celle utilisée dans CostRequirementInput
+        const val = reqValues[key];
+
+        // nettoyer l'erreur existante pour ce champ avant de (potentiellement) la remettre
+        form.setError(`costs.${index}.requirements.${key}`, null);
+
+        if (req.type === 'text') {
+            const isEmpty = val === undefined || val === null || String(val).trim() === '';
+            if (isEmpty) {
+                form.setError(`costs.${index}.requirements.${key}`, 'Ce champ est requis.');
+                ok = false;
+            }
+        } else if (req.type === 'file') {
+            // Accepte un File choisi. Si tu gères des "fichiers existants", adapte ici.
+            const hasNewFile = val instanceof File;
+            if (!hasNewFile) {
+                form.setError(`costs.${index}.requirements.${key}`, 'Ce fichier est requis.');
+                ok = false;
+            }
+        } else {
+            // Type inconnu : on le marque manquant
+            form.setError(`costs.${index}.requirements.${key}`, 'Type de prérequis inconnu ou non rempli.');
+            ok = false;
+        }
+    });
+
+    return ok;
+};
+
+const validateAllRequirements = () => {
+    let allOk = true;
+    // On efface les erreurs de requirements avant de revalider
+    Object.keys(form.errors || {}).forEach((k) => {
+        if (k.startsWith('costs.') && k.includes('.requirements.')) {
+            form.setError(k, null);
+        }
+    });
+
+    selectedCosts.value.forEach((cost, index) => {
+        const ok = validateRequirementsForCost(cost, index);
+        if (!ok) allOk = false;
+    });
+
+    return allOk;
+};
+
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
