@@ -8,11 +8,13 @@ use App\Models\User;
 use App\Notifications\UserCreated;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -164,16 +166,25 @@ class UserController extends Controller
     public function doImport(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,csv', // évite 'txt' sauf besoin spécifique
+            'file' => 'required|mimes:xlsx,csv',
         ]);
 
-        $path = $request->file('file')->store('imports');
+        // Envoie le fichier sur le disque partagé "laravel_cloud"
+        $path = $request->file('file')->store('imports', 'laravel_cloud');
 
-        // Nécessite un import qui implémente ShouldQueue
-        Excel::queueImport(new UsersImport, $path);
+        // (Optionnel mais utile) Forcer la config runtime au cas où le worker n'a pas la même env
+        config([
+            'excel.temporary_files.remote_disk' => 'laravel_cloud',
+            'excel.temporary_files.remote_prefix' => 'temp/excel',
+            'excel.temporary_files.force_resync_remote' => true,
+        ]);
+
+        // Très important : préciser le DISQUE où se trouve le fichier
+        Excel::queueImport(new UsersImport, $path, 'laravel_cloud');
 
         return redirect()
             ->route('users.index')
-            ->with('success', 'Import démarré. Vous serez notifié à la fin.');
+            ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
     }
+
 }
