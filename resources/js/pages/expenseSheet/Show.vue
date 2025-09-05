@@ -2,30 +2,25 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`Note de frais #${expenseSheet.id}`" />
 
-        <div class="container mx-auto p-4 space-y-6">
-
-
-            <div class="flex justify-between items-start">
+        <div class="container mx-auto space-y-6 p-4">
+            <div class="flex items-start justify-between">
                 <div>
                     <h1 class="text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
-                    <p class="text-sm text-muted-foreground">
-                        Créée le {{ formatDate(expenseSheet.created_at) }}
-                    </p>
+                    <p class="text-sm text-muted-foreground">Créée le {{ formatDate(expenseSheet.created_at) }}</p>
                 </div>
 
-
                 <div class="flex items-center gap-2">
-                    <div class="flex items-center gap-2 mr-2">
+                    <div class="mr-2 flex items-center gap-2">
                         <!--                        <Button v-if="canEdit" variant="outline" size="sm" @click="editExpenseSheet">-->
                         <!--                            <PencilIcon class="h-4 w-4 mr-1" />-->
                         <!--                            Modifier-->
                         <!--                        </Button>-->
                         <Button v-if="canApprove" variant="success" size="sm" @click="approveExpenseSheet">
-                            <CheckIcon class="h-4 w-4 mr-1" />
+                            <CheckIcon class="mr-1 h-4 w-4" />
                             Approuver
                         </Button>
                         <Button v-if="canReject" variant="destructive" size="sm" @click="openRejectModal">
-                            <XIcon class="h-4 w-4 mr-1" />
+                            <XIcon class="mr-1 h-4 w-4" />
                             Rejeter
                         </Button>
                     </div>
@@ -43,27 +38,29 @@
                                 <PrinterIcon class="mr-2 h-4 w-4" />
                                 Imprimer
                             </DropdownMenuItem>
-<!--                            <DropdownMenuItem @click="downloadPdf">-->
-<!--                                <DownloadIcon class="mr-2 h-4 w-4" />-->
-<!--                                Télécharger PDF-->
-<!--                            </DropdownMenuItem>-->
+                            <!--                            <DropdownMenuItem @click="downloadPdf">-->
+                            <!--                                <DownloadIcon class="mr-2 h-4 w-4" />-->
+                            <!--                                Télécharger PDF-->
+                            <!--                            </DropdownMenuItem>-->
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </div>
 
             <!-- Bannière de refus moderne -->
-            <div v-if="expenseSheet.approved == false"
-                 class="bg-gradient-to-r from-destructive/10 to-destructive/5 border-l-4 border-destructive shadow-sm px-5 py-4 rounded-lg flex items-start gap-3 transition-all duration-200 hover:shadow-md">
-                <div class="bg-destructive/10 p-2 rounded-full flex-shrink-0">
+            <div
+                v-if="expenseSheet.approved == false"
+                class="flex items-start gap-3 rounded-lg border-l-4 border-destructive bg-gradient-to-r from-destructive/10 to-destructive/5 px-5 py-4 shadow-sm transition-all duration-200 hover:shadow-md"
+            >
+                <div class="flex-shrink-0 rounded-full bg-destructive/10 p-2">
                     <AlertCircleIcon class="h-5 w-5 text-destructive" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="font-medium text-destructive flex items-center gap-2">
+                    <h3 class="flex items-center gap-2 font-medium text-destructive">
                         Note de frais refusée
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-destructive/70 animate-pulse"></span>
+                        <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive/70"></span>
                     </h3>
-                    <div class="text-sm text-destructive/90 space-y-1">
+                    <div class="space-y-1 text-sm text-destructive/90">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Refusée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -77,19 +74,19 @@
             </div>
 
             <!-- Bannière d'approbation moderne avec vert Tailwind -->
-            <div v-if="expenseSheet.approved == true"
-                 class="border-l-4 shadow-sm px-5 py-4 rounded-lg flex items-start gap-3 transition-all duration-200 hover:shadow-md
-            bg-green-100 border-green-400 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200">
-                <div class="bg-green-200 dark:bg-green-700 p-2 rounded-full flex-shrink-0">
+            <div
+                v-if="expenseSheet.approved == true"
+                class="flex items-start gap-3 rounded-lg border-l-4 border-green-400 bg-green-100 px-5 py-4 text-green-800 shadow-sm transition-all duration-200 hover:shadow-md dark:border-green-700 dark:bg-green-900 dark:text-green-200"
+            >
+                <div class="flex-shrink-0 rounded-full bg-green-200 p-2 dark:bg-green-700">
                     <CheckIcon class="h-5 w-5 text-green-600 dark:text-green-300" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="font-medium flex items-center gap-2">
+                    <h3 class="flex items-center gap-2 font-medium">
                         Note de frais approuvée
-                        <span
-                            class="inline-block h-1.5 w-1.5 rounded-full bg-green-600 dark:bg-green-300 animate-pulse"></span>
+                        <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-600 dark:bg-green-300"></span>
                     </h3>
-                    <div class="text-sm space-y-1">
+                    <div class="space-y-1 text-sm">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Approuvée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -98,18 +95,17 @@
                 </div>
             </div>
 
-
             <!-- Informations générales -->
             <Card class="bg-card text-card-foreground">
                 <CardHeader>
                     <CardTitle>Informations générales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
                             <h3 class="text-sm font-medium text-muted-foreground">Demandeur</h3>
-                            <p class="flex items-center mt-1">
-                                <Avatar class="h-6 w-6 mr-2">
+                            <p class="mt-1 flex items-center">
+                                <Avatar class="mr-2 h-6 w-6">
                                     <AvatarFallback>{{ getInitials(expenseSheet.user.name) }}</AvatarFallback>
                                 </Avatar>
                                 {{ expenseSheet.user.name }}
@@ -130,16 +126,10 @@
                 </CardHeader>
                 <CardContent>
                     <div class="space-y-6">
-                        <div
-                            v-for="(cost, index) in expenseSheet.costs"
-                            :key="index"
-                            class="p-4 border rounded space-y-4 bg-background"
-                        >
-                            <div class="flex justify-between items-center">
+                        <div v-for="(cost, index) in expenseSheet.costs" :key="index" class="space-y-4 rounded border bg-background p-4">
+                            <div class="flex items-center justify-between">
                                 <h3 class="text-xl font-bold text-foreground">{{ cost.form_cost.name }}</h3>
-                                <span
-                                    class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }} / {{ cost.type
-                                    }}</span>
+                                <span class="text-sm italic text-muted-foreground">{{ getActiveRate(cost, cost.date) }} / {{ cost.type }}</span>
                             </div>
                             <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
@@ -177,10 +167,10 @@
                                         {{ Math.round(cost.route.google_km) }} km
                                     </li>
 
-<!--                                    <li v-if="cost.route.manual_km">-->
-<!--                                        <span class="font-semibold">Distance manuelle :</span>-->
-<!--                                        {{ cost.route.manual_km }} km-->
-<!--                                    </li>-->
+                                    <!--                                    <li v-if="cost.route.manual_km">-->
+                                    <!--                                        <span class="font-semibold">Distance manuelle :</span>-->
+                                    <!--                                        {{ cost.route.manual_km }} km-->
+                                    <!--                                    </li>-->
 
                                     <li v-if="cost.route.justification">
                                         <span class="font-semibold">Justification :</span>
@@ -198,22 +188,24 @@
                             <div v-if="cost.requirements" class="space-y-2">
                                 <h4 class="text-sm font-medium text-muted-foreground">Annexes :</h4>
                                 <ul class="list-disc pl-5">
-                                    <li
-                                        v-for="(requirement, key) in parseRequirements(cost.requirements)"
-                                        :key="key"
-                                        class="text-foreground"
-                                    >
+                                    <li v-for="(requirement, key) in parseRequirements(cost.requirements)" :key="key" class="text-foreground">
                                         <span class="font-semibold">{{ key }} :</span>
                                         <span v-if="requirement.file">
-                                            <a
-                                                :href="requirement.file"
-                                                target="_blank"
-                                                class="text-primary underline"
-                                            >
-                                                Visualiser le fichier
-                                            </a>
+                                            <a :href="requirement.file" target="_blank" class="text-primary underline"> Visualiser le fichier </a>
                                         </span>
-                                        <span v-else>{{ requirement.value }}</span>
+                                        <span v-else>
+                                            <template
+                                                v-if="
+                                                    requirement.value &&
+                                                    (requirement.value.startsWith('http://') || requirement.value.startsWith('https://'))
+                                                "
+                                            >
+                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{requirement.value}}</a>
+                                            </template>
+                                            <template v-else>
+                                                {{ requirement.value }}
+                                            </template>
+                                        </span>
                                     </li>
                                 </ul>
                             </div>
@@ -232,7 +224,6 @@
                     </div>
                 </CardContent>
             </Card>
-
         </div>
 
         <!-- Modal de justification de refus -->
@@ -240,9 +231,7 @@
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Justification du refus</DialogTitle>
-                    <DialogDescription>
-                        Veuillez fournir une raison pour le refus de cette note de frais.
-                    </DialogDescription>
+                    <DialogDescription> Veuillez fournir une raison pour le refus de cette note de frais. </DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4 py-4">
                     <div class="space-y-2">
@@ -257,84 +246,57 @@
                 </div>
                 <DialogFooter>
                     <Button variant="outline" @click="closeRejectModal">Annuler</Button>
-                    <Button
-                        variant="destructive"
-                        @click="confirmReject"
-                        :disabled="!rejectionReason.trim()"
-                    >
-                        Confirmer le refus
-                    </Button>
+                    <Button variant="destructive" @click="confirmReject" :disabled="!rejectionReason.trim()"> Confirmer le refus </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     </AppLayout>
 
     <ExpenseSheetPdf ref="pdfContent" :expenseSheet="expenseSheet" class="hidden" />
-
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/AppLayout.vue';
 import ExpenseSheetPdf from '@/pages/expenseSheet/Pdf.vue';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
-} from '@/components/ui/dialog';
-import {
-    MoreVerticalIcon,
-    PrinterIcon,
-    DownloadIcon,
-    CheckIcon,
-    XIcon,
-    PencilIcon,
-    AlertCircleIcon
-} from 'lucide-vue-next';
-import { formatDate, formatCurrency, formatRate, getStatusLabel, getActiveRate } from '@/utils/formatters';
-import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { formatCurrency, formatDate, getActiveRate, getStatusLabel } from '@/utils/formatters';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import html2pdf from 'html2pdf.js';
+import { AlertCircleIcon, CheckIcon, MoreVerticalIcon, PrinterIcon, XIcon } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 const props = defineProps({
     expenseSheet: Object,
     canApprove: {
         type: Boolean,
-        default: false
+        default: false,
     },
     canReject: {
         type: Boolean,
-        default: false
+        default: false,
     },
     canEdit: {
         type: Boolean,
-        default: false
-    }
+        default: false,
+    },
 });
 
 const breadcrumbs = [
     {
         title: 'Tableau de bord',
-        href: '/dashboard'
+        href: '/dashboard',
     },
     {
         title: `Note de frais #${props.expenseSheet.id}`,
-        href: `/expense-sheet/${props.expenseSheet.id}`
-    }
+        href: `/expense-sheet/${props.expenseSheet.id}`,
+    },
 ];
 
 // État pour le modal de rejet
@@ -342,7 +304,6 @@ const isRejectModalOpen = ref(false);
 const rejectionReason = ref('');
 
 const pdfContent = ref();
-
 
 // Ouvrir le modal de rejet
 const openRejectModal = () => {
@@ -361,7 +322,7 @@ const confirmReject = () => {
 
     useForm({
         approval: false,
-        reason: rejectionReason.value
+        reason: rejectionReason.value,
     }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
     closeRejectModal();
 };
@@ -369,7 +330,7 @@ const confirmReject = () => {
 // Action methods
 const approveExpenseSheet = () => {
     useForm({
-        approval: true
+        approval: true,
     }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
 };
 
@@ -384,7 +345,7 @@ const downloadPdf = () => {
             filename: `note-frais-${props.expenseSheet.id}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(pdfContent.value.$el) // Attention : .value.$el car c'est un composant enfant
         .save();
@@ -416,13 +377,14 @@ const printExpenseSheet = () => {
     printWindow.close();
 };
 
-
 // Obtenir le libellé du statut
-
 
 // Obtenir les initiales d'un nom
 const getInitials = (name) => {
-    return name.split(' ').map((word) => word.charAt(0)).join('');
+    return name
+        .split(' ')
+        .map((word) => word.charAt(0))
+        .join('');
 };
 
 // Fonction pour parser les requirements JSON
@@ -434,6 +396,4 @@ const parseRequirements = (requirements) => {
         return {};
     }
 };
-
 </script>
-

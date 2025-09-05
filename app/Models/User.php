@@ -41,6 +41,11 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
