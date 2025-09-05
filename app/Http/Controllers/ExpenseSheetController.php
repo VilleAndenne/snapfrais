@@ -499,7 +499,7 @@ class ExpenseSheetController extends Controller
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ') - ' . $cost->formCost->type;
                     $costTypes[$key] = $cost->formCost->type; // 'km', 'fixe', 'pourcent' (adapter selon tes valeurs)
                 }
             }
