@@ -31,35 +31,153 @@
     <meta charset="utf-8">
     <title>Note de frais #{{ $sheet->id }}</title>
     <style>
-        @page { margin: 28mm 18mm 22mm 18mm; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #222; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .brand { font-size: 18px; font-weight: 700; }
-        .muted { color:#666; }
-        .badge { display:inline-block; padding: 2px 8px; border-radius: 10px; font-size:11px; border:1px solid #bbb; }
-        .status { font-weight:700; }
-        h1 { font-size: 20px; margin: 0 0 6px 0; }
-        h2 { font-size: 15px; margin: 16px 0 8px 0; border-bottom: 1px solid #ddd; padding-bottom:4px; }
-        table { width:100%; border-collapse: collapse; }
-        th, td { padding: 8px; vertical-align: top; }
-        th { background:#f5f5f5; text-align:left; }
-        .table-bordered th, .table-bordered td { border:1px solid #ddd; }
-        .small { font-size: 11px; }
-        .right { text-align:right; }
-        .center { text-align:center; }
-        .mb-4 { margin-bottom:16px; }
-        .mb-6 { margin-bottom:24px; }
-        .grid-2 { width:100%; display: table; table-layout: fixed; }
-        .col { display: table-cell; vertical-align: top; }
-        .col + .col { padding-left: 18px; }
-        .box { border:1px solid #e5e5e5; border-radius: 6px; padding:10px; }
-        .break-inside-avoid { page-break-inside: avoid; }
-        .footer { position: fixed; bottom: -10mm; left: 0; right: 0; text-align: center; font-size: 10px; color:#777; }
-        .waterline { border-top:1px solid #e5e5e5; margin-top:6px; padding-top:6px; }
-        .sign { height: 70px; border:1px dashed #bbb; border-radius:6px; }
-        .nowrap { white-space: nowrap; }
-        .w-25 { width:25%; }
-        .w-50 { width:50%; }
+        @page {
+            margin: 28mm 18mm 22mm 18mm;
+        }
+
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 12px;
+            color: #222;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .brand {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .muted {
+            color: #666;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            border: 1px solid #bbb;
+        }
+
+        .status {
+            font-weight: 700;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0 0 6px 0;
+        }
+
+        h2 {
+            font-size: 15px;
+            margin: 16px 0 8px 0;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f5f5f5;
+            text-align: left;
+        }
+
+        .table-bordered th, .table-bordered td {
+            border: 1px solid #ddd;
+        }
+
+        .small {
+            font-size: 11px;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .mb-4 {
+            margin-bottom: 16px;
+        }
+
+        .mb-6 {
+            margin-bottom: 24px;
+        }
+
+        .grid-2 {
+            width: 100%;
+            display: table;
+            table-layout: fixed;
+        }
+
+        .col {
+            display: table-cell;
+            vertical-align: top;
+        }
+
+        .col + .col {
+            padding-left: 18px;
+        }
+
+        .box {
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .break-inside-avoid {
+            page-break-inside: avoid;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: -10mm;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            color: #777;
+        }
+
+        .waterline {
+            border-top: 1px solid #e5e5e5;
+            margin-top: 6px;
+            padding-top: 6px;
+        }
+
+        .sign {
+            height: 70px;
+            border: 1px dashed #bbb;
+            border-radius: 6px;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .w-25 {
+            width: 25%;
+        }
+
+        .w-50 {
+            width: 50%;
+        }
     </style>
 </head>
 <body>
@@ -71,7 +189,8 @@
         <span class="muted small">Récapitulatif de note de frais</span>
     </div>
     <div class="right">
-        <div class="badge">Note #{{ $sheet->id }}</div><br>
+        <div class="badge">Note #{{ $sheet->id }}</div>
+        <br>
         <span class="small muted">Généré le {{ fr_date(now()) }}</span>
     </div>
 </div>
@@ -99,9 +218,9 @@
                     <td class="muted">Statut</td>
                     <td>
                         <span class="status">
-                            {{ $sheet->status == true ? 'Approuvée' : ($sheet->status == false ? 'Refusée' : 'En attente') }}
-                        </span>
-                        @if(($sheet->approved === false || ($sheet->status ?? null) === 'Refusée') && !empty($sheet->refusal_reason))
+{{ $sheet->approved == true ? 'Approuvée' : ($sheet->approved == false ? 'Refusée' : 'En attente') }}
+                            </span>
+                        @if(($sheet->approved == false || ($sheet->status ?? null) == 'Refusée') && !empty($sheet->refusal_reason))
                             <div class="small muted">Motif: {{ $sheet->refusal_reason }}</div>
                         @endif
                     </td>
@@ -218,7 +337,9 @@
                                 @endif
                             @endforeach
                         </ul>
-                        <div class="small muted">NB: les liens/URLs de fichiers restent consultables depuis l'application.</div>
+                        <div class="small muted">NB: les liens/URLs de fichiers restent consultables depuis
+                            l'application.
+                        </div>
                     </div>
                 @endif
             </td>
