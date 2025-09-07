@@ -38,10 +38,12 @@
                                 <PrinterIcon class="mr-2 h-4 w-4" />
                                 Imprimer
                             </DropdownMenuItem>
-                            <!--                            <DropdownMenuItem @click="downloadPdf">-->
-                            <!--                                <DownloadIcon class="mr-2 h-4 w-4" />-->
-                            <!--                                Télécharger PDF-->
-                            <!--                            </DropdownMenuItem>-->
+                            <DropdownMenuItem>
+                                <a :href="`/expense-sheets/${expenseSheet.id}/pdf`" target="_blank" class="flex w-full">
+                                <DownloadIcon class="mr-2 h-4 w-4" />
+                                Télécharger PDF
+                                </a>
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -200,7 +202,9 @@
                                                     (requirement.value.startsWith('http://') || requirement.value.startsWith('https://'))
                                                 "
                                             >
-                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{requirement.value}}</a>
+                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{
+                                                    requirement.value
+                                                }}</a>
                                             </template>
                                             <template v-else>
                                                 {{ requirement.value }}
@@ -271,7 +275,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import html2pdf from 'html2pdf.js';
 import { AlertCircleIcon, CheckIcon, MoreVerticalIcon, PrinterIcon, XIcon } from 'lucide-vue-next';
 import { ref } from 'vue';
-
+import { DownloadIcon } from 'lucide-vue-next';
 const props = defineProps({
     expenseSheet: Object,
     canApprove: {
@@ -338,44 +342,60 @@ const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
 
-const downloadPdf = () => {
-    html2pdf()
-        .set({
-            margin: 10,
-            filename: `note-frais-${props.expenseSheet.id}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .from(pdfContent.value.$el) // Attention : .value.$el car c'est un composant enfant
-        .save();
-};
-
 const printExpenseSheet = () => {
-    if (!pdfContent.value) return;
+    const url = `/expense-sheets/${props.expenseSheet.id}/pdf?cb=${Date.now()}#page=1`;
+    const absolute = new URL(url, window.location.href);
+    const sameOrigin = absolute.origin === window.location.origin;
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    // Si ce n’est PAS la même origin, on passe en mode fallback (B)
+    if (!sameOrigin) {
+        window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
+        return;
+    }
 
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Impression Note de frais</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                </style>
-            </head>
-            <body>
-                ${pdfContent.value.$el.outerHTML}
-            </body>
-        </html>
-    `);
+    // --- Même origin: iframe + afterprint ---
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = absolute.toString();
 
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+    const safeCleanup = () => {
+        try { iframe.contentWindow?.removeEventListener('afterprint', safeCleanup); } catch {}
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+    };
+
+    iframe.onload = () => {
+        try {
+            const cw = iframe.contentWindow;
+            if (!cw) throw new Error('no contentWindow');
+            setTimeout(() => {
+                cw.addEventListener('afterprint', safeCleanup, { once: true });
+                cw.focus();
+                cw.print();
+                setTimeout(safeCleanup, 10000); // filet de sécurité
+            }, 300);
+        } catch {
+            window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
+            safeCleanup();
+        }
+    };
+
+    document.body.appendChild(iframe);
+
+    // Si l’iframe ne charge pas, fallback après 3s
+    setTimeout(() => {
+        // @ts-ignore
+        if (!iframe.contentWindow || iframe.contentWindow.document?.readyState !== 'complete') {
+            window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
+            safeCleanup();
+        }
+    }, 3000);
 };
+
 
 // Obtenir le libellé du statut
 

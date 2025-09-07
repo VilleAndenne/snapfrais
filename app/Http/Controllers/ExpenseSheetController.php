@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Barryvdh\DomPDF\Facade\Pdf;
 
+// en haut du fichier
 
 class ExpenseSheetController extends Controller
 {
@@ -145,7 +147,7 @@ class ExpenseSheetController extends Controller
                     'justification' => $data['justification'] ?? null,
                 ];
 
-                // In route, we can also save the steps if needed
+                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
@@ -155,7 +157,6 @@ class ExpenseSheetController extends Controller
                         ];
                     }
                 }
-
             } elseif ($type === 'fixed') {
                 $total = round($rate->value, 2);
             } elseif ($type === 'percentage') {
@@ -186,22 +187,33 @@ class ExpenseSheetController extends Controller
                 'total' => $total,
                 'date' => $date,
                 'amount' => $data['paidAmount'] ?? null,
-                'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
+                'requirements' => json_encode($requirements),
                 'expense_sheet_id' => $expenseSheet->id
             ]);
 
             $globalTotal += $total;
         }
 
+        // Met à jour le total global
         $expenseSheet->update(['total' => $globalTotal]);
+
+        // 🔴 Si total = 0 €, on supprime et on renvoie avec erreur
+        if ($globalTotal <= 0) {
+            $expenseSheet->delete();
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+        }
 
         $user = auth()->user();
         $department = $expenseSheet->department;
 
-// Récupère les responsables
+        // Récupère les responsables
         $heads = $department->heads;
 
-// Si l'agent est lui-même head du service, alors on passe au parent
+        // Si l'agent est lui-même head du service, alors on passe au parent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
@@ -470,12 +482,12 @@ class ExpenseSheetController extends Controller
 
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date'   => 'required|date',
+            'end_date' => 'required|date',
         ]);
 
         // On élargit end_date à la fin de journée pour inclure toute la date
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
-        $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
+        $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
         // Récupérer les utilisateurs ayant au moins une note encodée dans l'intervalle
         // et ne charger que ces notes + leurs coûts (avec formCost->form)
@@ -523,12 +535,12 @@ class ExpenseSheetController extends Controller
                     if (isset($costTypes[$key])) {
                         if (strtolower($cost->formCost->type) === 'km') {
                             // Sécuriser l'accès à route (array ou cast)
-                            $route = is_array($cost->route) ? $cost->route : (array) $cost->route;
+                            $route = is_array($cost->route) ? $cost->route : (array)$cost->route;
                             $googleKm = isset($route['google_km']) ? (float)$route['google_km'] : 0;
                             $manualKm = isset($route['manual_km']) ? (float)$route['manual_km'] : 0;
                             $costSums[$key] += ($googleKm + $manualKm);
                         } else {
-                            $costSums[$key] += (float) $cost->amount;
+                            $costSums[$key] += (float)$cost->amount;
                         }
                     }
                 }
@@ -571,5 +583,22 @@ class ExpenseSheetController extends Controller
         $writer->save($temp_file);
 
         return response()->download($temp_file, $fileName)->deleteFileAfterSend(true);
+    }
+
+    public function generatePDF($id)
+    {
+        $expenseSheet = ExpenseSheet::with([
+            'costs.formCost.reimbursementRates',
+            'user', 'department', 'validatedBy', 'form',
+        ])->findOrFail($id);
+
+        if (!auth()->user()->can('view', $expenseSheet)) {
+            abort(403);
+        }
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('expenseSheet.pdf', [
+            'expenseSheet' => $expenseSheet,
+        ])->setPaper('a4', 'landscape')
+            ->stream('note_de_frais_' . $id . '.pdf'); // inline
     }
 }
