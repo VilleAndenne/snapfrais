@@ -38,10 +38,12 @@
                                 <PrinterIcon class="mr-2 h-4 w-4" />
                                 Imprimer
                             </DropdownMenuItem>
-                            <!--                            <DropdownMenuItem @click="downloadPdf">-->
-                            <!--                                <DownloadIcon class="mr-2 h-4 w-4" />-->
-                            <!--                                Télécharger PDF-->
-                            <!--                            </DropdownMenuItem>-->
+                            <DropdownMenuItem>
+                                <a :href="`/expense-sheets/${expenseSheet.id}/pdf`" target="_blank" class="flex w-full">
+                                <DownloadIcon class="mr-2 h-4 w-4" />
+                                Télécharger PDF
+                                </a>
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -200,7 +202,9 @@
                                                     (requirement.value.startsWith('http://') || requirement.value.startsWith('https://'))
                                                 "
                                             >
-                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{requirement.value}}</a>
+                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{
+                                                    requirement.value
+                                                }}</a>
                                             </template>
                                             <template v-else>
                                                 {{ requirement.value }}
@@ -271,7 +275,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import html2pdf from 'html2pdf.js';
 import { AlertCircleIcon, CheckIcon, MoreVerticalIcon, PrinterIcon, XIcon } from 'lucide-vue-next';
 import { ref } from 'vue';
-
+import { DownloadIcon } from 'lucide-vue-next';
 const props = defineProps({
     expenseSheet: Object,
     canApprove: {
@@ -336,19 +340,6 @@ const approveExpenseSheet = () => {
 
 const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
-};
-
-const downloadPdf = () => {
-    html2pdf()
-        .set({
-            margin: 10,
-            filename: `note-frais-${props.expenseSheet.id}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .from(pdfContent.value.$el) // Attention : .value.$el car c'est un composant enfant
-        .save();
 };
 
 const printExpenseSheet = () => {

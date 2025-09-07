@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-
+use Barryvdh\DomPDF\Facade\Pdf; // en haut du fichier
 
 class ExpenseSheetController extends Controller
 {
@@ -581,5 +581,18 @@ class ExpenseSheetController extends Controller
         $writer->save($temp_file);
 
         return response()->download($temp_file, $fileName)->deleteFileAfterSend(true);
+    }
+
+    public function generatePDF($id)
+    {
+        $expenseSheet = ExpenseSheet::with(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy'])->findOrFail($id);
+
+        if (!auth()->user()->can('view', $expenseSheet)) {
+            abort(403);
+        }
+
+        $pdf = PDF::loadView('expenseSheet.pdf', ['expenseSheet' => $expenseSheet]);
+
+        return $pdf->download('note_de_frais_' . $expenseSheet->id . '.pdf');
     }
 }
