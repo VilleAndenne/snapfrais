@@ -99,7 +99,7 @@
                     <td class="muted">Statut</td>
                     <td>
                         <span class="status">
-                            {{ $sheet->status ?? ($sheet->approved === null ? 'En attente' : ($sheet->approved ? 'Approuvée' : 'Refusée')) }}
+                            {{ $sheet->status == true ? 'Approuvée' : ($sheet->status == false ? 'Refusée' : 'En attente') }}
                         </span>
                         @if(($sheet->approved === false || ($sheet->status ?? null) === 'Refusée') && !empty($sheet->refusal_reason))
                             <div class="small muted">Motif: {{ $sheet->refusal_reason }}</div>
