@@ -485,76 +485,79 @@ class ExpenseSheetController extends Controller
             'end_date' => 'required|date',
         ]);
 
-        // On élargit end_date à la fin de journée pour inclure toute la date
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
         $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
-        // Récupérer les utilisateurs ayant au moins une note encodée dans l'intervalle
-        // et ne charger que ces notes + leurs coûts (avec formCost->form)
+        // Récupérer les utilisateurs avec leurs notes et coûts
         $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
             $q->whereBetween('created_at', [$startDate, $endDate]);
-            // Si tu as une colonne dédiée : $q->whereBetween('encoded_at', [$startDate, $endDate]);
         })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
                     $q->whereBetween('created_at', [$startDate, $endDate]);
-                    // $q->whereBetween('encoded_at', [$startDate, $endDate]);
                 },
                 'expenseSheets.expenseSheetCosts.formCost.form'
             ])
             ->get();
 
-        // Préparer l'entête : Username + liste unique de tous les types de coûts rencontrés
+        // Préparer entête
         $headers = ['Username'];
-        $costTypes = []; // 'Nom coût (Nom formulaire)' => type
+        $costTypes = [];
 
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ') - ' . $cost->formCost->type;
-                    $costTypes[$key] = $cost->formCost->type; // 'km', 'fixe', 'pourcent' (adapter selon tes valeurs)
+                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $costTypes[$key] = $cost->formCost->type;
                 }
             }
         }
 
         $headers = array_merge($headers, array_keys($costTypes));
+        $headers[] = 'Total Général (€)';   // ✅ colonne de synthèse
+        $headers[] = 'Total Km';            // ✅ optionnel
 
-        // Construire les lignes utilisateur
+        // Construire les lignes
         $data = [];
 
         foreach ($users as $user) {
             $row = [$user->name];
-
-            // Initialiser toutes les colonnes à 0
             $costSums = array_fill_keys(array_keys($costTypes), 0);
+            $totalGeneral = 0;
+            $totalKm = 0;
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
                     $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
 
-                    if (isset($costTypes[$key])) {
+                    if (isset($costSums[$key])) {
+                        // ✅ prendre le vrai montant total
+                        $costSums[$key] += (float)$cost->total;
+                        $totalGeneral += (float)$cost->total;
+
+                        // ✅ suivre aussi les km
                         if (strtolower($cost->formCost->type) === 'km') {
-                            // Sécuriser l'accès à route (array ou cast)
                             $route = is_array($cost->route) ? $cost->route : (array)$cost->route;
                             $googleKm = isset($route['google_km']) ? (float)$route['google_km'] : 0;
                             $manualKm = isset($route['manual_km']) ? (float)$route['manual_km'] : 0;
-                            $costSums[$key] += ($googleKm + $manualKm);
-                        } else {
-                            $costSums[$key] += (float)$cost->amount;
+                            $totalKm += ($googleKm + $manualKm);
                         }
                     }
                 }
             }
 
-            // Ajouter dans l'ordre des headers
             foreach (array_keys($costTypes) as $key) {
                 $row[] = $costSums[$key];
             }
 
+            // ✅ ajouter les totaux
+            $row[] = $totalGeneral;
+            $row[] = $totalKm;
+
             $data[] = $row;
         }
 
-        // Générer l'Excel
+        // Générer Excel
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
@@ -565,7 +568,7 @@ class ExpenseSheetController extends Controller
             $col++;
         }
 
-        // Données
+        // Lignes de données
         $rowNumber = 2;
         foreach ($data as $rowData) {
             $col = 1;
@@ -576,7 +579,6 @@ class ExpenseSheetController extends Controller
             $rowNumber++;
         }
 
-        // Téléchargement du fichier
         $fileName = 'export_expense_sheets_' . now()->format('Ymd_His') . '.xlsx';
         $writer = new Xlsx($spreadsheet);
         $temp_file = tempnam(sys_get_temp_dir(), $fileName);
