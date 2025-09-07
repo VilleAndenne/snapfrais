@@ -145,7 +145,7 @@ class ExpenseSheetController extends Controller
                     'justification' => $data['justification'] ?? null,
                 ];
 
-                // In route, we can also save the steps if needed
+                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
@@ -155,7 +155,6 @@ class ExpenseSheetController extends Controller
                         ];
                     }
                 }
-
             } elseif ($type === 'fixed') {
                 $total = round($rate->value, 2);
             } elseif ($type === 'percentage') {
@@ -186,22 +185,33 @@ class ExpenseSheetController extends Controller
                 'total' => $total,
                 'date' => $date,
                 'amount' => $data['paidAmount'] ?? null,
-                'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
+                'requirements' => json_encode($requirements),
                 'expense_sheet_id' => $expenseSheet->id
             ]);
 
             $globalTotal += $total;
         }
 
+        // Met à jour le total global
         $expenseSheet->update(['total' => $globalTotal]);
+
+        // 🔴 Si total = 0 €, on supprime et on renvoie avec erreur
+        if ($globalTotal <= 0) {
+            $expenseSheet->delete();
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+        }
 
         $user = auth()->user();
         $department = $expenseSheet->department;
 
-// Récupère les responsables
+        // Récupère les responsables
         $heads = $department->heads;
 
-// Si l'agent est lui-même head du service, alors on passe au parent
+        // Si l'agent est lui-même head du service, alors on passe au parent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
