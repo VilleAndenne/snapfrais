@@ -585,14 +585,17 @@ class ExpenseSheetController extends Controller
 
     public function generatePDF($id)
     {
-        $expenseSheet = ExpenseSheet::with(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy'])->findOrFail($id);
+        $expenseSheet = ExpenseSheet::with([
+            'costs.formCost.reimbursementRates',
+            'user','department','validatedBy','form',
+        ])->findOrFail($id);
 
         if (!auth()->user()->can('view', $expenseSheet)) {
             abort(403);
         }
 
-        $pdf = PDF::loadView('expenseSheet.pdf', ['expenseSheet' => $expenseSheet]);
-
-        return $pdf->download('note_de_frais_' . $expenseSheet->id . '.pdf');
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('expenseSheet.pdf', [
+            'expenseSheet' => $expenseSheet,
+        ])->setPaper('a4')->stream('note_de_frais_'.$id.'.pdf'); // inline
     }
 }
