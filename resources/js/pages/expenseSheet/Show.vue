@@ -344,9 +344,16 @@ const editExpenseSheet = () => {
 
 const printExpenseSheet = () => {
     const url = `/expense-sheets/${props.expenseSheet.id}/pdf?cb=${Date.now()}#page=1`;
-    // (#page=1 aide certains viewers ; pour Firefox on peut même mettre #print)
+    const absolute = new URL(url, window.location.href);
+    const sameOrigin = absolute.origin === window.location.origin;
 
-    // 1) Créer l'iframe caché
+    // Si ce n’est PAS la même origin, on passe en mode fallback (B)
+    if (!sameOrigin) {
+        window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
+        return;
+    }
+
+    // --- Même origin: iframe + afterprint ---
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -354,55 +361,41 @@ const printExpenseSheet = () => {
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = '0';
-    iframe.src = url;
+    iframe.src = absolute.toString();
 
-    // 2) Fonction de nettoyage sûre (après impression uniquement)
     const safeCleanup = () => {
-        try {
-            iframe.contentWindow?.removeEventListener('afterprint', safeCleanup);
-        } catch {}
-        if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-        }
+        try { iframe.contentWindow?.removeEventListener('afterprint', safeCleanup); } catch {}
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
     };
 
-    // 3) Quand le PDF est chargé, déclencher l'impression
     iframe.onload = () => {
         try {
             const cw = iframe.contentWindow;
             if (!cw) throw new Error('no contentWindow');
-
-            // – Attendre un micro-délai pour laisser le viewer PDF se stabiliser (Chrome/Safari)
             setTimeout(() => {
-                // Écoute l'évènement afterprint pour nettoyer au bon moment
                 cw.addEventListener('afterprint', safeCleanup, { once: true });
-
-                // Appel impression
                 cw.focus();
                 cw.print();
-
-                // 🔁 Filet de sécurité : si afterprint ne se déclenche pas (certains viewers),
-                // on nettoie quand même au bout de 10s, sans fermer le dialogue trop tôt.
-                setTimeout(safeCleanup, 30000);
+                setTimeout(safeCleanup, 10000); // filet de sécurité
             }, 300);
-        } catch (e) {
-            // Fallback : ouvrir dans un nouvel onglet si l'impression est bloquée
-            window.open(url.replace('#page=1', '#print'), '_blank'); // #print déclenche l’impression sur Firefox/pdf.js
+        } catch {
+            window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
             safeCleanup();
         }
     };
 
-    // 4) Ajouter l'iframe au DOM
     document.body.appendChild(iframe);
 
-    // 5) Filet de sécurité : si l'iframe ne charge pas (ex: plugin PDF bloqué), fallback après 3s
+    // Si l’iframe ne charge pas, fallback après 3s
     setTimeout(() => {
+        // @ts-ignore
         if (!iframe.contentWindow || iframe.contentWindow.document?.readyState !== 'complete') {
-            window.open(url.replace('#page=1', '#print'), '_blank');
+            window.open(absolute.toString().replace('#page=1', '#print'), '_blank', 'noopener');
             safeCleanup();
         }
-    }, 30000000);
+    }, 3000);
 };
+
 
 // Obtenir le libellé du statut
 

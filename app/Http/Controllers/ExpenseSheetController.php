@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Barryvdh\DomPDF\Facade\Pdf; // en haut du fichier
+use Barryvdh\DomPDF\Facade\Pdf;
+
+// en haut du fichier
 
 class ExpenseSheetController extends Controller
 {
@@ -480,12 +482,12 @@ class ExpenseSheetController extends Controller
 
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date'   => 'required|date',
+            'end_date' => 'required|date',
         ]);
 
         // On élargit end_date à la fin de journée pour inclure toute la date
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
-        $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
+        $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
         // Récupérer les utilisateurs ayant au moins une note encodée dans l'intervalle
         // et ne charger que ces notes + leurs coûts (avec formCost->form)
@@ -533,12 +535,12 @@ class ExpenseSheetController extends Controller
                     if (isset($costTypes[$key])) {
                         if (strtolower($cost->formCost->type) === 'km') {
                             // Sécuriser l'accès à route (array ou cast)
-                            $route = is_array($cost->route) ? $cost->route : (array) $cost->route;
+                            $route = is_array($cost->route) ? $cost->route : (array)$cost->route;
                             $googleKm = isset($route['google_km']) ? (float)$route['google_km'] : 0;
                             $manualKm = isset($route['manual_km']) ? (float)$route['manual_km'] : 0;
                             $costSums[$key] += ($googleKm + $manualKm);
                         } else {
-                            $costSums[$key] += (float) $cost->amount;
+                            $costSums[$key] += (float)$cost->amount;
                         }
                     }
                 }
@@ -587,7 +589,7 @@ class ExpenseSheetController extends Controller
     {
         $expenseSheet = ExpenseSheet::with([
             'costs.formCost.reimbursementRates',
-            'user','department','validatedBy','form',
+            'user', 'department', 'validatedBy', 'form',
         ])->findOrFail($id);
 
         if (!auth()->user()->can('view', $expenseSheet)) {
@@ -596,6 +598,7 @@ class ExpenseSheetController extends Controller
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('expenseSheet.pdf', [
             'expenseSheet' => $expenseSheet,
-        ])->setPaper('a4')->stream('note_de_frais_'.$id.'.pdf'); // inline
+        ])->setPaper('a4', 'landscape')
+            ->stream('note_de_frais_' . $id . '.pdf'); // inline
     }
 }
