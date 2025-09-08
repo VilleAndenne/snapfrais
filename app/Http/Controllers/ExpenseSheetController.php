@@ -83,18 +83,29 @@ class ExpenseSheetController extends Controller
             $type = $formCost->type;
             $date = $costItem['date'];
 
-            // Récupération du taux de remboursement actif à la date du coût
-            $rate = $formCost->reimbursementRates()
+            // Récupération du ou des taux actifs
+            $rates = $formCost->reimbursementRates()
                 ->where('start_date', '<=', $date)
                 ->where(function ($q) use ($date) {
                     $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
                 })
                 ->orderByDesc('start_date')
-                ->first();
+                ->get();
 
-            if (!$rate) {
+            if ($rates->count() === 0) {
                 continue;
             }
+
+            if ($rates->count() > 1) {
+                // ⚠️ Sécurité : plusieurs taux actifs = erreur de config
+                $expenseSheet->delete();
+                return back()
+                    ->withInput()
+                    ->with('error', "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.");
+            }
+
+            $rate = $rates->first();
+            $transport = $rate->transport ?? 'car'; // transport stocké dans la table reimbursement_rates
 
             $data = $costItem['data'];
             $total = 0;
@@ -122,7 +133,8 @@ class ExpenseSheetController extends Controller
                     $params = [
                         'origin' => $segmentOrigin,
                         'destination' => $segmentDest,
-                        'mode' => 'driving',
+                        // Utilisation du mode issu du taux
+                        'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
                         'key' => env('GOOGLE_MAPS_API_KEY'),
                     ];
 
@@ -145,9 +157,9 @@ class ExpenseSheetController extends Controller
                     'google_km' => $googleKm,
                     'manual_km' => $manualKm,
                     'justification' => $data['justification'] ?? null,
+                    'transport' => $transport, // on garde une trace
                 ];
 
-                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
@@ -164,7 +176,7 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
-            // Gestion des requirements sous forme de JSON
+            // Gestion des requirements
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
@@ -177,8 +189,7 @@ class ExpenseSheetController extends Controller
                 }
             }
 
-            // Création du coût avec requirements stockés en JSON
-            $createdCost = $expenseSheet->costs()->create([
+            $expenseSheet->costs()->create([
                 'form_cost_id' => $formCost->id,
                 'type' => $type,
                 'distance' => $distance,
@@ -194,13 +205,10 @@ class ExpenseSheetController extends Controller
             $globalTotal += $total;
         }
 
-        // Met à jour le total global
         $expenseSheet->update(['total' => $globalTotal]);
 
-        // 🔴 Si total = 0 €, on supprime et on renvoie avec erreur
         if ($globalTotal <= 0) {
             $expenseSheet->delete();
-
             return redirect()
                 ->back()
                 ->withInput()
@@ -209,11 +217,8 @@ class ExpenseSheetController extends Controller
 
         $user = auth()->user();
         $department = $expenseSheet->department;
-
-        // Récupère les responsables
         $heads = $department->heads;
 
-        // Si l'agent est lui-même head du service, alors on passe au parent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
