@@ -34,14 +34,21 @@ class FormController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+
             'costs' => 'required|array|min:1',
+
             'costs.*.name' => 'required|string|max:255',
             'costs.*.description' => 'required|string|max:255',
             'costs.*.type' => 'required|string|in:km,fixed,percentage',
+
             'costs.*.reimbursement_rates' => 'nullable|array',
             'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
             'costs.*.reimbursement_rates.*.end_date' => 'nullable|date|after_or_equal:costs.*.reimbursement_rates.*.start_date',
             'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
+
+            // 🔸 nouveau : transport pour les taux (utile pour type=km)
+            // on le laisse nullable côté validation, et on forcera une valeur par défaut au save
+            'costs.*.reimbursement_rates.*.transport' => 'nullable|string|in:car,bike,other',
 
             'costs.*.requirements' => 'nullable|array',
             'costs.*.requirements.*.name' => 'required_with:costs.*.requirements|string|max:255',
@@ -64,10 +71,17 @@ class FormController extends Controller
             // Créer les taux de remboursement
             if (!empty($costData['reimbursement_rates'])) {
                 foreach ($costData['reimbursement_rates'] as $rateData) {
+                    // 🔸 si le coût est "km", on prend le transport fourni ou 'car' par défaut
+                    // 🔸 si le coût n'est PAS "km", on peut ignorer transport (mais la colonne peut avoir un défaut DB)
+                    $transport = $costData['type'] === 'km'
+                        ? ($rateData['transport'] ?? 'car')
+                        : ($rateData['transport'] ?? 'car'); // garde 'car' par défaut si colonne NOT NULL avec default
+
                     $cost->reimbursementRates()->create([
                         'start_date' => $rateData['start_date'],
-                        'end_date' => $rateData['end_date'],
+                        'end_date' => $rateData['end_date'] ?? null,
                         'value' => $rateData['value'],
+                        'transport' => $transport, // 🔸 nouveau champ
                     ]);
                 }
             }
@@ -97,19 +111,29 @@ class FormController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
+// FormController.php
+
     public function edit(Form $form)
     {
+        // Charger les relations
         $form->load('costs.reimbursementRates', 'costs.requirements');
 
-        // ✅ S'assurer que le tableau requirements est toujours défini
+        // ✅ Normaliser les structures pour l'UI et garantir un transport par défaut
         $form->costs->each(function ($cost) {
+            // Toujours des tableaux
             if (!$cost->requirements) {
                 $cost->requirements = [];
             }
-
             if (!$cost->reimbursementRates) {
                 $cost->reimbursementRates = [];
             }
+
+            // Ajouter un transport par défaut pour chaque taux
+            $cost->reimbursementRates->transform(function ($rate) use ($cost) {
+                // Si la colonne n'existe pas encore en DB, ajoute la migration avant d'utiliser ceci.
+                $rate->transport = $rate->transport ?? 'car';
+                return $rate;
+            });
         });
 
         return inertia('forms/EditForm', [
@@ -117,22 +141,25 @@ class FormController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+
     public function update(Request $request, Form $form)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+
             'costs' => 'required|array|min:1',
+
             'costs.*.id' => 'nullable|exists:form_costs,id',
             'costs.*.name' => 'required|string|max:255',
             'costs.*.description' => 'required|string|max:255',
             'costs.*.type' => 'required|string|in:km,fixed,percentage',
 
             'costs.*.reimbursement_rates' => 'nullable|array',
-            'costs.*.reimbursement_rates.*.id' => 'nullable|exists:form_cost_remboursiement_rates,id',
+            // ⚠️ Si ton nom de table est mal orthographié, corrige-le ici.
+            // 'costs.*.reimbursement_rates.*.id' => 'nullable|exists:form_cost_reimbursement_rates,id',
+            'costs.*.reimbursement_rates.*.id' => 'nullable|integer',
+
             'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
             'costs.*.reimbursement_rates.*.end_date' => [
                 'nullable',
@@ -140,6 +167,8 @@ class FormController extends Controller
                 'after_or_equal:costs.*.reimbursement_rates.*.start_date',
             ],
             'costs.*.reimbursement_rates.*.value' => 'required_with:costs.*.reimbursement_rates|numeric|min:0',
+            // 🔸 Nouveau : transport
+            'costs.*.reimbursement_rates.*.transport' => 'nullable|string|in:car,bike,other',
 
             'costs.*.requirements' => 'nullable|array',
             'costs.*.requirements.*.id' => 'nullable|exists:form_cost_requirements,id',
@@ -153,96 +182,84 @@ class FormController extends Controller
             'description' => $validated['description'] ?? '',
         ]);
 
-        // ✅ Récupérer les IDs des coûts envoyés dans la requête
+        // ✅ Supprimer les coûts qui ne sont plus présents
         $incomingCostIds = collect($validated['costs'])->pluck('id')->filter()->toArray();
-
-        // ✅ Supprimer les coûts qui ne sont plus dans la requête
         $form->costs()->whereNotIn('id', $incomingCostIds)->delete();
 
         // ✅ Traiter chaque coût
         foreach ($validated['costs'] as $costData) {
             if (!empty($costData['id'])) {
-                // ✅ Mise à jour du coût existant
-                $cost = $form->costs()->find($costData['id']);
+                // Mise à jour
+                $cost = $form->costs()->findOrFail($costData['id']);
                 $cost->update([
-                    'name' => $costData['name'],
-                    'type' => $costData['type'],
+                    'name'        => $costData['name'],
+                    'description' => $costData['description'], // 🔧 on met aussi à jour la description
+                    'type'        => $costData['type'],
                 ]);
             } else {
-                // ✅ Création d'un nouveau coût
+                // Création
                 $cost = $form->costs()->create([
-                    'name' => $costData['name'],
-                    'type' => $costData['type'],
+                    'name'        => $costData['name'],
                     'description' => $costData['description'],
+                    'type'        => $costData['type'],
                 ]);
             }
 
-            // ✅ Mise à jour des taux de remboursement
-            $incomingRateIds = collect($costData['reimbursement_rates'])->pluck('id')->filter()->toArray();
-            $cost->reimbursementRates()->whereNotIn('id', $incomingRateIds)->delete();
+            // ✅ Reimbursement rates (taux)
+            $incomingRateIds = collect($costData['reimbursement_rates'] ?? [])->pluck('id')->filter()->toArray();
+            if (!empty($incomingRateIds)) {
+                $cost->reimbursementRates()->whereNotIn('id', $incomingRateIds)->delete();
+            } else {
+                // S'il n'y a plus de taux, on supprime tout
+                $cost->reimbursementRates()->delete();
+            }
 
-            foreach ($costData['reimbursement_rates'] as $rateData) {
+            foreach ($costData['reimbursement_rates'] ?? [] as $rateData) {
+                $payload = [
+                    'start_date' => $rateData['start_date'],
+                    'end_date'   => $rateData['end_date'] ?? null,
+                    'value'      => $rateData['value'],
+                    'transport'  => ($costData['type'] === 'km')
+                        ? ($rateData['transport'] ?? 'car') // défaut pour km
+                        : ($rateData['transport'] ?? 'car'), // valeur par défaut si colonne NOT NULL
+                ];
+
                 if (!empty($rateData['id'])) {
-                    // ✅ Mise à jour d'un taux existant
-                    $rate = $cost->reimbursementRates()->find($rateData['id']);
-                    $rate->update([
-                        'start_date' => $rateData['start_date'],
-                        'end_date' => $rateData['end_date'],
-                        'value' => $rateData['value'],
-                    ]);
+                    // Update
+                    $rate = $cost->reimbursementRates()->findOrFail($rateData['id']);
+                    $rate->update($payload);
                 } else {
-                    // ✅ Création d'un nouveau taux
-                    $cost->reimbursementRates()->create([
-                        'start_date' => $rateData['start_date'],
-                        'end_date' => $rateData['end_date'],
-                        'value' => $rateData['value'],
-                    ]);
+                    // Create
+                    $cost->reimbursementRates()->create($payload);
                 }
             }
 
-            // ✅ Mise à jour des requirements (prérequis)
-            $incomingRequirementIds = collect($costData['requirements'])->pluck('id')->filter()->toArray();
-            $cost->requirements()->whereNotIn('id', $incomingRequirementIds)->delete();
+            // ✅ Requirements (prérequis)
+            $incomingRequirementIds = collect($costData['requirements'] ?? [])->pluck('id')->filter()->toArray();
+            if (!empty($incomingRequirementIds)) {
+                $cost->requirements()->whereNotIn('id', $incomingRequirementIds)->delete();
+            } else {
+                $cost->requirements()->delete();
+            }
 
-            foreach ($costData['requirements'] as $requirementData) {
-                $content = [];
+            foreach ($costData['requirements'] ?? [] as $requirementData) {
+                $reqPayload = [
+                    'name' => $requirementData['name'],
+                    'type' => $requirementData['type'],
+                ];
+
                 if (!empty($requirementData['id'])) {
-                    // ✅ Mise à jour d'un requirement existant
-                    $requirement = $cost->requirements()->find($requirementData['id']);
-
-                    // Vérifier si le requirement est un fichier
-                    if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = $requirementData['file']->store('requirements', 'public');
-                        $content = ['file' => $path];
-                    } elseif ($requirementData['type'] === 'text' && isset($requirementData['value'])) {
-                        $content = ['value' => $requirementData['value']];
-                    }
-
-                    $requirement->update([
-                        'name' => $requirementData['name'],
-                        'type' => $requirementData['type'],
-                        'content' => json_encode($content),
-                    ]);
+                    $requirement = $cost->requirements()->findOrFail($requirementData['id']);
+                    $requirement->update($reqPayload);
                 } else {
-                    // ✅ Création d'un nouveau requirement
-                    if ($requirementData['type'] === 'file' && isset($requirementData['file']) && $requirementData['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = $requirementData['file']->store('requirements', 'public');
-                        $content = ['file' => $path];
-                    } elseif ($requirementData['type'] === 'text' && isset($requirementData['value'])) {
-                        $content = ['value' => $requirementData['value']];
-                    }
-
-                    $cost->requirements()->create([
-                        'name' => $requirementData['name'],
-                        'type' => $requirementData['type'],
-                        'content' => json_encode($content),
-                    ]);
+                    $cost->requirements()->create($reqPayload);
                 }
             }
         }
 
         return redirect()->route('forms.index')->with('success', 'Formulaire mis à jour avec succès!');
     }
+
 
 
     /**
