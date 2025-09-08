@@ -31,6 +31,11 @@ class ExpenseSheet extends Model
         'steps',
     ];
 
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
 
     public function costs()
     {

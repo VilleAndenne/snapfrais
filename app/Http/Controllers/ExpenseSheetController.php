@@ -48,7 +48,8 @@ class ExpenseSheetController extends Controller
 
         return inertia('expenseSheet/Create', [
             'form' => $form,
-            'departments' => auth()->user()->departments()->with('heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'authUser' => auth()->user()->only(['id', 'name', 'email'])
         ]);
     }
 
@@ -65,25 +66,47 @@ class ExpenseSheetController extends Controller
             'costs.*.date' => 'required|date',
             'costs.*.requirements' => 'nullable|array',
             'department_id' => 'required|exists:departments,id',
+            'target_user_id' => 'nullable|exists:users,id',
         ]);
 
-        $expenseSheet = ExpenseSheet::create([
-            'user_id' => auth()->id(),
-            'status' => 'En attente',
-            'total' => 0,
-            'form_id' => $id,
-            'department_id' => $validated['department_id'],
+        // Département + relations nécessaires (heads + users)
+        $department = \App\Models\Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+        $currentUserId = auth()->id();
+        $targetUserId = $request->input('target_user_id');
+
+        // Si on encode pour quelqu'un d'autre : il faut être head du service + la cible doit appartenir au service
+        if ($targetUserId && (int)$targetUserId !== (int)$currentUserId) {
+            $isHead = $department->heads->contains('id', $currentUserId);
+            if (!$isHead) {
+                abort(403, "Vous devez être responsable du service pour encoder au nom d'un agent.");
+            }
+            $belongsToDept = $department->users->contains('id', (int)$targetUserId);
+            if (!$belongsToDept) {
+                return back()
+                    ->withErrors(['target_user_id' => "L'agent sélectionné n'appartient pas à ce service."])
+                    ->withInput();
+            }
+        }
+
+        // Création de la note de frais
+        $expenseSheet = \App\Models\ExpenseSheet::create([
+            'user_id'         => $targetUserId ?: $currentUserId, // bénéficiaire
+            'created_by'      => $currentUserId,                  // créateur réel
+            'status'          => 'En attente',
+            'total'           => 0,
+            'form_id'         => $id,
+            'department_id'   => $validated['department_id'],
             'organization_id' => auth()->user()->organization_id,
         ]);
 
         $globalTotal = 0;
 
         foreach ($validated['costs'] as $costItem) {
-            $formCost = FormCost::find($costItem['cost_id']);
+            $formCost = \App\Models\FormCost::find($costItem['cost_id']);
             $type = $formCost->type;
             $date = $costItem['date'];
 
-            // Récupération du taux de remboursement actif à la date du coût
+            // Taux de remboursement actif à la date
             $rate = $formCost->reimbursementRates()
                 ->where('start_date', '<=', $date)
                 ->where(function ($q) use ($date) {
@@ -126,7 +149,7 @@ class ExpenseSheetController extends Controller
                         'key' => env('GOOGLE_MAPS_API_KEY'),
                     ];
 
-                    $response = Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
+                    $response = \Illuminate\Support\Facades\Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
                     $json = $response->json();
 
                     if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
@@ -140,20 +163,19 @@ class ExpenseSheetController extends Controller
                 $total = round($distance * $rate->value, 2);
 
                 $route = [
-                    'departure' => $origin,
-                    'arrival' => $destination,
-                    'google_km' => $googleKm,
-                    'manual_km' => $manualKm,
-                    'justification' => $data['justification'] ?? null,
+                    'departure'    => $origin,
+                    'arrival'      => $destination,
+                    'google_km'    => $googleKm,
+                    'manual_km'    => $manualKm,
+                    'justification'=> $data['justification'] ?? null,
                 ];
 
-                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
                         $route['steps'][] = [
                             'address' => $address,
-                            'order' => $index + 1,
+                            'order'   => $index + 1,
                         ];
                     }
                 }
@@ -164,12 +186,12 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
-            // Gestion des requirements sous forme de JSON
+            // Requirements (fichiers/valeurs)
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = Storage::url(Storage::putFile($requirement['file']));
+                        $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
@@ -177,43 +199,39 @@ class ExpenseSheetController extends Controller
                 }
             }
 
-            // Création du coût avec requirements stockés en JSON
-            $createdCost = $expenseSheet->costs()->create([
-                'form_cost_id' => $formCost->id,
-                'type' => $type,
-                'distance' => $distance,
-                'google_distance' => $googleDistance,
-                'route' => $route,
-                'total' => $total,
-                'date' => $date,
-                'amount' => $data['paidAmount'] ?? null,
-                'requirements' => json_encode($requirements),
+            $expenseSheet->costs()->create([
+                'form_cost_id'     => $formCost->id,
+                'type'             => $type,
+                'distance'         => $distance,
+                'google_distance'  => $googleDistance,
+                'route'            => $route,
+                'total'            => $total,
+                'date'             => $date,
+                'amount'           => $data['paidAmount'] ?? null,
+                'requirements'     => json_encode($requirements),
                 'expense_sheet_id' => $expenseSheet->id
             ]);
 
             $globalTotal += $total;
         }
 
-        // Met à jour le total global
+        // Total global
         $expenseSheet->update(['total' => $globalTotal]);
 
-        // 🔴 Si total = 0 €, on supprime et on renvoie avec erreur
+        // Si rien à rembourser, on annule
         if ($globalTotal <= 0) {
             $expenseSheet->delete();
-
             return redirect()
                 ->back()
                 ->withInput()
                 ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
         }
 
+        // Notifications
         $user = auth()->user();
-        $department = $expenseSheet->department;
-
-        // Récupère les responsables
         $heads = $department->heads;
 
-        // Si l'agent est lui-même head du service, alors on passe au parent
+        // Si l’agent est head du service, escalade vers le parent si présent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
@@ -222,7 +240,7 @@ class ExpenseSheetController extends Controller
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
         });
 
-        $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
+        $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
 
         return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
     }
