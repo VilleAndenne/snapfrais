@@ -240,6 +240,10 @@ class ExpenseSheetController extends Controller
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
         });
 
+        if($expenseSheet->creator->id !== $expenseSheet->user->id) {
+            $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+        }
+
         $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
 
         return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
