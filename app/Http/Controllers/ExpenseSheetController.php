@@ -488,18 +488,18 @@ class ExpenseSheetController extends Controller
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
         $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
-        // Récupérer les utilisateurs avec leurs notes et coûts
         $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('created_at', [$startDate, $endDate]);
+            $q->where('approved', true)
+                ->whereBetween('validated_at', [$startDate, $endDate]);
         })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('created_at', [$startDate, $endDate]);
+                    $q->where('approved', true)
+                        ->whereBetween('validated_at', [$startDate, $endDate]);
                 },
                 'expenseSheets.expenseSheetCosts.formCost.form'
             ])
             ->get();
-
         // Préparer entête
         $headers = ['Username'];
         $costTypes = [];
