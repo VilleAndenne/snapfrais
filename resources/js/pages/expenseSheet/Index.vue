@@ -176,7 +176,7 @@ const breadcrumbs = [
                 <div v-if="isFilterOpen" class="p-3 sm:p-4 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-background">
                     <div class="space-y-1 sm:space-y-2">
                         <label for="status-filter" class="text-xs sm:text-sm font-medium">Statut</label>
-                        <select id="status-filter" v-model="statusFilter" class="w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
+                        <select id="status-filter" v-model="statusFilter" class="bg-white dark:bg-black  w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les statuts</option>
                             <option value="pending">En attente</option>
                             <option value="approved">Approuvée</option>
@@ -186,7 +186,7 @@ const breadcrumbs = [
 
                     <div class="space-y-1 sm:space-y-2">
                         <label for="department-filter" class="text-xs sm:text-sm font-medium">Département</label>
-                        <select id="department-filter" v-model="departmentFilter" class="w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
+                        <select id="department-filter" v-model="departmentFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les départements</option>
                             <option v-for="d in departmentOptions" :key="d" :value="d">{{ d }}</option>
                         </select>
@@ -194,12 +194,12 @@ const breadcrumbs = [
 
                     <div class="space-y-1 sm:space-y-2">
                         <label for="date-start" class="text-xs sm:text-sm font-medium">Date de début</label>
-                        <input id="date-start" v-model="dateStart" type="date" class="w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm" />
+                        <input id="date-start" v-model="dateStart" type="date" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm" />
                     </div>
 
                     <div class="space-y-1 sm:space-y-2">
                         <label for="date-end" class="text-xs sm:text-sm font-medium">Date de fin</label>
-                        <input id="date-end" v-model="dateEnd" type="date" class="w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm" />
+                        <input id="date-end" v-model="dateEnd" type="date" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm" />
                     </div>
 
                     <div class="col-span-full flex justify-end">
