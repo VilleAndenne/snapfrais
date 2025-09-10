@@ -250,6 +250,7 @@ class ExpenseSheetController extends Controller
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canEdit' => $canEdit,
+            'canDestroy' => auth()->user()->can('destroy', $expenseSheet),
         ]);
     }
 
@@ -425,9 +426,13 @@ class ExpenseSheetController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ExpenseSheetController $expenseSheetController)
+    public function destroy($id)
     {
-        //
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+
+        $expenseSheet->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Note de frais supprimée.');
     }
 
     /**

@@ -19,6 +19,10 @@
                             <XIcon class="mr-1 h-4 w-4" />
                             Rejeter
                         </Button>
+                        <Button v-if="expenseSheet.approved == false && canDestroy" variant="destructive" size="sm" @click="openDeleteModal">
+                            <TrashIcon class="mr-1 h-4 w-4" />
+                            Supprimer
+                        </Button>
                     </div>
                     <Badge :variant="getStatusLabel(expenseSheet).variant">
                         {{ getStatusLabel(expenseSheet).label }}
@@ -134,9 +138,7 @@
                                         {{ transportLabel(resolveTransport(cost)) }}
                                     </Badge>
                                     <!-- Ancien texte -->
-                                    <span class="text-sm italic text-muted-foreground">
-                                        {{ getActiveRate(cost, cost.date) }} / {{ cost.type }}
-                                    </span>
+                                    <span class="text-sm italic text-muted-foreground"> {{ getActiveRate(cost, cost.date) }} / {{ cost.type }} </span>
                                 </div>
                             </div>
                             <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
@@ -178,8 +180,15 @@
                                             <a :href="requirement.file" target="_blank" class="text-primary underline"> Visualiser le fichier </a>
                                         </span>
                                         <span v-else>
-                                            <template v-if="requirement.value && (requirement.value.startsWith('http://') || requirement.value.startsWith('https://'))">
-                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{ requirement.value }}</a>
+                                            <template
+                                                v-if="
+                                                    requirement.value &&
+                                                    (requirement.value.startsWith('http://') || requirement.value.startsWith('https://'))
+                                                "
+                                            >
+                                                <a :href="requirement.value" target="_blank" class="text-primary underline">{{
+                                                    requirement.value
+                                                }}</a>
                                             </template>
                                             <template v-else>
                                                 {{ requirement.value }}
@@ -225,7 +234,20 @@
                 </div>
                 <DialogFooter>
                     <Button variant="outline" @click="closeRejectModal">Annuler</Button>
-                    <Button variant="destructive" @click="confirmReject" :disabled="!rejectionReason.trim()">Confirmer le refus</Button>
+                    <Button variant="destructive" @click="confirmReject" :disabled="!rejectionReason.trim()">Confirmer le refus </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog :open="isDeleteModalOpen" @update:open="isDeleteModalOpen = $event">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Confirmation de supression</DialogTitle>
+                    <DialogDescription>Etes-vous sûr de vouloir supprimer cette note de frais ?</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" @click="closeDeleteModal">Annuler</Button>
+                    <Button variant="destructive" @click="confirmDelete">Supprimer</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -247,15 +269,26 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import ExpenseSheetPdf from '@/pages/expenseSheet/Pdf.vue';
 import { formatCurrency, formatDate, getActiveRate, getStatusLabel } from '@/utils/formatters';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { AlertCircleIcon, CheckIcon, MoreVerticalIcon, PrinterIcon, XIcon, BikeIcon, CarIcon, FootprintsIcon } from 'lucide-vue-next';
+import {
+    AlertCircleIcon,
+    BikeIcon,
+    CarIcon,
+    CheckIcon,
+    DownloadIcon,
+    FootprintsIcon,
+    MoreVerticalIcon,
+    PrinterIcon,
+    TrashIcon,
+    XIcon,
+} from 'lucide-vue-next';
 import { ref } from 'vue';
-import { DownloadIcon } from 'lucide-vue-next';
 
 const props = defineProps({
     expenseSheet: Object,
     canApprove: { type: Boolean, default: false },
     canReject: { type: Boolean, default: false },
     canEdit: { type: Boolean, default: false },
+    canDestroy: { type: Boolean, default: false },
 });
 
 const breadcrumbs = [
@@ -267,11 +300,34 @@ const breadcrumbs = [
 const isRejectModalOpen = ref(false);
 const rejectionReason = ref('');
 
-const openRejectModal = () => { rejectionReason.value = ''; isRejectModalOpen.value = true; };
-const closeRejectModal = () => { isRejectModalOpen.value = false; };
+// Modal de delete
+const isDeleteModalOpen = ref(false);
+
+const openDeleteModal = () => {
+    isDeleteModalOpen.value = true;
+};
+const closeDeleteModal = () => {
+    isDeleteModalOpen.value = false;
+};
+
+const confirmDelete = () => {
+    useForm().delete('/expense-sheet/' + props.expenseSheet.id);
+    closeDeleteModal();
+};
+
+const openRejectModal = () => {
+    rejectionReason.value = '';
+    isRejectModalOpen.value = true;
+};
+const closeRejectModal = () => {
+    isRejectModalOpen.value = false;
+};
 const confirmReject = () => {
     if (!rejectionReason.value.trim()) return;
-    useForm({ approval: false, reason: rejectionReason.value }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
+    useForm({
+        approval: false,
+        reason: rejectionReason.value,
+    }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
     closeRejectModal();
 };
 const approveExpenseSheet = () => {
@@ -280,12 +336,21 @@ const approveExpenseSheet = () => {
 const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
-const printExpenseSheet = () => { /* ... ton code d’impression inchangé ... */ };
+const printExpenseSheet = () => {
+    /* ... ton code d’impression inchangé ... */
+};
 
-const getInitials = (name: string) => name.split(' ').map((w) => w.charAt(0)).join('');
+const getInitials = (name: string) =>
+    name
+        .split(' ')
+        .map((w) => w.charAt(0))
+        .join('');
 const parseRequirements = (requirements: any) => {
-    try { return typeof requirements === 'string' ? JSON.parse(requirements) : requirements; }
-    catch { return {}; }
+    try {
+        return typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
+    } catch {
+        return {};
+    }
 };
 
 // === Gestion transport ===
@@ -302,6 +367,6 @@ const resolveTransport = (cost: any) => {
     const rate = getActiveRateRecordLocal(cost);
     return rate?.transport ?? 'car';
 };
-const transportLabel = (t: string) => t === 'bike' ? 'Vélo' : t === 'other' ? 'Autre' : 'Voiture';
+const transportLabel = (t: string) => (t === 'bike' ? 'Vélo' : t === 'other' ? 'Autre' : 'Voiture');
 const transportIcon = (t: string) => (t === 'bike' ? BikeIcon : t === 'other' ? FootprintsIcon : CarIcon);
 </script>
