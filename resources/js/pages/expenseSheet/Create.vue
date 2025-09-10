@@ -110,7 +110,7 @@
             <!-- Coûts disponibles -->
             <div>
                 <h2 class="mb-2 text-lg font-medium text-foreground">Types de coûts disponibles</h2>
-                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/7</p>
+                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/30</p>
                 <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
@@ -173,8 +173,8 @@ const getActiveRate = (cost, date) => getActiveRateRecord(cost, date)?.value ?? 
 const getActiveTransport = (cost, date) => getActiveRateRecord(cost, date)?.transport ?? 'car';
 
 const addToRequest = (cost) => {
-    if (selectedCosts.value.length >= 7) {
-        alert('Vous avez atteint le maximum de 7 coûts.');
+    if (selectedCosts.value.length >= 30) {
+        alert('Vous avez atteint le maximum de 30 coûts.');
         return;
     }
 
