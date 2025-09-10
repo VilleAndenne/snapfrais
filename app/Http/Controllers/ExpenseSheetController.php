@@ -106,18 +106,29 @@ class ExpenseSheetController extends Controller
             $type = $formCost->type;
             $date = $costItem['date'];
 
-            // Taux de remboursement actif à la date
-            $rate = $formCost->reimbursementRates()
+            // Récupération du ou des taux actifs
+            $rates = $formCost->reimbursementRates()
                 ->where('start_date', '<=', $date)
                 ->where(function ($q) use ($date) {
                     $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
                 })
                 ->orderByDesc('start_date')
-                ->first();
+                ->get();
 
-            if (!$rate) {
+            if ($rates->count() === 0) {
                 continue;
             }
+
+            if ($rates->count() > 1) {
+                // ⚠️ Sécurité : plusieurs taux actifs = erreur de config
+                $expenseSheet->delete();
+                return back()
+                    ->withInput()
+                    ->with('error', "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.");
+            }
+
+            $rate = $rates->first();
+            $transport = $rate->transport ?? 'car'; // transport stocké dans la table reimbursement_rates
 
             $data = $costItem['data'];
             $total = 0;
@@ -145,7 +156,8 @@ class ExpenseSheetController extends Controller
                     $params = [
                         'origin' => $segmentOrigin,
                         'destination' => $segmentDest,
-                        'mode' => 'driving',
+                        // Utilisation du mode issu du taux
+                        'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
                         'key' => env('GOOGLE_MAPS_API_KEY'),
                     ];
 
@@ -163,13 +175,15 @@ class ExpenseSheetController extends Controller
                 $total = round($distance * $rate->value, 2);
 
                 $route = [
-                    'departure'    => $origin,
-                    'arrival'      => $destination,
-                    'google_km'    => $googleKm,
-                    'manual_km'    => $manualKm,
-                    'justification'=> $data['justification'] ?? null,
+                    'departure' => $origin,
+                    'arrival' => $destination,
+                    'google_km' => $googleKm,
+                    'manual_km' => $manualKm,
+                    'justification' => $data['justification'] ?? null,
+                    'transport' => $transport, // on garde une trace
                 ];
 
+                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
@@ -186,7 +200,7 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
-            // Requirements (fichiers/valeurs)
+            // Gestion des requirements
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
@@ -215,10 +229,8 @@ class ExpenseSheetController extends Controller
             $globalTotal += $total;
         }
 
-        // Total global
         $expenseSheet->update(['total' => $globalTotal]);
 
-        // Si rien à rembourser, on annule
         if ($globalTotal <= 0) {
             $expenseSheet->delete();
             return redirect()
@@ -227,11 +239,10 @@ class ExpenseSheetController extends Controller
                 ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
         }
 
-        // Notifications
         $user = auth()->user();
+        $department = $expenseSheet->department;
         $heads = $department->heads;
 
-        // Si l’agent est head du service, escalade vers le parent si présent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
@@ -240,7 +251,7 @@ class ExpenseSheetController extends Controller
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
         });
 
-        if($expenseSheet->creator->id !== $expenseSheet->user->id) {
+        if(auth()->user()->id !== $expenseSheet->user->id) {
             $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
         }
 
@@ -267,6 +278,7 @@ class ExpenseSheetController extends Controller
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canEdit' => $canEdit,
+            'canDestroy' => auth()->user()->can('destroy', $expenseSheet),
         ]);
     }
 
@@ -442,9 +454,13 @@ class ExpenseSheetController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ExpenseSheetController $expenseSheetController)
+    public function destroy($id)
     {
-        //
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+
+        $expenseSheet->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Note de frais supprimée.');
     }
 
     /**
@@ -510,18 +526,18 @@ class ExpenseSheetController extends Controller
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
         $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
-        // Récupérer les utilisateurs avec leurs notes et coûts
         $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('created_at', [$startDate, $endDate]);
+            $q->where('approved', true)
+                ->whereBetween('validated_at', [$startDate, $endDate]);
         })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('created_at', [$startDate, $endDate]);
+                    $q->where('approved', true)
+                        ->whereBetween('validated_at', [$startDate, $endDate]);
                 },
                 'expenseSheets.expenseSheetCosts.formCost.form'
             ])
             ->get();
-
         // Préparer entête
         $headers = ['Username'];
         $costTypes = [];

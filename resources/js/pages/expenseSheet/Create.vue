@@ -19,8 +19,8 @@
                     </SelectContent>
                 </Select>
                 <span v-if="form.errors.department_id" class="text-sm text-red-600">
-          {{ form.errors.department_id }}
-        </span>
+                    {{ form.errors.department_id }}
+                </span>
             </div>
 
             <!-- Sélecteur d'agent (visible si l'utilisateur est head du service sélectionné) -->
@@ -88,12 +88,25 @@
 
                     <!-- Champs dynamiques selon le type de coût -->
                     <div v-if="cost.type === 'km'">
-                        <KmCostInput v-model="costData[index].kmData" />
-
+                        <KmCostInput
+                            v-model="costData[index].kmData"
+                            :travel_mode="getActiveTransport(cost, costData[index].date) === 'bike' ? 'BICYCLING' : 'DRIVING'"
+                        />
                         <!-- Résumé remboursement km -->
                         <div class="mt-3 rounded border border-border bg-muted/40 p-3">
                             <div class="flex flex-col gap-x-4 gap-y-2 text-sm">
                                 <span class="font-medium">Estimation</span>
+                                <span
+                                    >• Mode :
+                                    {{
+                                        getActiveTransport(cost, costData[index].date) === 'bike'
+                                            ? 'Vélo'
+                                            : getActiveTransport(cost, costData[index].date) === 'car'
+                                              ? 'Voiture'
+                                              : 'Autre'
+                                    }}</span
+                                >
+
                                 <span>• Taux : {{ formatRate(getActiveRate(cost, costData[index].date)) }} / km</span>
                                 <span>• Distance : {{ roundKm(costData[index]?.kmData?.totalKm) }} km</span>
                                 <span>
@@ -125,7 +138,7 @@
             <!-- Coûts disponibles -->
             <div>
                 <h2 class="mb-2 text-lg font-medium text-foreground">Types de coûts disponibles</h2>
-                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/7</p>
+                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/30</p>
                 <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
@@ -198,16 +211,23 @@ watch(
     }
 );
 
-const getActiveRate = (cost, date) => {
-    const activeRate = cost.reimbursement_rates.find(
-        (rate) => rate.start_date <= date && (!rate.end_date || rate.end_date >= date)
-    );
-    return activeRate?.value ?? 0;
+const getActiveRateRecord = (cost, date) => {
+    const rates = cost.reimbursement_rates || [];
+    // On filtre par date uniquement (pas de sélection utilisateur)
+    const actives = rates.filter((r) => r.start_date <= date && (!r.end_date || r.end_date >= date));
+    // Idéalement: il ne doit y en avoir qu'un ce jour-là
+    // Si plusieurs: on prend le plus récent (start_date max), ou on affichera un warning UI
+    actives.sort((a, b) => (a.start_date > b.start_date ? -1 : 1));
+    return actives[0] || null;
 };
 
+const getActiveRate = (cost, date) => getActiveRateRecord(cost, date)?.value ?? 0;
+
+const getActiveTransport = (cost, date) => getActiveRateRecord(cost, date)?.transport ?? 'car';
+
 const addToRequest = (cost) => {
-    if (selectedCosts.value.length >= 7) {
-        alert('Vous avez atteint le maximum de 7 coûts.');
+    if (selectedCosts.value.length >= 30) {
+        alert('Vous avez atteint le maximum de 30 coûts.');
         return;
     }
 
@@ -393,8 +413,7 @@ const roundKm = (v) => {
     return Math.round(n * 10) / 10;
 };
 
-const formatCurrency = (v) =>
-    (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' });
+const formatCurrency = (v) => (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' });
 
 const formatRate = (v) => `${v} €`;
 

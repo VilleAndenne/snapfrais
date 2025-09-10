@@ -11,6 +11,7 @@ Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])-
 Route::post('/expense-sheet/{id}/approve', [ExpenseSheetController::class, 'approve'])->name('expense-sheet.approve')->middleware('auth');
 Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])->name('expense-sheet.edit')->middleware('auth');
 Route::put('/expense-sheet/{id}', [ExpenseSheetController::class, 'update'])->name('expense-sheet.update')->middleware('auth');
+Route::delete('/expense-sheet/{id}', [ExpenseSheetController::class, 'destroy'])->name('expense-sheet.destroy')->middleware('auth');
 Route::get('/expense-sheets/{id}/pdf', [\App\Http\Controllers\ExpenseSheetController::class, 'generatePDF'])
     ->middleware(\App\Http\Middleware\AllowFrameSameOrigin::class)
     ->name('expenseSheets.pdf');
