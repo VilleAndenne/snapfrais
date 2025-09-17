@@ -103,7 +103,7 @@
                     <CardTitle>Informations générales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div>
                             <h3 class="text-sm font-medium text-muted-foreground">Demandeur</h3>
                             <p class="mt-1 flex items-center">
@@ -111,6 +111,15 @@
                                     <AvatarFallback>{{ getInitials(expenseSheet.user.name) }}</AvatarFallback>
                                 </Avatar>
                                 {{ expenseSheet.user.name }}
+                            </p>
+                        </div>
+                        <div v-if="expenseSheet.user.name !== expenseSheet.creator.name">
+                            <h3 class="text-sm font-medium text-muted-foreground">Encodeur</h3>
+                            <p class="mt-1 flex items-center">
+                                <Avatar class="mr-2 h-6 w-6">
+                                    <AvatarFallback>{{ getInitials(expenseSheet.creator.name) }}</AvatarFallback>
+                                </Avatar>
+                                {{ expenseSheet.creator.name }}
                             </p>
                         </div>
                         <div>
