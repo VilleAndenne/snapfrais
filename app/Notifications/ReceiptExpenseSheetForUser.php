@@ -29,7 +29,7 @@ class ReceiptExpenseSheetForUser extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject('Confirmation de l\'encodage de la note de frais')
             ->greeting("Bonjour {$notifiable->name},")
-            ->line("Nous avons bien reçu la note de frais que vous avez encodée pour **{$this->expenseSheet->user?->name ?? 'un utilisateur'}**.")
+            ->line("Nous avons bien reçu la note de frais que vous avez encodée pour **" . ($this->expenseSheet->user?->name ?? 'un utilisateur') . "**.")
             ->line("Montant total : " . number_format($this->expenseSheet->total, 2, ',', ' ') . " €")
             ->action('Voir la note de frais', url("/expense-sheet/{$this->expenseSheet->id}"))
             ->line('La note de frais est en attente de validation.');

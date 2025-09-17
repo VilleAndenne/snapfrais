@@ -21,6 +21,7 @@ class ExpenseSheet extends Model
         'validated_at',
         'approved',
         'refusal_reason',
+        'created_by'
     ];
 
     protected $casts = [
