@@ -23,6 +23,28 @@
                 </span>
             </div>
 
+            <!-- Sélecteur d'agent (visible si l'utilisateur est head du service sélectionné) -->
+            <div v-if="isHeadOfSelectedDept" class="flex flex-col space-y-2">
+                <Label for="targetUser">Pour quel agent ?</Label>
+                <Select v-model="form.target_user_id">
+                    <SelectTrigger id="targetUser">
+                        <SelectValue placeholder="Sélectionner un agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="u in (selectedDepartment?.users || [])"
+                            :key="u.id"
+                            :value="u.id"
+                        >
+                            {{ u.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <span v-if="form.errors.target_user_id" class="text-sm text-red-600">
+          {{ form.errors.target_user_id }}
+        </span>
+            </div>
+
             <!-- Coûts ajoutés -->
             <div v-if="selectedCosts.length" class="space-y-6 border-t border-border pt-6">
                 <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
@@ -30,10 +52,16 @@
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
+                    :id="`cost-card-${index}`"
                     class="relative space-y-4 rounded border border-border bg-card p-4 text-card-foreground"
                 >
                     <!-- Bouton de suppression -->
-                    <Button variant="ghost" size="icon" class="absolute right-2 top-2 text-destructive" @click="removeCost(index)">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="absolute right-2 top-2 text-destructive"
+                        @click="removeCost(index)"
+                    >
                         <Trash2Icon class="h-5 w-5" />
                     </Button>
 
@@ -54,8 +82,8 @@
                             @change="updateRate(index, cost)"
                         />
                         <span v-if="form.errors[`costs.${index}.date`]" class="text-sm text-red-600">
-                            {{ form.errors[`costs.${index}.date`] }}
-                        </span>
+              {{ form.errors[`costs.${index}.date`] }}
+            </span>
                     </div>
 
                     <!-- Champs dynamiques selon le type de coût -->
@@ -82,11 +110,11 @@
                                 <span>• Taux : {{ formatRate(getActiveRate(cost, costData[index].date)) }} / km</span>
                                 <span>• Distance : {{ roundKm(costData[index]?.kmData?.totalKm) }} km</span>
                                 <span>
-                                    • Remboursé :
-                                    <span class="font-semibold">
-                                        {{ formatCurrency(kmReimbursed(index, cost)) }}
-                                    </span>
-                                </span>
+                  • Remboursé :
+                  <span class="font-semibold">
+                    {{ formatCurrency(kmReimbursed(index, cost)) }}
+                  </span>
+                </span>
                             </div>
                         </div>
                     </div>
@@ -132,7 +160,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Loader2Icon, Trash2Icon } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
 import CostrequirementInput from '@/components/expense/CostRequirementInput.vue';
@@ -146,17 +174,42 @@ const costData = ref([]);
 
 const props = defineProps({
     form: { type: Object, required: true },
-    departments: { type: Array, required: true },
+    departments: { type: Array, required: true }, // heads[] + users[]
+    authUser: { type: Object, required: true },   // { id, name }
 });
 
 const form = useForm({
     costs: [],
     department_id: null,
+    target_user_id: null, // agent pour qui la note est encodée (si responsable)
 });
 
 onMounted(() => {
     costs.value = props.form.costs;
 });
+
+// Département sélectionné + statut "head"
+const selectedDepartment = computed(() =>
+    props.departments.find((d) => d.id === form.department_id) || null
+);
+
+const isHeadOfSelectedDept = computed(() => {
+    if (!selectedDepartment.value) return false;
+    const heads = selectedDepartment.value.heads || [];
+    return heads.some((h) => Number(h.id) === Number(props.authUser.id));
+});
+
+// Quand le département change : si head -> pré-sélectionne soi-même, sinon reset
+watch(
+    () => form.department_id,
+    () => {
+        if (isHeadOfSelectedDept.value) {
+            form.target_user_id = props.authUser.id;
+        } else {
+            form.target_user_id = null;
+        }
+    }
+);
 
 const getActiveRateRecord = (cost, date) => {
     const rates = cost.reimbursement_rates || [];
@@ -178,17 +231,19 @@ const addToRequest = (cost) => {
         return;
     }
 
+    const today = new Date().toISOString().split('T')[0];
+
     selectedCosts.value.push(cost);
     costData.value.push({
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         kmData: {},
         percentageData: {
             paidAmount: null,
-            percentage: getActiveRate(cost, new Date().toISOString().split('T')[0]),
+            percentage: getActiveRate(cost, today),
             reimbursedAmount: 0,
         },
         requirements: {},
-        fixedAmount: getActiveRate(cost, new Date().toISOString().split('T')[0]),
+        fixedAmount: getActiveRate(cost, today),
     });
 };
 
@@ -199,7 +254,7 @@ const updateRate = (index, cost) => {
     if (cost.type === 'percentage') {
         costData.value[index].percentageData.percentage = rate;
         const paidAmount = costData.value[index].percentageData.paidAmount;
-        if (paidAmount !== null && paidAmount !== undefined) {
+        if (paidAmount !== null && typeof paidAmount !== 'undefined') {
             costData.value[index].percentageData.reimbursedAmount = (paidAmount * rate) / 100;
         }
     } else if (cost.type === 'fixed') {
@@ -216,16 +271,16 @@ const submitted = ref(false);
 
 const submit = () => {
     submitted.value = true;
-    // 1) Construire l'objet à poster (comme tu fais déjà)
+
+    // 1) Construire l'objet à poster
     form.costs = selectedCosts.value.map((cost, index) => {
         const data =
             cost.type === 'km'
                 ? costData.value[index].kmData
                 : cost.type === 'percentage'
-                  ? costData.value[index].percentageData
-                  : { amount: costData.value[index].fixedAmount };
+                    ? costData.value[index].percentageData
+                    : { amount: costData.value[index].fixedAmount };
 
-        // requirements "plats" (clé -> {file|value})
         const requirements = {};
         if (costData.value[index].requirements) {
             Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
@@ -245,24 +300,21 @@ const submit = () => {
         };
     });
 
-    // 2) Valider les CostRequirementInput AVANT l’envoi
+    // 2) Valider les requirements avant envoi
     if (!validateAllRequirements()) {
-        // Optionnel : scroll jusqu’à la première erreur
         const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
         if (firstErrorKey) {
-            // Essaie de scroller sur le container de la première carte coût
             const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
             if (m) {
                 const idx = Number(m[1]);
-                // si chaque carte a un id unique :
                 const el = document.getElementById(`cost-card-${idx}`);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
-        return; // on n’envoie pas
+        return;
     }
 
-    // 3) Envoi si tout est ok
+    // 3) Envoi
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
@@ -276,17 +328,20 @@ const submit = () => {
         transform: (data) => {
             const fd = new FormData();
             fd.append('department_id', form.department_id);
+            if (form.target_user_id) {
+                fd.append('target_user_id', form.target_user_id);
+            }
 
             data.costs.forEach((cost, index) => {
                 fd.append(`costs[${index}][cost_id]`, cost.cost_id);
                 fd.append(`costs[${index}][date]`, cost.date);
 
-                // ⚠️ Données du coût
+                // Données du coût
                 Object.entries(cost.data).forEach(([key, value]) => {
                     fd.append(`costs[${index}][data][${key}]`, value ?? '');
                 });
 
-                // ✅ REQUIREMENTS AU BON NIVEAU (PAS dans data)
+                // REQUIREMENTS au bon niveau
                 if (cost.requirements) {
                     Object.entries(cost.requirements).forEach(([reqId, req]) => {
                         if (req.file instanceof File) {
@@ -303,17 +358,16 @@ const submit = () => {
     });
 };
 
-// Renvoie true/false et alimente form.errors pour chaque requirement manquant
+// Validation des requirements
 const validateRequirementsForCost = (cost, index) => {
     let ok = true;
     const reqMeta = cost.requirements || [];
     const reqValues = costData.value[index]?.requirements || {};
 
     reqMeta.forEach((req) => {
-        const key = req.name; // même clé que celle utilisée dans CostRequirementInput
+        const key = req.name;
         const val = reqValues[key];
 
-        // nettoyer l'erreur existante pour ce champ avant de (potentiellement) la remettre
         form.setError(`costs.${index}.requirements.${key}`, null);
 
         if (req.type === 'text') {
@@ -323,14 +377,12 @@ const validateRequirementsForCost = (cost, index) => {
                 ok = false;
             }
         } else if (req.type === 'file') {
-            // Accepte un File choisi. Si tu gères des "fichiers existants", adapte ici.
             const hasNewFile = val instanceof File;
             if (!hasNewFile) {
                 form.setError(`costs.${index}.requirements.${key}`, 'Ce fichier est requis.');
                 ok = false;
             }
         } else {
-            // Type inconnu : on le marque manquant
             form.setError(`costs.${index}.requirements.${key}`, 'Type de prérequis inconnu ou non rempli.');
             ok = false;
         }
@@ -341,7 +393,6 @@ const validateRequirementsForCost = (cost, index) => {
 
 const validateAllRequirements = () => {
     let allOk = true;
-    // On efface les erreurs de requirements avant de revalider
     Object.keys(form.errors || {}).forEach((k) => {
         if (k.startsWith('costs.') && k.includes('.requirements.')) {
             form.setError(k, null);
@@ -356,20 +407,20 @@ const validateAllRequirements = () => {
     return allOk;
 };
 
-// Helpers d'affichage
+// Helpers
 const roundKm = (v) => {
     const n = Number(v) || 0;
-    return Math.round(n * 10) / 10; // 0.1 km près
+    return Math.round(n * 10) / 10;
 };
 
 const formatCurrency = (v) => (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' });
 
 const formatRate = (v) => `${v} €`;
 
-// Montant remboursé pour un coût "km" donné
+// Montant remboursé pour un coût "km"
 const kmReimbursed = (index, cost) => {
     const km = Number(costData.value[index]?.kmData?.totalKm) || 0;
-    const rate = getActiveRate(cost, costData.value[index].date); // €/km
+    const rate = getActiveRate(cost, costData.value[index].date);
     return Number((km * rate).toFixed(2));
 };
 
