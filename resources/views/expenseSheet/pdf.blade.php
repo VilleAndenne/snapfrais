@@ -206,6 +206,12 @@
                     <td class="w-25 muted">Agent</td>
                     <td>{{ $sheet->user->name ?? '-' }} ({{ $sheet->user->email ?? '-' }})</td>
                 </tr>
+                @if($sheet->user_id !== $sheet->creator_id && !empty($sheet->created_by))
+                <tr>
+                    <td class="w-25 muted">Encodeur</td>
+                    <td>{{ $sheet->creator->name ?? '-' }} ({{ $sheet->creator->email ?? '-' }})</td>
+                </tr>
+                @endif
                 <tr>
                     <td class="muted">Service</td>
                     <td>{{ $sheet->department->name ?? '-' }}</td>
@@ -218,7 +224,7 @@
                     <td class="muted">Statut</td>
                     <td>
                         <span class="status">
-{{ $sheet->approved == true ? 'Approuvée' : ($sheet->approved == false ? 'Refusée' : 'En attente') }}
+{{ $sheet->approved === 1 ? 'Approuvée' : ($sheet->approved === 0 ? 'Refusée' : 'En attente') }}
                             </span>
                         @if(($sheet->approved == false || ($sheet->status ?? null) == 'Refusée') && !empty($sheet->refusal_reason))
                             <div class="small muted">Motif: {{ $sheet->refusal_reason }}</div>

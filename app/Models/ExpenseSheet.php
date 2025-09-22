@@ -21,6 +21,7 @@ class ExpenseSheet extends Model
         'validated_at',
         'approved',
         'refusal_reason',
+        'created_by'
     ];
 
     protected $casts = [
@@ -30,6 +31,11 @@ class ExpenseSheet extends Model
     protected $appends = [
         'steps',
     ];
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
 
     public function costs()
