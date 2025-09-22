@@ -113,7 +113,7 @@
                                 {{ expenseSheet.user.name }}
                             </p>
                         </div>
-                        <div v-if="expenseSheet.user.name !== expenseSheet.creator.name">
+                        <div v-if="expenseSheet.user_id !== expenseSheet.created_by && expenseSheet.creator">
                             <h3 class="text-sm font-medium text-muted-foreground">Encodeur</h3>
                             <p class="mt-1 flex items-center">
                                 <Avatar class="mr-2 h-6 w-6">
