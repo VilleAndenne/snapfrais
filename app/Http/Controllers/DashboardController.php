@@ -42,6 +42,7 @@ class DashboardController extends Controller
             })
             ->get();
 
+
         $expenseToValidate = $candidateToValidate->filter(function ($sheet) {
             return Gate::allows('approve', $sheet);
         })->values();
