@@ -1,5 +1,5 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
@@ -16,42 +16,12 @@ const form = useForm({
     end_date: '',
 });
 
+const props = defineProps({
+    exports: Array
+});
+
 const isLoading = ref(false);
 
-const exportHistory = ref([
-    {
-        id: 1,
-        period: '01/01/2024 - 31/01/2024',
-        created_at: '2024-02-01 10:30:00',
-        status: 'completed',
-        file_size: '2.3 MB',
-        records_count: 45
-    },
-    {
-        id: 2,
-        period: '01/12/2023 - 31/12/2023',
-        created_at: '2024-01-02 14:15:00',
-        status: 'completed',
-        file_size: '1.8 MB',
-        records_count: 32
-    },
-    {
-        id: 3,
-        period: '01/11/2023 - 30/11/2023',
-        created_at: '2023-12-01 09:45:00',
-        status: 'failed',
-        file_size: null,
-        records_count: 0
-    },
-    {
-        id: 4,
-        period: '01/10/2023 - 31/10/2023',
-        created_at: '2023-11-01 16:20:00',
-        status: 'processing',
-        file_size: null,
-        records_count: 28
-    }
-]);
 
 const submit = () => {
     isLoading.value = true;
@@ -66,7 +36,7 @@ const getStatusBadge = (status) => {
     switch (status) {
         case 'completed':
             return { variant: 'default', icon: CheckCircle, text: 'Terminé' };
-        case 'processing':
+        case 'pending':
             return { variant: 'secondary', icon: Clock, text: 'En cours' };
         case 'failed':
             return { variant: 'destructive', icon: XCircle, text: 'Échec' };
@@ -149,7 +119,6 @@ const breadcrumbs = [
                     <a
                         :href="route('expense-sheets.export', { start_date: form.start_date, end_date: form.end_date })"
                         :class="{ 'pointer-events-none opacity-70': !form.start_date || !form.end_date }"
-                        target="_blank"
                     >
                         <Button
                             :disabled="!form.start_date || !form.end_date"
@@ -189,9 +158,9 @@ const breadcrumbs = [
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow v-for="history in exportHistory" :key="history.id">
+                                <TableRow v-for="history in exports" :key="history.id">
                                     <TableCell class="font-medium">
-                                        {{ history.period }}
+                                        {{ history.start_date }} - {{ history.end_date }}
                                     </TableCell>
                                     <TableCell>
                                         {{ formatDate(history.created_at) }}
@@ -209,15 +178,16 @@ const breadcrumbs = [
                                         {{ history.file_size || '-' }}
                                     </TableCell>
                                     <TableCell class="text-right">
-                                        <Button
+                                        <Link
                                             v-if="history.status === 'completed'"
                                             variant="ghost"
                                             size="sm"
                                             class="flex items-center gap-1"
+                                            :href="history.file_url"
                                         >
                                             <Download class="h-4 w-4" />
                                             Télécharger
-                                        </Button>
+                                        </Link>
                                         <span v-else class="text-muted-foreground text-sm">-</span>
                                     </TableCell>
                                 </TableRow>
