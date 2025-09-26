@@ -570,8 +570,8 @@ class ExpenseSheetController extends Controller
 
                     if (isset($costSums[$key])) {
                         // ✅ prendre le vrai montant total
-                        $costSums[$key] += (float)$cost->total;
-                        $totalGeneral += (float)$cost->total;
+                        $costSums[$key] += (float)$cost->amount;
+                        $totalGeneral += (float)$cost->amount;
 
                         // ✅ suivre aussi les km
                         if (strtolower($cost->formCost->type) === 'km') {
