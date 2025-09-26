@@ -152,7 +152,6 @@ const breadcrumbs = [
                                     <TableHead>Période</TableHead>
                                     <TableHead>Date d'export</TableHead>
                                     <TableHead>Statut</TableHead>
-                                    <TableHead>Enregistrements</TableHead>
                                     <TableHead>Taille</TableHead>
                                     <TableHead class="text-right">Actions</TableHead>
                                 </TableRow>
@@ -170,9 +169,6 @@ const breadcrumbs = [
                                             <component :is="getStatusBadge(history.status).icon" class="h-3 w-3" />
                                             {{ getStatusBadge(history.status).text }}
                                         </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {{ history.records_count }} notes
                                     </TableCell>
                                     <TableCell>
                                         {{ history.file_size || '-' }}
