@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 class ExpenseSheetExportController extends Controller
 {
     public function index() {
-        $exports = ExpenseSheetExport::all();
+$exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         return Inertia::render('expenseSheet/Export/Index', [
             'exports' => $exports,
