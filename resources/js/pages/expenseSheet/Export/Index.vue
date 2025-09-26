@@ -178,16 +178,15 @@ const breadcrumbs = [
                                         {{ history.file_size || '-' }}
                                     </TableCell>
                                     <TableCell class="text-right">
-                                        <Link
+                                        <a
                                             v-if="history.status === 'completed'"
-                                            variant="ghost"
-                                            size="sm"
                                             class="flex items-center gap-1"
+                                            target="_blank"
                                             :href="history.file_url"
                                         >
                                             <Download class="h-4 w-4" />
                                             Télécharger
-                                        </Link>
+                                        </a>
                                         <span v-else class="text-muted-foreground text-sm">-</span>
                                     </TableCell>
                                 </TableRow>
