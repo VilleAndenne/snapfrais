@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExpenseSheet;
+use App\Models\ExpenseSheetCost;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class ExpenseSheetController extends Controller
                 ->all(),
         ]);
     }
+
     public function summary(): JsonResponse
     {
         $user = auth()->user();
@@ -65,7 +67,7 @@ class ExpenseSheetController extends Controller
         // 1) "janvier" -> 1
         try {
             $d = Carbon::createFromLocaleFormat('F', 'fr', mb_strtolower($month));
-            $monthNum = (int) $d->format('n'); // 1..12
+            $monthNum = (int)$d->format('n'); // 1..12
         } catch (\Throwable $e) {
             return response()->json(['error' => 'Mois invalide'], 400);
         }
@@ -73,89 +75,83 @@ class ExpenseSheetController extends Controller
         // 2) /api/months/janvier?year=2025 (optionnel)
         $year = request()->integer('year');
 
-        // 3) Agrégation par note + JOIN forms
-        $rows = DB::table('expense_sheets as es')
-            ->join('expense_sheet_costs as esc', 'esc.expense_sheet_id', '=', 'es.id')
-            ->leftJoin('forms as f', 'f.id', '=', 'es.form_id')
-            // décommente si tu veux restreindre par organisation :
-            // ->where('es.organization_id', $user->organization_id)
-            ->when(! $user->can('viewAll', \App\Models\ExpenseSheet::class), function ($q) use ($user) {
-                $q->where('es.user_id', $user->id);
-            })
-            // ⚠️ Filtre sur la date de création de la NOTE (et pas des coûts)
-            ->whereMonth('es.created_at', $monthNum)
-            ->when($year, fn($q) => $q->whereYear('es.created_at', $year))
-            ->groupBy('es.id', 'es.status', 'es.created_at', 'es.user_id', 'es.department_id', 'es.form_id', 'f.name')
-            ->select([
-                'es.id',
-                'es.status',
-                'es.created_at',
-                'es.user_id',
-                'es.department_id',
-                'es.form_id',
-                DB::raw('COALESCE(f.name, "Formulaire") as form_name'),
-
-                // Montant total "d’origine" de la note :
-                // - percentage: amount (payé par l’agent)
-                // - autres (km, fixed, ...): total (montant remboursé = montant d’origine)
-                DB::raw("
-                SUM(
+        // 3) Agrégations via sous-requêtes Eloquent (pas de GREATEST)
+        $rows = ExpenseSheet::query()
+            ->with([
+                'form:id,name',
+                'user:id,name,email',
+                'department:id,name',
+            ])
+            // ->where('organization_id', $user->organization_id) // si besoin
+            ->when(!$user->can('viewAll', \App\Models\ExpenseSheet::class), fn($q) => $q->where('user_id', $user->id))
+            ->whereMonth('created_at', $monthNum)
+            ->when($year, fn($q) => $q->whereYear('created_at', $year))
+            ->addSelect([
+                'expense_sheets.id',
+                'expense_sheets.status',
+                'expense_sheets.created_at',
+                'expense_sheets.user_id',
+                'expense_sheets.department_id',
+                'expense_sheets.form_id',
+            ])
+            // remboursable = SUM(total)
+            ->withSum('costs as reimbursable', 'total')
+            // total_original = SUM(CASE WHEN lower(type)='percentage' THEN amount ELSE total END)
+            ->addSelect([
+                'total_original' => ExpenseSheetCost::selectRaw("
+                COALESCE(SUM(
                     CASE
-                        WHEN LOWER(esc.type) = 'percentage'
-                            THEN COALESCE(esc.amount, 0)
-                        ELSE COALESCE(esc.total, 0)
+                        WHEN LOWER(type) = 'percentage' THEN COALESCE(amount, 0)
+                        ELSE COALESCE(total, 0)
                     END
-                ) as total_original
-            "),
-
-                // Montant remboursable = somme des 'total'
-                DB::raw('SUM(COALESCE(esc.total, 0)) as reimbursable'),
-
-                // Part non remboursable = (amount - total) pour les 'percentage', sinon 0
-                DB::raw("
-                SUM(
+                ), 0)
+            ")->whereColumn('expense_sheet_id', 'expense_sheets.id'),
+            ])
+            // non_remboursable = SUM(CASE WHEN lower(type)='percentage' THEN
+            //                                CASE WHEN (amount - total) > 0 THEN (amount - total) ELSE 0 END
+            //                             ELSE 0 END)
+            ->addSelect([
+                'non_reimbursable' => ExpenseSheetCost::selectRaw("
+                COALESCE(SUM(
                     CASE
-                        WHEN LOWER(esc.type) = 'percentage'
+                        WHEN LOWER(type) = 'percentage'
                             THEN CASE
-                                     WHEN (COALESCE(esc.amount,0) - COALESCE(esc.total,0)) > 0
-                                         THEN (COALESCE(esc.amount,0) - COALESCE(esc.total,0))
-                                     ELSE 0
+                                    WHEN (COALESCE(amount,0) - COALESCE(total,0)) > 0
+                                         THEN (COALESCE(amount,0) - COALESCE(total,0))
+                                    ELSE 0
                                  END
                         ELSE 0
                     END
-                ) as non_reimbursable
-            "),
+                ), 0)
+            ")->whereColumn('expense_sheet_id', 'expense_sheets.id'),
             ])
-            ->orderByDesc('es.created_at')
+            ->orderByDesc('created_at')
             ->get();
 
-        // 4) Enrichissement minimal (user / department)
-        $userIds = $rows->pluck('user_id')->unique()->all();
-        $deptIds = $rows->pluck('department_id')->unique()->all();
-
-        $users = \App\Models\User::whereIn('id', $userIds)->get(['id','name','email'])->keyBy('id');
-        $depts = \App\Models\Department::whereIn('id', $deptIds)->get(['id','name'])->keyBy('id');
-
-        // 5) Payload
-        $payload = $rows->map(function ($r) use ($users, $depts) {
-            $totalOriginal   = (float) $r->total_original;
-            $remboursable    = (float) $r->reimbursable;
-            $nonRemboursable = (float) $r->non_reimbursable;
+        // 4) Payload
+        $payload = $rows->map(function ($r) {
+            $formName = optional($r->form)->name ?? 'Formulaire';
 
             return [
-                'id' => (int) $r->id,
+                'id' => (int)$r->id,
                 'status' => $r->status,
-                'created_at' => (string) $r->created_at,
+                'created_at' => (string)$r->created_at,
                 'form' => [
-                    'id' => (int) $r->form_id,
-                    'name' => $r->form_name,
+                    'id' => (int)$r->form_id,
+                    'name' => $formName,
                 ],
-                // ce que tu affiches en "montant total de la note"
-                'total' => $totalOriginal,
-                'remboursable' => $remboursable,
-                'non_remboursable' => $nonRemboursable,
-                'user' => $users[$r->user_id] ?? null,
-                'department' => $depts[$r->department_id] ?? null,
+                'total' => (float)$r->total_original,
+                'remboursable' => (float)($r->reimbursable ?? 0),
+                'non_remboursable' => (float)$r->non_reimbursable,
+                'user' => $r->user ? [
+                    'id' => (int)$r->user->id,
+                    'name' => $r->user->name,
+                    'email' => $r->user->email,
+                ] : null,
+                'department' => $r->department ? [
+                    'id' => (int)$r->department->id,
+                    'name' => $r->department->name,
+                ] : null,
             ];
         })->values();
 
