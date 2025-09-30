@@ -8,6 +8,9 @@ Route::post('/login', [\App\Http\Controllers\API\Auth\AuthController::class, 'lo
 Route::get('/verify', [\App\Http\Controllers\API\Auth\AuthController::class, 'verify'])
     ->name('api.verify')->middleware('auth:sanctum');
 
+Route::get('/expense-sheets/summary', [\App\Http\Controllers\API\ExpenseSheetController::class, 'summary'])->middleware('auth:sanctum');
+Route::get('/expense-sheets/summary/{month}', [\App\Http\Controllers\API\ExpenseSheetController::class, 'monthsSummary'])->middleware('auth:sanctum');
+
 Route::get('/forms', [\App\Http\Controllers\API\FormController::class, 'index'])->middleware('auth:sanctum');
 Route::get('/forms/{id}', [\App\Http\Controllers\API\FormController::class, 'show'])->middleware('auth:sanctum');
 Route::get('/expense-sheets', [\App\Http\Controllers\API\ExpenseSheetController::class, 'index'])->middleware('auth:sanctum');
