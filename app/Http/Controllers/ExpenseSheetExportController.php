@@ -13,9 +13,8 @@ use Illuminate\Support\Facades\Storage;
 
 class ExpenseSheetExportController extends Controller
 {
-    public function index()
-    {
-        $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
+    public function index() {
+$exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         return Inertia::render('expenseSheet/Export/Index', [
             'exports' => $exports,
@@ -34,11 +33,11 @@ class ExpenseSheetExportController extends Controller
 
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date' => 'required|date',
+            'end_date'   => 'required|date',
         ]);
 
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
-        $endDate = Carbon::parse($validated['end_date'])->endOfDay();
+        $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
 
         // Petite validation supplémentaire : début <= fin
         if ($startDate->gt($endDate)) {
@@ -64,7 +63,7 @@ class ExpenseSheetExportController extends Controller
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $key = $cost->formCost->name.' ('.$cost->formCost->form->name.')';
                     $costTypes[$key] = $cost->formCost->type;
                 }
             }
@@ -84,17 +83,17 @@ class ExpenseSheetExportController extends Controller
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
+                    $key = $cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
                     if (isset($costSums[$key])) {
-                        $amount = (float)$cost->total;
+                        $amount = (float) $cost->total;
                         $costSums[$key] += $amount;
-                        $totalGeneral += $amount;
+                        $totalGeneral   += $amount;
 
                         if (strtolower($cost->formCost->type) === 'km') {
-                            $route = is_array($cost->route) ? $cost->route : (array)$cost->route;
-                            $googleKm = isset($route['google_km']) ? (float)$route['google_km'] : 0;
-                            $manualKm = isset($route['manual_km']) ? (float)$route['manual_km'] : 0;
+                            $route = is_array($cost->route) ? $cost->route : (array) $cost->route;
+                            $googleKm = isset($route['google_km']) ? (float) $route['google_km'] : 0;
+                            $manualKm = isset($route['manual_km']) ? (float) $route['manual_km'] : 0;
                             $totalKm += ($googleKm + $manualKm);
                         }
                     }
@@ -135,11 +134,11 @@ class ExpenseSheetExportController extends Controller
 
         // Nom et chemins
         $fileName = 'export_expense_sheets_'
-            . $startDate->format('Ymd')
-            . '_au_'
-            . $endDate->format('Ymd')
-            . '_' . now()->format('His')
-            . '.xlsx';
+            .$startDate->format('Ymd')
+            .'_au_'
+            .$endDate->format('Ymd')
+            .'_'.now()->format('His')
+            .'.xlsx';
 
         // On enregistre d’abord dans un tmp local…
         $writer = new Xlsx($spreadsheet);
@@ -147,15 +146,15 @@ class ExpenseSheetExportController extends Controller
         $writer->save($tempFile);
 
         // …puis on copie le fichier vers le storage (ex. disk local) sous /exports
-        $relativePath = 'exports/' . $fileName; // <-- sera stocké en DB
+        $relativePath = 'exports/'.$fileName; // <-- sera stocké en DB
         Storage::put($relativePath, file_get_contents($tempFile));
 
         // 🆕 1) Créer l'export en "pending" (sans file_path au départ)
         $export = ExpenseSheetExport::create([
             'start_date' => $startDate,
-            'end_date' => $endDate,
-            'status' => 'completed',
-            'file_path' => null,
+            'end_date'   => $endDate,
+            'status'     => 'completed',
+            'file_path'  => null,
         ]);
 
         // 🆕 2) Récupérer les IDs des notes de frais comprises dans la période et approuvées
