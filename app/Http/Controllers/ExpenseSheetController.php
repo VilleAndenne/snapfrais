@@ -96,7 +96,6 @@ class ExpenseSheetController extends Controller
             'total'           => 0,
             'form_id'         => $id,
             'department_id'   => $validated['department_id'],
-            'organization_id' => auth()->user()->organization_id,
         ]);
 
         $globalTotal = 0;
@@ -301,8 +300,18 @@ class ExpenseSheetController extends Controller
         $expenseSheetData = [
             'id' => $expenseSheet->id,
             'department_id' => $expenseSheet->department_id,
+            'user_id' => $expenseSheet->user_id,
             'costs' => $expenseSheet->costs->map(function ($cost) {
                 $requirementsData = json_decode($cost->requirements, true) ?? [];
+
+                // Extraire les données de route si elles existent
+                $route = $cost->route ?? [];
+                $steps = [];
+                if (isset($route['steps']) && is_array($route['steps'])) {
+                    $steps = array_map(function($step) {
+                         return is_array($step) ? ($step['address'] ?? '') : $step;
+                    }, $route['steps']);
+                }
 
                 return [
                     'id' => $cost->form_cost_id,
@@ -313,13 +322,12 @@ class ExpenseSheetController extends Controller
                     'requirements' => $cost->formCost->requirements,
                     'reimbursement_rates' => $cost->formCost->reimbursementRates,
                     'data' => [
-                        'route' => $cost->route,
                         'paidAmount' => $cost->amount,
-                        'steps' => $cost->route['steps'] ?? [],
-                        'departure' => $cost->route['departure'] ?? '',
-                        'arrival' => $cost->route['arrival'] ?? '',
-                        'manualKm' => $cost->route['manual_km'] ?? 0,
-                        'justification' => $cost->route['justification'] ?? '',
+                        'departure' => $route['departure'] ?? '',
+                        'arrival' => $route['arrival'] ?? '',
+                        'steps' => $steps,
+                        'manualKm' => $route['manual_km'] ?? 0,
+                        'justification' => $route['justification'] ?? '',
                     ],
                     'date' => $cost->date,
                     'total' => $cost->total,
@@ -343,6 +351,8 @@ class ExpenseSheetController extends Controller
                 })->toArray(),
             ],
             'expenseSheet' => $expenseSheetData,
+            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
 
@@ -368,75 +378,143 @@ class ExpenseSheetController extends Controller
             // Supprimer tous les coûts existants
             $expenseSheet->costs()->delete();
 
-            // Mettre à jour les informations de la note de frais
+            // Réinitialiser l'approbation et remettre en attente pour resoumission
             $expenseSheet->update([
                 'approved' => null,
                 'status' => 'En attente',
+                'refusal_reason' => null,
+                'validated_by' => null,
+                'validated_at' => null,
             ]);
 
             $globalTotal = 0;
 
-            foreach ($validated['costs'] as $cost) {
-                $formCost = FormCost::findOrFail($cost['cost_id']);
+            foreach ($validated['costs'] as $costItem) {
+                $formCost = FormCost::find($costItem['cost_id']);
                 $type = $formCost->type;
-                $date = $cost['date'];
-                $data = $cost['data'];
-                $requirements = $cost['requirements'] ?? [];
+                $date = $costItem['date'];
 
-                // Traitement des fichiers dans les requirements
-                foreach ($requirements as $key => $requirement) {
-                    if (isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $file = $requirement['file'];
-                        $path = Storage::url(Storage::putFile($file));
-                        $requirements[$key] = ['file' => $path];
-                    }
+                // Récupération du ou des taux actifs
+                $rates = $formCost->reimbursementRates()
+                    ->where('start_date', '<=', $date)
+                    ->where(function ($q) use ($date) {
+                        $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
+                    })
+                    ->orderByDesc('start_date')
+                    ->get();
+
+                if ($rates->count() === 0) {
+                    continue;
                 }
 
+                if ($rates->count() > 1) {
+                    $expenseSheet->delete();
+                    return back()
+                        ->withInput()
+                        ->with('error', "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.");
+                }
+
+                $rate = $rates->first();
+                $transport = $rate->transport ?? 'car';
+
+                $data = $costItem['data'];
+                $total = 0;
                 $distance = null;
                 $googleDistance = null;
                 $route = null;
-                $total = 0;
-                $steps = [];
 
                 if ($type === 'km') {
-                    $distance = $data['manualKm'] ?? 0;
-                    $googleDistance = $data['googleDistance'] ?? null;
+                    $origin = $data['departure'] ?? null;
+                    $destination = $data['arrival'] ?? null;
+                    $steps = $data['steps'] ?? [];
+                    $manualKm = $data['manualKm'] ?? 0;
+
+                    if (!$origin || !$destination) {
+                        continue;
+                    }
+
+                    $points = array_merge([$origin], $steps, [$destination]);
+                    $googleKm = 0;
+
+                    foreach (range(0, count($points) - 2) as $i) {
+                        $segmentOrigin = $points[$i];
+                        $segmentDest = $points[$i + 1];
+
+                        $params = [
+                            'origin' => $segmentOrigin,
+                            'destination' => $segmentDest,
+                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
+                            'key' => env('GOOGLE_MAPS_API_KEY'),
+                        ];
+
+                        $response = \Illuminate\Support\Facades\Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
+                        $json = $response->json();
+
+                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
+                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
+                        }
+                    }
+
+                    $googleKm = round($googleKm / 1000, 2);
+                    $googleDistance = $googleKm;
+                    $distance = $googleKm + $manualKm;
+                    $total = round($distance * $rate->value, 2);
+
                     $route = [
-                        'departure' => $data['departure'] ?? '',
-                        'arrival' => $data['arrival'] ?? '',
-                        'steps' => $data['steps'] ?? [],
-                        'manual_km' => $distance,
-                        'justification' => $data['justification'] ?? '',
+                        'departure' => $origin,
+                        'arrival' => $destination,
+                        'google_km' => $googleKm,
+                        'manual_km' => $manualKm,
+                        'justification' => $data['justification'] ?? null,
+                        'transport' => $transport,
                     ];
-                    $total = $distance * $formCost->getActiveRate($date);
-                } elseif ($type === 'percentage') {
-                    $total = $data['paidAmount'] * ($data['percentage'] / 100);
+
+                    if (count($steps) > 0) {
+                        $route['steps'] = [];
+                        foreach ($steps as $index => $address) {
+                            $route['steps'][] = [
+                                'address' => $address,
+                                'order'   => $index + 1,
+                            ];
+                        }
+                    }
                 } elseif ($type === 'fixed') {
-                    $total = $data['amount'];
+                    $total = round($rate->value, 2);
+                } elseif ($type === 'percentage') {
+                    $paid = $data['paidAmount'] ?? 0;
+                    $total = round($paid * ($rate->value / 100), 2);
                 }
 
-                $createdCost = $expenseSheet->costs()->create([
-                    'form_cost_id' => $formCost->id,
-                    'type' => $type,
-                    'distance' => $distance,
-                    'google_distance' => $googleDistance,
-                    'route' => $route,
-                    'total' => $total,
-                    'date' => $date,
-                    'amount' => $data['paidAmount'] ?? null,
-                    'requirements' => json_encode($requirements),
-                    'expense_sheet_id' => $expenseSheet->id
-                ]);
-
-                // Ajout des étapes pour le type "km"
-                if ($type === 'km') {
-                    foreach ($steps as $index => $address) {
-                        $createdCost->steps()->create([
-                            'address' => $address,
-                            'order' => $index + 1,
-                        ]);
+                // Gestion des requirements
+                $requirements = [];
+                if (isset($costItem['requirements'])) {
+                    foreach ($costItem['requirements'] as $key => $requirement) {
+                        if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
+                            // Nouveau fichier uploadé
+                            $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
+                            $requirements[$key] = ['file' => $path];
+                        } elseif (is_array($requirement) && isset($requirement['existing_file'])) {
+                            // Fichier existant conservé
+                            $requirements[$key] = ['file' => $requirement['existing_file']];
+                        } elseif (is_array($requirement) && isset($requirement['value'])) {
+                            // Valeur texte
+                            $requirements[$key] = ['value' => $requirement['value']];
+                        }
                     }
                 }
+
+                $expenseSheet->costs()->create([
+                    'form_cost_id'     => $formCost->id,
+                    'type'             => $type,
+                    'distance'         => $distance,
+                    'google_distance'  => $googleDistance,
+                    'route'            => $route,
+                    'total'            => $total,
+                    'date'             => $date,
+                    'amount'           => $data['paidAmount'] ?? null,
+                    'requirements'     => json_encode($requirements),
+                    'expense_sheet_id' => $expenseSheet->id
+                ]);
 
                 $globalTotal += $total;
             }
@@ -444,7 +522,27 @@ class ExpenseSheetController extends Controller
             // Mettre à jour le total global
             $expenseSheet->update(['total' => $globalTotal]);
 
-            return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour avec succès.');
+            if ($globalTotal <= 0) {
+                $expenseSheet->delete();
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+            }
+
+            // Notifier les responsables de la resoumission
+            $department = $expenseSheet->department;
+            $heads = $department->heads;
+
+            if ($heads->contains(auth()->user()) && $department->parent) {
+                $heads = $department->parent->heads;
+            }
+
+            $heads->each(function ($head) use ($expenseSheet) {
+                $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+            });
+
+            return redirect()->route('dashboard')->with('success', 'Note de frais modifiée et resoumise avec succès.');
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()])->withInput();

@@ -67,6 +67,15 @@ const removeStep = (i) => steps.value.splice(i, 1);
 
 let directionsService = null;
 
+// Initialiser les valeurs depuis modelValue
+if (props.modelValue) {
+    departure.value = props.modelValue.departure || '';
+    arrival.value = props.modelValue.arrival || '';
+    steps.value = props.modelValue.steps || [];
+    manualKm.value = props.modelValue.manualKm || 0;
+    justification.value = props.modelValue.justification || '';
+}
+
 onMounted(async () => {
     const google = await loadGoogleMaps();
     directionsService = new google.maps.DirectionsService();
