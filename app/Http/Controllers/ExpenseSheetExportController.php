@@ -86,7 +86,7 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                     $key = $cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
                     if (isset($costSums[$key])) {
-                        $amount = (float) $cost->total;
+                        $amount = (float) $cost->amount;
                         $costSums[$key] += $amount;
                         $totalGeneral   += $amount;
 
