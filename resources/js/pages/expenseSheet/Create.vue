@@ -162,7 +162,7 @@ const getActiveRate = (cost, date) => {
 
 const addToRequest = (cost) => {
     if (selectedCosts.value.length >= 7) {
-        alert('Vous avez atteint le maximum de 7 coûts.');
+        alert('Vous avez atteint le maximum de 30 coûts.');
         return;
     }
 
