@@ -291,7 +291,7 @@ class ExpenseSheetController extends Controller
             abort(403);
         }
         // Charger tous les coûts disponibles avec leurs taux et prérequis
-        $formCosts = FormCost::with(['reimbursementRates', 'requirements'])->get();
+        $formCosts = FormCost::with(['reimbursementRates', 'requirements'])->where('form_id', $expenseSheet->form_id)->get();
 
         // Charger les coûts liés à cette note de frais avec leurs relations
         $expenseSheet->load(['costs.formCost.reimbursementRates', 'costs.formCost.requirements', 'department']);
