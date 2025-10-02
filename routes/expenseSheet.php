@@ -3,6 +3,8 @@
 use App\Http\Controllers\ExpenseSheetController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/expense-sheet/export', [\App\Http\Controllers\ExpenseSheetExportController::class, 'index'])->middleware(['auth', 'verified'])->name('export');
+Route::get('/expense-sheet/export/submit', [\App\Http\Controllers\ExpenseSheetExportController::class, 'export'])->middleware(['auth', 'verified'])->name('expense-sheets.export');
 Route::get('/expense-sheet', [ExpenseSheetController::class, 'index'])->name('expense-sheet.index')->middleware('auth');
 Route::get('/expense-sheet/{id}', [ExpenseSheetController::class, 'show'])->name('expense-sheet.show')->middleware('auth');
 Route::get('/expense-sheet/{id}/create', [ExpenseSheetController::class, 'create'])->name('expense-sheet.create')->middleware('auth');
@@ -11,3 +13,7 @@ Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])-
 Route::post('/expense-sheet/{id}/approve', [ExpenseSheetController::class, 'approve'])->name('expense-sheet.approve')->middleware('auth');
 Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])->name('expense-sheet.edit')->middleware('auth');
 Route::put('/expense-sheet/{id}', [ExpenseSheetController::class, 'update'])->name('expense-sheet.update')->middleware('auth');
+Route::delete('/expense-sheet/{id}', [ExpenseSheetController::class, 'destroy'])->name('expense-sheet.destroy')->middleware('auth');
+Route::get('/expense-sheets/{id}/pdf', [\App\Http\Controllers\ExpenseSheetController::class, 'generatePDF'])
+    ->middleware(\App\Http\Middleware\AllowFrameSameOrigin::class)->middleware('auth')
+    ->name('expenseSheets.pdf');

@@ -12,24 +12,42 @@ class DashboardController extends Controller
     public function index()
     {
         $forms = Form::all();
+        $user  = auth()->user();
 
-        // Charger toutes les expenseSheets avec relations utiles
-        $allExpenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+        $baseQuery = ExpenseSheet::with([
+            'form',
+            'costs',
+            'department.heads',
+            'department.parent.heads',
+            'user'
+        ])
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
-            ->orderBy('created_at', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        // Mes propres notes
+        $myExpenseSheets = (clone $baseQuery)
+            ->where('user_id', $user->id)
             ->get();
 
-        // Garder uniquement celles que l'utilisateur peut approuver (selon la policy)
-        $expenseToValidate = $allExpenseSheets->filter(function ($sheet) {
+        // Candidats à la validation : je suis head du département de la note OU du parent (N+1)
+        $candidateToValidate = (clone $baseQuery)
+            ->where(function ($q) use ($user) {
+                $q->whereHas('department.heads', function ($h) use ($user) {
+                    $h->where('users.id', $user->id);
+                })
+                    ->orWhereHas('department.parent.heads', function ($h) use ($user) {
+                        $h->where('users.id', $user->id);
+                    });
+            })
+            ->get();
+
+
+        $expenseToValidate = $candidateToValidate->filter(function ($sheet) {
             return Gate::allows('approve', $sheet);
         })->values();
 
-        $myExpenseSheets = $allExpenseSheets->filter(function ($sheet) {
-            return $sheet->user_id === auth()->id();
-        })->values();
-
-        $isHead = auth()->user()->isHead();
+        $isHead = $user->isHead();
 
         return inertia('Dashboard', [
             'forms' => $forms,
@@ -38,5 +56,6 @@ class DashboardController extends Controller
             'isHead' => $isHead,
         ]);
     }
+
 
 }

@@ -11,8 +11,11 @@
     "require": {
         "php": "^8.2",
         "alexpechkarev/google-maps": "^12.0",
+        "barryvdh/laravel-dompdf": "^3.1",
+        "dompdf/dompdf": "^3.1",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
+        "laravel/nightwatch": "^1.13",
         "laravel/pulse": "^1.4",
         "laravel/sanctum": "^4.0",
         "laravel/telescope": "^5.7",

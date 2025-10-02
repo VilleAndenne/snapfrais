@@ -12,5 +12,6 @@ class FormCostRemboursiementRate extends Model
         'start_date',
         'end_date',
         'value',
+        'transport'
     ];
 }

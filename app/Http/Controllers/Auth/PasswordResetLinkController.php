@@ -32,6 +32,10 @@ class PasswordResetLinkController extends Controller
             'email' => 'required|email',
         ]);
 
+        $request->merge([
+            'email' => strtolower($request->input('email'))
+        ]);
+
         Password::sendResetLink(
             $request->only('email')
         );

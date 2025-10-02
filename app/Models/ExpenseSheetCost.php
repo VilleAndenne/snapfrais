@@ -34,9 +34,11 @@ class ExpenseSheetCost extends Model
         return $this->belongsTo(FormCost::class);
     }
 
-    // public function steps()
-    // {
-    //     // In route array, you have a key called "steps" which is an array of objects
-    //     return collect($this->route)->pluck('steps')->flatten();
-    // }
+    public function exports()
+    {
+        return $this->belongsToMany(
+            \App\Models\ExpenseSheetExport::class,
+            'expense_sheet_export_expense_sheets'
+        )->withTimestamps();
+    }
 }

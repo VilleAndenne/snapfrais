@@ -7,13 +7,16 @@ use App\Models\Form;
 use App\Models\FormCost;
 use App\Notifications\ApprovalExpenseSheet;
 use App\Notifications\ReceiptExpenseSheet;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Barryvdh\DomPDF\Facade\Pdf;
 
+// en haut du fichier
 
 class ExpenseSheetController extends Controller
 {
@@ -45,7 +48,8 @@ class ExpenseSheetController extends Controller
 
         return inertia('expenseSheet/Create', [
             'form' => $form,
-            'departments' => auth()->user()->departments()->with('heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'authUser' => auth()->user()->only(['id', 'name', 'email'])
         ]);
     }
 
@@ -62,36 +66,69 @@ class ExpenseSheetController extends Controller
             'costs.*.date' => 'required|date',
             'costs.*.requirements' => 'nullable|array',
             'department_id' => 'required|exists:departments,id',
+            'target_user_id' => 'nullable|exists:users,id',
         ]);
 
-        $expenseSheet = ExpenseSheet::create([
-            'user_id' => auth()->id(),
-            'status' => 'En attente',
-            'total' => 0,
-            'form_id' => $id,
-            'department_id' => $validated['department_id'],
+        // Département + relations nécessaires (heads + users)
+        $department = \App\Models\Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+        $currentUserId = auth()->id();
+        $targetUserId = $request->input('target_user_id');
+
+        // Si on encode pour quelqu'un d'autre : il faut être head du service + la cible doit appartenir au service
+        if ($targetUserId && (int)$targetUserId !== (int)$currentUserId) {
+            $isHead = $department->heads->contains('id', $currentUserId);
+            if (!$isHead) {
+                abort(403, "Vous devez être responsable du service pour encoder au nom d'un agent.");
+            }
+            $belongsToDept = $department->users->contains('id', (int)$targetUserId);
+            if (!$belongsToDept) {
+                return back()
+                    ->withErrors(['target_user_id' => "L'agent sélectionné n'appartient pas à ce service."])
+                    ->withInput();
+            }
+        }
+
+        // Création de la note de frais
+        $expenseSheet = \App\Models\ExpenseSheet::create([
+            'user_id'         => $targetUserId ?: $currentUserId, // bénéficiaire
+            'created_by'      => $currentUserId,                  // créateur réel
+            'status'          => 'En attente',
+            'total'           => 0,
+            'form_id'         => $id,
+            'department_id'   => $validated['department_id'],
             'organization_id' => auth()->user()->organization_id,
         ]);
 
         $globalTotal = 0;
 
         foreach ($validated['costs'] as $costItem) {
-            $formCost = FormCost::find($costItem['cost_id']);
+            $formCost = \App\Models\FormCost::find($costItem['cost_id']);
             $type = $formCost->type;
             $date = $costItem['date'];
 
-            // Récupération du taux de remboursement actif à la date du coût
-            $rate = $formCost->reimbursementRates()
+            // Récupération du ou des taux actifs
+            $rates = $formCost->reimbursementRates()
                 ->where('start_date', '<=', $date)
                 ->where(function ($q) use ($date) {
                     $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
                 })
                 ->orderByDesc('start_date')
-                ->first();
+                ->get();
 
-            if (!$rate) {
+            if ($rates->count() === 0) {
                 continue;
             }
+
+            if ($rates->count() > 1) {
+                // ⚠️ Sécurité : plusieurs taux actifs = erreur de config
+                $expenseSheet->delete();
+                return back()
+                    ->withInput()
+                    ->with('error', "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.");
+            }
+
+            $rate = $rates->first();
+            $transport = $rate->transport ?? 'car'; // transport stocké dans la table reimbursement_rates
 
             $data = $costItem['data'];
             $total = 0;
@@ -119,11 +156,12 @@ class ExpenseSheetController extends Controller
                     $params = [
                         'origin' => $segmentOrigin,
                         'destination' => $segmentDest,
-                        'mode' => 'driving',
+                        // Utilisation du mode issu du taux
+                        'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
                         'key' => env('GOOGLE_MAPS_API_KEY'),
                     ];
 
-                    $response = Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
+                    $response = \Illuminate\Support\Facades\Http::get("https://maps.googleapis.com/maps/api/directions/json", $params);
                     $json = $response->json();
 
                     if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
@@ -142,19 +180,19 @@ class ExpenseSheetController extends Controller
                     'google_km' => $googleKm,
                     'manual_km' => $manualKm,
                     'justification' => $data['justification'] ?? null,
+                    'transport' => $transport, // on garde une trace
                 ];
 
-                // In route, we can also save the steps if needed
+                // Enregistrer aussi les étapes si besoin
                 if (count($steps) > 0) {
                     $route['steps'] = [];
                     foreach ($steps as $index => $address) {
                         $route['steps'][] = [
                             'address' => $address,
-                            'order' => $index + 1,
+                            'order'   => $index + 1,
                         ];
                     }
                 }
-
             } elseif ($type === 'fixed') {
                 $total = round($rate->value, 2);
             } elseif ($type === 'percentage') {
@@ -162,12 +200,12 @@ class ExpenseSheetController extends Controller
                 $total = round($paid * ($rate->value / 100), 2);
             }
 
-            // Gestion des requirements sous forme de JSON
+            // Gestion des requirements
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = Storage::url(Storage::putFile($requirement['file']));
+                        $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
@@ -175,17 +213,16 @@ class ExpenseSheetController extends Controller
                 }
             }
 
-            // Création du coût avec requirements stockés en JSON
-            $createdCost = $expenseSheet->costs()->create([
-                'form_cost_id' => $formCost->id,
-                'type' => $type,
-                'distance' => $distance,
-                'google_distance' => $googleDistance,
-                'route' => $route,
-                'total' => $total,
-                'date' => $date,
-                'amount' => $data['paidAmount'] ?? null,
-                'requirements' => json_encode($requirements),  // Enregistrement des requirements en JSON
+            $expenseSheet->costs()->create([
+                'form_cost_id'     => $formCost->id,
+                'type'             => $type,
+                'distance'         => $distance,
+                'google_distance'  => $googleDistance,
+                'route'            => $route,
+                'total'            => $total,
+                'date'             => $date,
+                'amount'           => $data['paidAmount'] ?? null,
+                'requirements'     => json_encode($requirements),
                 'expense_sheet_id' => $expenseSheet->id
             ]);
 
@@ -194,13 +231,18 @@ class ExpenseSheetController extends Controller
 
         $expenseSheet->update(['total' => $globalTotal]);
 
+        if ($globalTotal <= 0) {
+            $expenseSheet->delete();
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+        }
+
         $user = auth()->user();
         $department = $expenseSheet->department;
-
-// Récupère les responsables
         $heads = $department->heads;
 
-// Si l'agent est lui-même head du service, alors on passe au parent
         if ($heads->contains($user) && $department->parent) {
             $heads = $department->parent->heads;
         }
@@ -209,7 +251,11 @@ class ExpenseSheetController extends Controller
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
         });
 
-        $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
+        if(auth()->user()->id !== $expenseSheet->user->id) {
+            $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+        }
+
+        $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
 
         return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
     }
@@ -228,10 +274,11 @@ class ExpenseSheetController extends Controller
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
         return Inertia::render('expenseSheet/Show', [
-            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy']),
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy', 'creator']),
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canEdit' => $canEdit,
+            'canDestroy' => auth()->user()->can('destroy', $expenseSheet),
         ]);
     }
 
@@ -407,9 +454,13 @@ class ExpenseSheetController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ExpenseSheetController $expenseSheetController)
+    public function destroy($id)
     {
-        //
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+
+        $expenseSheet->delete();
+
+        return redirect()->route('dashboard')->with('success', 'Note de frais supprimée.');
     }
 
     /**
@@ -445,122 +496,20 @@ class ExpenseSheetController extends Controller
         return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
     }
 
-    /**
-     * Show expense export form.
-     */
-    public function exportForm()
+    public function generatePDF($id)
     {
-        if (!auth()->user()->can('export', ExpenseSheet::class)) {
+        $expenseSheet = ExpenseSheet::with([
+            'costs.formCost.reimbursementRates',
+            'user', 'department', 'validatedBy', 'form',
+        ])->findOrFail($id);
+
+        if (!auth()->user()->can('view', $expenseSheet)) {
             abort(403);
         }
 
-        return Inertia::render('expenseSheet/Export');
-    }
-
-    /**
-     * Export the expense sheets total to a CSV file.
-     */
-
-    public function export(Request $request)
-    {
-        if (!auth()->user()->can('export', ExpenseSheet::class)) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date',
-        ]);
-
-        $startDate = $validated['start_date'];
-        $endDate = $validated['end_date'];
-
-        // Récupérer tous les utilisateurs ayant au moins un ExpenseSheetCost entre ces dates
-        $users = \App\Models\User::whereHas('expenseSheets.expenseSheetCosts', function ($query) use ($startDate, $endDate) {
-            $query->whereBetween('date', [$startDate, $endDate]);
-        })->with(['expenseSheets.expenseSheetCosts.formCost.form'])->get();
-
-        // Création du tableau de données
-        $data = [];
-
-//        return 1;
-        // Préparer la première ligne : Username + liste des coûts (types de coût + formulaire)
-        $headers = ['Username'];
-        $costTypes = []; // pour stocker tous les types de coût rencontrés
-
-        foreach ($users as $user) {
-            foreach ($user->expenseSheets as $expenseSheet) {
-                foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if ($cost->date >= $startDate && $cost->date <= $endDate) {
-                        $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
-                        $costTypes[$key] = $cost->formCost->type; // type: KM, FIXE, POURCENT
-                    }
-                }
-            }
-        }
-
-        $headers = array_merge($headers, array_keys($costTypes));
-
-        // Remplir les données utilisateur
-        foreach ($users as $user) {
-            $row = [];
-            $row[] = $user->name;
-
-            // Initialiser toutes les colonnes à zéro
-            $costSums = array_fill_keys(array_keys($costTypes), 0);
-
-            foreach ($user->expenseSheets as $expenseSheet) {
-                foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if ($cost->date >= $startDate && $cost->date <= $endDate) {
-                        $key = $cost->formCost->name . ' (' . $cost->formCost->form->name . ')';
-
-                        if (isset($costTypes[$key])) {
-                            if ($cost->formCost->type === 'km') {
-                                $costSums[$key] += ($cost->route['google_km'] + $cost->route['manual_km']);
-                            } else {
-                                $costSums[$key] += $cost->amount;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Ajouter les valeurs à la ligne
-            foreach (array_keys($costTypes) as $key) {
-                $row[] = $costSums[$key];
-            }
-
-            $data[] = $row;
-        }
-
-        // Création du fichier Excel
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-
-        // Ecriture de l'entête
-        $col = 1;
-        foreach ($headers as $header) {
-            $sheet->setCellValueByColumnAndRow($col, 1, $header);
-            $col++;
-        }
-
-        // Ecriture des données
-        $rowNumber = 2;
-        foreach ($data as $rowData) {
-            $col = 1;
-            foreach ($rowData as $cell) {
-                $sheet->setCellValueByColumnAndRow($col, $rowNumber, $cell);
-                $col++;
-            }
-            $rowNumber++;
-        }
-
-// Téléchargement du fichier
-        $fileName = 'export_expense_sheets_' . now()->format('Ymd_His') . '.xlsx';
-        $writer = new Xlsx($spreadsheet);
-        $temp_file = tempnam(sys_get_temp_dir(), $fileName);
-        $writer->save($temp_file);
-
-        return response()->download($temp_file, $fileName)->deleteFileAfterSend(true);
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('expenseSheet.pdf', [
+            'expenseSheet' => $expenseSheet,
+        ])->setPaper('a4', 'landscape')
+            ->stream('note_de_frais_' . $id . '.pdf'); // inline
     }
 }

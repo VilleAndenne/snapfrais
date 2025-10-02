@@ -18,7 +18,8 @@
                 </div>
             </div>
             <Button variant="outline" size="sm" class="mt-2" @click="addStep">
-                <PlusIcon class="w-4 h-4 mr-1" /> Ajouter une étape
+                <PlusIcon class="w-4 h-4 mr-1" />
+                Ajouter une étape
             </Button>
         </div>
 
@@ -33,37 +34,35 @@
             <label class="block font-medium text-sm mb-1">Distance Google Maps</label>
             <div>{{ Math.round(googleKm.toFixed(1)) }} km</div>
         </div>
-
-        <!-- Total -->
-        <div class="pt-2 border-t mt-4">
-            <div class="font-semibold">Total : {{ Math.round(totalKm.toFixed(1)) }} km</div>
-        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted } from "vue";
-import { Trash2Icon, PlusIcon } from "lucide-vue-next";
+import { ref, watch, computed, onMounted } from 'vue';
+import { Trash2Icon, PlusIcon } from 'lucide-vue-next';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import GoogleAddressInput from "./GoogleAddressInput.vue";
-import { Button } from "@/components/ui/button";
-import { loadGoogleMaps } from "@/utils/googleMapsService";
+import GoogleAddressInput from './GoogleAddressInput.vue';
+import { Button } from '@/components/ui/button';
+import { loadGoogleMaps } from '@/utils/googleMapsService';
 
-const props = defineProps({ modelValue: Object });
-const emit = defineEmits(["update:modelValue"]);
+const props = defineProps({
+    modelValue: Object,
+    travel_mode: { type: String, default: 'car' } // ← injecté par le parent
+});
+const emit = defineEmits(['update:modelValue']);
 
-const departure = ref("");
-const arrival = ref("");
+const departure = ref('');
+const arrival = ref('');
 const steps = ref([]);
 
 const googleKm = ref(0);
 const manualKm = ref(0);
-const justification = ref("");
+const justification = ref('');
 
 const totalKm = computed(() => googleKm.value + manualKm.value);
 
-const addStep = () => steps.value.push("");
+const addStep = () => steps.value.push('');
 const removeStep = (i) => steps.value.splice(i, 1);
 
 let directionsService = null;
@@ -93,7 +92,7 @@ watch([departure, arrival, steps], async () => {
 }, { deep: true });
 
 watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
-    emit("update:modelValue", {
+    emit('update:modelValue', {
         departure: departure.value,
         arrival: arrival.value,
         steps: steps.value.filter(e => e),
@@ -103,7 +102,6 @@ watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
         totalKm: totalKm.value
     });
 }, { deep: true });
-
 const calculateDistance = async () => {
     if (!directionsService) return;
 
@@ -111,15 +109,24 @@ const calculateDistance = async () => {
         .filter(s => s)
         .map(address => ({ location: address, stopover: true }));
 
+    // Déterminer le mode Google Maps
+    let travelMode = google.maps.TravelMode.DRIVING;
+    if (props.travel_mode === 'bike') {
+        travelMode = google.maps.TravelMode.BICYCLING;
+    } else if (props.travel_mode === 'other') {
+        // Pas de mode direct "other" → on peut rester en DRIVING ou mettre WALKING
+        travelMode = google.maps.TravelMode.WALKING;
+    }
+
     directionsService.route(
         {
             origin: departure.value,
             destination: arrival.value,
             waypoints,
-            travelMode: google.maps.TravelMode.DRIVING
+            travelMode
         },
         (result, status) => {
-            if (status === "OK") {
+            if (status === 'OK') {
                 let distanceMeters = 0;
                 result.routes[0].legs.forEach(leg => {
                     distanceMeters += leg.distance.value;
@@ -127,7 +134,7 @@ const calculateDistance = async () => {
                 googleKm.value = distanceMeters / 1000;
             } else {
                 googleKm.value = 0;
-                console.warn("Erreur Google Maps API :", status);
+                console.warn('Erreur Google Maps API :', status);
             }
         }
     );

@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\UsersImport;
+use App\Models\Department;
 use App\Models\User;
 use App\Notifications\UserCreated;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -23,8 +28,10 @@ class UserController extends Controller
         }
         $users = User::query()
             ->when(request('search'), function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
             })
             ->paginate(10)
             ->withQueryString();
@@ -149,4 +156,37 @@ class UserController extends Controller
 
         return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès.');
     }
+
+    public function import()
+    {
+        if (!auth()->user()->can('create', User::class)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
+        return Inertia::render('users/Import');
+    }
+
+    public function doImport(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,csv',
+        ]);
+
+        // Envoie le fichier sur le disque partagé "laravel_cloud"
+        $path = $request->file('file')->store('imports', 'laravel_cloud');
+
+        // (Optionnel mais utile) Forcer la config runtime au cas où le worker n'a pas la même env
+        config([
+            'excel.temporary_files.remote_disk' => 'laravel_cloud',
+            'excel.temporary_files.remote_prefix' => 'temp/excel',
+            'excel.temporary_files.force_resync_remote' => true,
+        ]);
+
+        // Très important : préciser le DISQUE où se trouve le fichier
+        Excel::queueImport(new UsersImport, $path, 'laravel_cloud');
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
+    }
+
 }
