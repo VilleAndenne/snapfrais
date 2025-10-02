@@ -45,13 +45,13 @@
                 </span>
             </div>
 
-            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t">
-                <h2 class="text-lg font-medium">Votre demande</h2>
+            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t border-border">
+                <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-4 border rounded space-y-4 bg-white relative"
+                    class="p-4 border border-border rounded space-y-4 bg-card text-card-foreground relative"
                 >
                     <Button
                         variant="ghost"
@@ -62,11 +62,11 @@
                         <Trash2Icon class="w-5 h-5" />
                     </Button>
 
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold">{{ cost.name }}</h3>
-                        <span class="text-sm italic text-muted">{{ cost.type }}</span>
+                    <div class="flex justify-between items-center ">
+                        <h3 class="text-xl font-bold text-foreground">{{ cost.name }}</h3>
+                        <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
-                    <p class="text-sm text-gray-600">{{ cost.description }}</p>
+                    <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
                     <div v-if="cost.type === 'km'">
                         <KmCostInput v-model="costData[index].kmData" />
@@ -79,11 +79,11 @@
                     </div>
 
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700">Date du coût</label>
+                        <label class="block text-sm font-medium text-foreground">Date du coût</label>
                         <input
                             type="date"
                             v-model="costData[index].date"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            class="mt-1 block w-full rounded-md border-input bg-background text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                             required
                         />
                     </div>
@@ -98,8 +98,8 @@
             </div>
 
             <div>
-                <h2 class="text-lg font-medium mb-2">Types de coûts disponibles</h2>
-                <p class="text-sm text-gray-600 mb-4">
+                <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
+                <p class="text-sm text-muted-foreground mb-4">
                     Coûts ajoutés : {{ selectedCosts.length }}/7
                 </p>
                 <CostPicker
