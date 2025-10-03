@@ -25,6 +25,11 @@ class ExpenseSheetPolicy
      */
     protected function canModerate(User $user, ExpenseSheet $expenseSheet): bool
     {
+        // Ne peut pas approuver/rejeter un brouillon
+        if ($expenseSheet->is_draft) {
+            return false;
+        }
+
         // Déjà traité
         if (isset($expenseSheet->approved)) {
             return false;
@@ -69,8 +74,16 @@ class ExpenseSheetPolicy
      */
     public function edit(User $user, ExpenseSheet $expenseSheet)
     {
-        // Peut modifier si le statut est "rejeté" (false) et si l'utilisateur est le propriétaire
-        return $expenseSheet->user_id === $user->id && $expenseSheet->approved === 0 or $user->is_admin;
+        // Admin peut toujours modifier
+        if ($user->is_admin) {
+            return true;
+        }
+
+        // Le propriétaire peut modifier si :
+        // - C'est un brouillon OU
+        // - Le statut est "rejeté" (approved === 0/false)
+        return $expenseSheet->user_id === $user->id &&
+               ($expenseSheet->is_draft || $expenseSheet->approved === 0);
     }
 
     /**

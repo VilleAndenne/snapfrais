@@ -10,23 +10,25 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('expense_sheet_exports', function (Blueprint $table) {
-            $table->id();
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->string('status')->default('pending');
-            $table->string('file_path')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('expense_sheet_exports')) {
+            Schema::create('expense_sheet_exports', function (Blueprint $table) {
+                $table->id();
+                $table->date('start_date');
+                $table->date('end_date');
+                $table->string('status')->default('pending');
+                $table->string('file_path')->nullable();
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('expense_sheet_export_expense_sheets', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('expense_sheet_export_id')->constrained('expense_sheet_exports')->onDelete('cascade');
-            $table->foreignId('expense_sheet_id')->constrained('expense_sheets')->onDelete('cascade');
-            $table->timestamps();
-        });
-
-
+        if (!Schema::hasTable('expense_sheet_export_expense_sheets')) {
+            Schema::create('expense_sheet_export_expense_sheets', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('expense_sheet_export_id')->constrained('expense_sheet_exports')->onDelete('cascade');
+                $table->foreignId('expense_sheet_id')->constrained('expense_sheets')->onDelete('cascade');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

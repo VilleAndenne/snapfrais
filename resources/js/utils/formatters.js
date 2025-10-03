@@ -35,6 +35,14 @@ export const getActiveRate = (cost, date) => {
 };
 
 export const getStatusLabel = (expenseSheet) => {
+    // Vérifier d'abord si c'est un brouillon
+    if (expenseSheet.is_draft) {
+        return {
+            label: 'Brouillon',
+            variant: 'secondary'
+        };
+    }
+
     if (expenseSheet.approved == true) {
         return {
             label: 'Approuvée',

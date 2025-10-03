@@ -401,7 +401,21 @@ const submitForm = (isDraft) => {
         };
     });
 
-    // 2) Envoi
+    // 2) Valider les requirements avant envoi
+    if (!validateAllRequirements()) {
+        const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
+        if (firstErrorKey) {
+            const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
+            if (m) {
+                const idx = Number(m[1]);
+                const el = document.getElementById(`cost-card-${idx}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        return;
+    }
+
+    // 3) Envoi
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
@@ -441,12 +455,6 @@ const submitForm = (isDraft) => {
                     });
                 }
             });
-
-            // Debug: afficher tout le contenu du FormData
-            console.log('FormData contents:');
-            for (let pair of fd.entries()) {
-                console.log(pair[0] + ': ' + pair[1]);
-            }
 
             return fd;
         },
