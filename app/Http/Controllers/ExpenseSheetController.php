@@ -368,6 +368,7 @@ class ExpenseSheetController extends Controller
             abort(403);
         }
         $validated = $request->validate([
+            'department_id' => 'required|exists:departments,id',
             'costs' => 'required|array|max:7',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
@@ -386,6 +387,7 @@ class ExpenseSheetController extends Controller
                 'refusal_reason' => null,
                 'validated_by' => null,
                 'validated_at' => null,
+                'department_id' => $validated['department_id'],
             ]);
 
             $globalTotal = 0;
