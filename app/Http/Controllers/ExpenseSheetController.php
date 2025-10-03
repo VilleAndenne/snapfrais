@@ -352,7 +352,7 @@ class ExpenseSheetController extends Controller
                 })->toArray(),
             ],
             'expenseSheet' => $expenseSheetData,
-            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'departments' => $expenseSheet->user->departments()->with('users', 'heads')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
