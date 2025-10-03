@@ -164,4 +164,24 @@ class User extends Authenticatable
         $this->notify(new ResetPasswordNotification($token));
     }
 
+    /**
+     * Relation many-to-many avec les patch notes lues
+     */
+    public function readPatchNotes()
+    {
+        return $this->belongsToMany(PatchNote::class, 'patch_note_user')
+            ->withPivot('read_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Récupérer les patch notes non lues
+     */
+    public function unreadPatchNotes()
+    {
+        return PatchNote::whereDoesntHave('readByUsers', function ($query) {
+            $query->where('user_id', $this->id);
+        })->orderBy('created_at', 'desc');
+    }
+
 }

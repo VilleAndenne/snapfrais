@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
+import PatchNoteModal from '@/components/PatchNoteModal.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 import { watch, ref, computed } from 'vue';
@@ -100,4 +101,7 @@ watch(
             </transition>
         </div>
     </div>
+
+    <!-- Modal Patch Notes -->
+    <PatchNoteModal />
 </template>

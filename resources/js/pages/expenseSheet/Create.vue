@@ -31,18 +31,14 @@
                         <SelectValue placeholder="Sélectionner un agent" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem
-                            v-for="u in (selectedDepartment?.users || [])"
-                            :key="u.id"
-                            :value="u.id"
-                        >
+                        <SelectItem v-for="u in selectedDepartment?.users || []" :key="u.id" :value="u.id">
                             {{ u.name }}
                         </SelectItem>
                     </SelectContent>
                 </Select>
                 <span v-if="form.errors.target_user_id" class="text-sm text-red-600">
-          {{ form.errors.target_user_id }}
-        </span>
+                    {{ form.errors.target_user_id }}
+                </span>
             </div>
 
             <!-- Coûts ajoutés -->
@@ -55,15 +51,15 @@
                     :id="`cost-card-${index}`"
                     class="relative space-y-4 rounded border border-border bg-card p-4 text-card-foreground"
                 >
-                    <!-- Bouton de suppression -->
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        class="absolute right-2 top-2 text-destructive"
-                        @click="removeCost(index)"
-                    >
-                        <Trash2Icon class="h-5 w-5" />
-                    </Button>
+                    <!-- Boutons d'action -->
+                    <div class="absolute right-2 top-2 flex gap-2">
+                        <Button variant="ghost" size="icon" class="text-primary" @click="openDuplicateDialog(index)">
+                            <CopyIcon class="h-5 w-5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" class="text-destructive" @click="removeCost(index)">
+                            <Trash2Icon class="h-5 w-5" />
+                        </Button>
+                    </div>
 
                     <!-- Détails du coût -->
                     <div class="flex items-center justify-between">
@@ -82,8 +78,8 @@
                             @change="updateRate(index, cost)"
                         />
                         <span v-if="form.errors[`costs.${index}.date`]" class="text-sm text-red-600">
-              {{ form.errors[`costs.${index}.date`] }}
-            </span>
+                            {{ form.errors[`costs.${index}.date`] }}
+                        </span>
                     </div>
 
                     <!-- Champs dynamiques selon le type de coût -->
@@ -110,11 +106,11 @@
                                 <span>• Taux : {{ formatRate(getActiveRate(cost, costData[index].date)) }} / km</span>
                                 <span>• Distance : {{ roundKm(costData[index]?.kmData?.totalKm) }} km</span>
                                 <span>
-                  • Remboursé :
-                  <span class="font-semibold">
-                    {{ formatCurrency(kmReimbursed(index, cost)) }}
-                  </span>
-                </span>
+                                    • Remboursé :
+                                    <span class="font-semibold">
+                                        {{ formatCurrency(kmReimbursed(index, cost)) }}
+                                    </span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -142,25 +138,49 @@
                 <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
-            <!-- Bouton d'envoi -->
-            <div class="flex justify-end pt-8">
+            <!-- Boutons d'envoi -->
+            <div class="flex justify-end gap-3 pt-8">
+                <Button @click="saveDraft" :disabled="!selectedCosts.length || form.processing" variant="outline">
+                    <Loader2Icon v-if="form.processing && isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ form.processing && isDraftSubmit ? 'Enregistrement...' : 'Enregistrer en brouillon' }}
+                </Button>
                 <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
-                    <Loader2Icon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                    {{ form.processing ? 'Envoi en cours...' : 'Envoyer la demande' }}
+                    <Loader2Icon v-if="form.processing && !isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ form.processing && !isDraftSubmit ? 'Envoi en cours...' : 'Envoyer la demande' }}
                 </Button>
             </div>
         </div>
+
+        <!-- Modal de duplication -->
+        <Dialog v-model:open="duplicateDialog.isOpen">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Dupliquer le coût</DialogTitle>
+                    <DialogDescription> Combien de copies de "{{ duplicateDialog.costName }}" voulez-vous créer ? </DialogDescription>
+                </DialogHeader>
+                <div class="py-4">
+                    <Label for="duplicate-count">Nombre de copies</Label>
+                    <Input id="duplicate-count" type="number" min="1" max="20" v-model.number="duplicateDialog.count" class="mt-2" />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" @click="duplicateDialog.isOpen = false">Annuler</Button>
+                    <Button @click="confirmDuplicate">Dupliquer</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
 <script setup>
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { Loader2Icon, Trash2Icon } from 'lucide-vue-next';
-import { onMounted, ref, computed, watch } from 'vue';
+import { CopyIcon, Loader2Icon, Trash2Icon } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
 import CostrequirementInput from '@/components/expense/CostRequirementInput.vue';
@@ -175,13 +195,14 @@ const costData = ref([]);
 const props = defineProps({
     form: { type: Object, required: true },
     departments: { type: Array, required: true }, // heads[] + users[]
-    authUser: { type: Object, required: true },   // { id, name }
+    authUser: { type: Object, required: true }, // { id, name }
 });
 
 const form = useForm({
     costs: [],
     department_id: null,
     target_user_id: null, // agent pour qui la note est encodée (si responsable)
+    is_draft: false,
 });
 
 onMounted(() => {
@@ -189,9 +210,7 @@ onMounted(() => {
 });
 
 // Département sélectionné + statut "head"
-const selectedDepartment = computed(() =>
-    props.departments.find((d) => d.id === form.department_id) || null
-);
+const selectedDepartment = computed(() => props.departments.find((d) => d.id === form.department_id) || null);
 
 const isHeadOfSelectedDept = computed(() => {
     if (!selectedDepartment.value) return false;
@@ -208,7 +227,7 @@ watch(
         } else {
             form.target_user_id = null;
         }
-    }
+    },
 );
 
 const getActiveRateRecord = (cost, date) => {
@@ -267,10 +286,92 @@ const removeCost = (index) => {
     costData.value.splice(index, 1);
 };
 
+// Gestion de la duplication
+const duplicateDialog = ref({
+    isOpen: false,
+    costIndex: -1,
+    costName: '',
+    count: 1,
+});
+
+const openDuplicateDialog = (index) => {
+    const cost = selectedCosts.value[index];
+    duplicateDialog.value = {
+        isOpen: true,
+        costIndex: index,
+        costName: cost.name,
+        count: 1,
+    };
+};
+
+const confirmDuplicate = () => {
+    const { costIndex, count } = duplicateDialog.value;
+
+    // Vérifier la limite
+    if (selectedCosts.value.length + count > 30) {
+        alert(`Vous ne pouvez pas ajouter ${count} coûts. Maximum 30 coûts au total.`);
+        return;
+    }
+
+    // Récupérer le coût et ses données
+    const originalCost = selectedCosts.value[costIndex];
+    const originalData = costData.value[costIndex];
+
+    // Dupliquer le coût le nombre de fois demandé
+    for (let i = 0; i < count; i++) {
+        // Dupliquer le coût
+        selectedCosts.value.push(originalCost);
+
+        // Dupliquer les données en réinitialisant les requirements
+        const newData = {
+            kmData: { ...originalData.kmData }, // Copier les données km
+            percentageData: { ...originalData.percentageData }, // Copier les données percentage
+            requirements: {}, // Réinitialiser les requirements (vides)
+            fixedAmount: originalData.fixedAmount, // Garder le montant fixe
+        };
+
+        costData.value.push(newData);
+    }
+
+    // Fermer le modal
+    duplicateDialog.value.isOpen = false;
+};
+
 const submitted = ref(false);
+const isDraftSubmit = ref(false);
+
+const saveDraft = () => {
+    isDraftSubmit.value = true;
+    submitForm(true);
+};
 
 const submit = () => {
     submitted.value = true;
+    isDraftSubmit.value = false;
+    submitForm(false);
+};
+
+const submitForm = (isDraft) => {
+    // Définir is_draft dans le form
+    form.is_draft = isDraft;
+
+    // Pour les brouillons, on ne valide pas les requirements
+    console.log('isDraft:', isDraft);
+    if (!isDraft) {
+        // 2) Valider les requirements avant envoi
+        if (!validateAllRequirements()) {
+            const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
+            if (firstErrorKey) {
+                const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
+                if (m) {
+                    const idx = Number(m[1]);
+                    const el = document.getElementById(`cost-card-${idx}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            return;
+        }
+    }
 
     // 1) Construire l'objet à poster
     form.costs = selectedCosts.value.map((cost, index) => {
@@ -278,8 +379,8 @@ const submit = () => {
             cost.type === 'km'
                 ? costData.value[index].kmData
                 : cost.type === 'percentage'
-                    ? costData.value[index].percentageData
-                    : { amount: costData.value[index].fixedAmount };
+                  ? costData.value[index].percentageData
+                  : { amount: costData.value[index].fixedAmount };
 
         const requirements = {};
         if (costData.value[index].requirements) {
@@ -300,21 +401,7 @@ const submit = () => {
         };
     });
 
-    // 2) Valider les requirements avant envoi
-    if (!validateAllRequirements()) {
-        const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
-        if (firstErrorKey) {
-            const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
-            if (m) {
-                const idx = Number(m[1]);
-                const el = document.getElementById(`cost-card-${idx}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-        return;
-    }
-
-    // 3) Envoi
+    // 2) Envoi
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
@@ -328,6 +415,8 @@ const submit = () => {
         transform: (data) => {
             const fd = new FormData();
             fd.append('department_id', form.department_id);
+            fd.append('is_draft', isDraft);
+
             if (form.target_user_id) {
                 fd.append('target_user_id', form.target_user_id);
             }
@@ -352,6 +441,12 @@ const submit = () => {
                     });
                 }
             });
+
+            // Debug: afficher tout le contenu du FormData
+            console.log('FormData contents:');
+            for (let pair of fd.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
 
             return fd;
         },
