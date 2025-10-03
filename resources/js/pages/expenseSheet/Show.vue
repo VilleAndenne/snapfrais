@@ -57,7 +57,7 @@
                 <div class="flex-shrink-0 rounded-full bg-destructive/10 p-2">
                     <AlertCircleIcon class="h-5 w-5 text-destructive" />
                 </div>
-                <div class="space-y-1.5">
+                <div class="flex-1 space-y-1.5">
                     <h3 class="flex items-center gap-2 font-medium text-destructive">
                         Note de frais refusée
                         <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive/70"></span>
@@ -72,6 +72,11 @@
                             <span>{{ expenseSheet.refusal_reason }}</span>
                         </p>
                     </div>
+                </div>
+                <div v-if="canEdit" class="flex-shrink-0">
+                    <Button variant="outline" size="sm" @click="editExpenseSheet" class="border-destructive text-destructive hover:bg-destructive hover:text-white">
+                        Modifier et resoumettre
+                    </Button>
                 </div>
             </div>
 

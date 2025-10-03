@@ -5,13 +5,53 @@
         <div class="container mx-auto p-4 space-y-6">
             <h1 class="text-2xl font-semibold">Modifier la note de frais</h1>
 
-            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t">
-                <h2 class="text-lg font-medium">Votre demande</h2>
+            <!-- Sélection du département -->
+            <div class="flex flex-col space-y-2">
+                <Label for="department">Département</Label>
+                <Select v-model="form.department_id">
+                    <SelectTrigger id="department">
+                        <SelectValue placeholder="Sélectionner un département" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem v-for="dep in departments" :key="dep.id" :value="dep.id">
+                            {{ dep.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <span v-if="form.errors.department_id" class="text-sm text-red-600">
+                    {{ form.errors.department_id }}
+                </span>
+            </div>
+
+            <!-- Sélecteur d'agent (visible si l'utilisateur est head du service sélectionné) -->
+            <div v-if="isHeadOfSelectedDept" class="flex flex-col space-y-2">
+                <Label for="targetUser">Pour quel agent ?</Label>
+                <Select v-model="form.target_user_id">
+                    <SelectTrigger id="targetUser">
+                        <SelectValue placeholder="Sélectionner un agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="u in (selectedDepartment?.users || [])"
+                            :key="u.id"
+                            :value="u.id"
+                        >
+                            {{ u.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <span v-if="form.errors.target_user_id" class="text-sm text-red-600">
+                    {{ form.errors.target_user_id }}
+                </span>
+            </div>
+
+            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t border-border">
+                <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-4 border rounded space-y-4 bg-white relative"
+                    class="p-4 border border-border rounded space-y-4 bg-card text-card-foreground relative"
                 >
                     <Button
                         variant="ghost"
@@ -22,11 +62,11 @@
                         <Trash2Icon class="w-5 h-5" />
                     </Button>
 
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold">{{ cost.name }}</h3>
-                        <span class="text-sm italic text-muted">{{ cost.type }}</span>
+                    <div class="flex justify-between items-center ">
+                        <h3 class="text-xl font-bold text-foreground">{{ cost.name }}</h3>
+                        <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
-                    <p class="text-sm text-gray-600">{{ cost.description }}</p>
+                    <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
 
                     <div v-if="cost.type === 'km'">
                         <KmCostInput v-model="costData[index].kmData" />
@@ -39,11 +79,11 @@
                     </div>
 
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700">Date du coût</label>
-                        <input 
-                            type="date" 
+                        <label class="block text-sm font-medium text-foreground">Date du coût</label>
+                        <input
+                            type="date"
                             v-model="costData[index].date"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            class="mt-1 block w-full rounded-md border-input bg-background text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                             required
                         />
                     </div>
@@ -51,15 +91,15 @@
                     <CostRequierementInput
                         v-if="cost.requirements?.length"
                         :requirements="cost.requirements"
-                        :existing-files="getExistingFiles(cost.requirements_data)"
+                        :existing-data="cost.requirements_data || {}"
                         v-model="costData[index].requirements"
                     />
                 </div>
             </div>
 
             <div>
-                <h2 class="text-lg font-medium mb-2">Types de coûts disponibles</h2>
-                <p class="text-sm text-gray-600 mb-4">
+                <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
+                <p class="text-sm text-muted-foreground mb-4">
                     Coûts ajoutés : {{ selectedCosts.length }}/7
                 </p>
                 <CostPicker
@@ -80,10 +120,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useForm, Head } from "@inertiajs/vue3";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Loader2Icon, Trash2Icon } from "lucide-vue-next";
 
 import CostPicker from "@/components/expense/CostPicker.vue";
@@ -95,15 +143,47 @@ import CostRequierementInput from "@/components/expense/CostRequirementInput.vue
 const costs = ref([]);
 const selectedCosts = ref([]);
 const costData = ref([]);
+const departments = ref([]);
 
 const props = defineProps({
     form: Object,
     expenseSheet: Object,
+    departments: Array,
+    authUser: Object,
 });
 
 const form = useForm({
     costs: [],
+    department_id: null,
+    target_user_id: null,
+    _method: 'PUT',
 });
+
+// Département sélectionné (pour afficher les utilisateurs)
+const selectedDepartment = computed(() => {
+    return departments.value.find((d) => d.id === form.department_id) || null;
+});
+
+// Vérifie si l'utilisateur est head du département sélectionné
+const isHeadOfSelectedDept = computed(() => {
+    if (!selectedDepartment.value) return false;
+    return selectedDepartment.value.heads.some((h) => h.id === props.authUser.id);
+});
+
+// Quand le département change : si head -> pré-sélectionne l'utilisateur existant ou soi-même, sinon reset
+watch(
+    () => form.department_id,
+    () => {
+        if (isHeadOfSelectedDept.value) {
+            // Garder le target_user_id existant ou mettre soi-même
+            if (!form.target_user_id) {
+                form.target_user_id = props.authUser.id;
+            }
+        } else {
+            form.target_user_id = null;
+        }
+    }
+);
 
 const getActiveRate = (cost) => {
     const today = new Date().toISOString().split("T")[0];
@@ -116,7 +196,14 @@ const getActiveRate = (cost) => {
 onMounted(() => {
     console.log('Form costs:', props.form.costs);
     console.log('Expense sheet costs:', props.expenseSheet.costs);
-    
+
+    // Initialiser les départements
+    departments.value = props.departments || [];
+
+    // Pré-remplir le département et l'utilisateur existants
+    form.department_id = props.expenseSheet.department_id;
+    form.target_user_id = props.expenseSheet.user_id;
+
     costs.value = props.form.costs;
     selectedCosts.value = props.expenseSheet.costs.map((item) => {
         const foundCost = costs.value.find((c) => c.id === item.cost_id);
@@ -134,11 +221,11 @@ onMounted(() => {
         let data = {};
         if (item.type === 'km') {
             data = {
-                departure: item.data.route?.departure || '',
-                arrival: item.data.route?.arrival || '',
-                steps: item.data.route?.steps || [],
-                manualKm: item.data.route?.manual_km || 0,
-                justification: item.data.route?.justification || '',
+                departure: item.data.departure || '',
+                arrival: item.data.arrival || '',
+                steps: item.data.steps || [],
+                manualKm: item.data.manualKm || 0,
+                justification: item.data.justification || '',
             };
         } else if (item.type === 'percentage') {
             data = {
@@ -152,11 +239,23 @@ onMounted(() => {
             };
         }
 
+        // Extraire les valeurs des requirements pour l'initialisation
+        const requirementsValues = {};
+        if (item.requirements_data) {
+            Object.entries(item.requirements_data).forEach(([key, value]) => {
+                if (value?.value !== undefined) {
+                    // Pour les champs texte, on stocke directement la valeur
+                    requirementsValues[key] = value.value;
+                }
+                // Pour les fichiers, on ne les ajoute pas ici, ils seront gérés via existingData
+            });
+        }
+
         return {
             kmData: item.type === 'km' ? data : {},
             percentageData: item.type === 'percentage' ? data : { paidAmount: null, percentage: getActiveRate(item), reimbursedAmount: 0 },
             fixedAmount: item.type === 'fixed' ? data.amount : getActiveRate(item),
-            requirements: item.requirements_data || {},
+            requirements: requirementsValues,
             date: item.date || new Date().toISOString().split('T')[0],
         };
     });
@@ -191,12 +290,24 @@ const submit = () => {
                     { amount: costData.value[index].fixedAmount };
 
         const requirements = {};
+
+        // Ajouter les nouvelles valeurs depuis costData
         if (costData.value[index].requirements) {
             Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
                 if (req instanceof File) {
                     requirements[reqId] = { file: req };
                 } else if (req !== null && req !== undefined && req !== '') {
                     requirements[reqId] = { value: req };
+                }
+            });
+        }
+
+        // Conserver les fichiers existants non modifiés
+        if (cost.requirements_data) {
+            Object.entries(cost.requirements_data).forEach(([reqId, existingData]) => {
+                // Si ce requirement n'a pas été modifié (pas dans requirements) et c'est un fichier
+                if (!requirements[reqId] && existingData?.file) {
+                    requirements[reqId] = { existing_file: existingData.file };
                 }
             });
         }
@@ -209,16 +320,26 @@ const submit = () => {
         };
     });
 
-    form.put("/expense-sheet/" + props.expenseSheet.id, {
+    console.log('Form costs before submit:', form.costs);
+
+    form.post("/expense-sheet/" + props.expenseSheet.id, {
         onSuccess: () => {
             window.location.href = '/dashboard';
         },
         onError: (errors) => {
+            console.log('Submit errors:', errors);
             alert("Une erreur est survenue lors de la mise à jour : " + Object.values(errors).join(', '));
         },
+        forceFormData: true,
         transform: (data) => {
+            console.log('Transform data:', data);
             const formData = new FormData();
-            formData.append('department_id', form.department_id);
+            formData.append('_method', 'PUT');
+
+            if (!data.costs || data.costs.length === 0) {
+                console.error('No costs in data!');
+                return formData;
+            }
 
             data.costs.forEach((cost, index) => {
                 formData.append(`costs[${index}][cost_id]`, cost.cost_id);
@@ -226,7 +347,14 @@ const submit = () => {
 
                 // Ajouter les données du coût
                 Object.entries(cost.data).forEach(([key, value]) => {
-                    formData.append(`costs[${index}][data][${key}]`, value);
+                    if (Array.isArray(value)) {
+                        // Pour les tableaux (comme steps), ajouter chaque élément
+                        value.forEach((item, itemIndex) => {
+                            formData.append(`costs[${index}][data][${key}][${itemIndex}]`, item);
+                        });
+                    } else if (value !== null && value !== undefined) {
+                        formData.append(`costs[${index}][data][${key}]`, value);
+                    }
                 });
 
                 // Ajouter les requirements correctement
@@ -234,12 +362,20 @@ const submit = () => {
                     Object.entries(cost.requirements).forEach(([reqId, req]) => {
                         if (req.file instanceof File) {
                             formData.append(`costs[${index}][requirements][${reqId}][file]`, req.file);
+                        } else if (req.existing_file) {
+                            // Fichier existant non modifié
+                            formData.append(`costs[${index}][requirements][${reqId}][existing_file]`, req.existing_file);
                         } else if (req.value) {
                             formData.append(`costs[${index}][requirements][${reqId}][value]`, req.value);
                         }
                     });
                 }
             });
+
+            // Debug: afficher le contenu du FormData
+            for (let pair of formData.entries()) {
+                console.log(pair[0]+ ': ' + pair[1]);
+            }
 
             return formData;
         }
