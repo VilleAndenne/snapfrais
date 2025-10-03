@@ -23,6 +23,7 @@ const props = defineProps<{
         route: string;
         total: number;
         approved: boolean | null;
+        is_draft: boolean;
         created_at: string;
         form: {
             name: string;
@@ -38,15 +39,16 @@ const props = defineProps<{
 }>();
 
 // 🔁 Mapping approved → statut lisible
-const getStatusFromApproved = (approved: boolean | null): 'approved' | 'pending' | 'rejected' => {
+const getStatusFromApproved = (approved: boolean | null, isDraft: boolean): 'approved' | 'pending' | 'rejected' | 'draft' => {
+    if (isDraft) return 'draft';
     if (approved == true) return 'approved';
     if (approved == false) return 'rejected';
     return 'pending';
 };
 
 // 🏷️ Badge & label
-const getStatusLabel = (sheet: { approved: boolean | null }) => {
-    const status = getStatusFromApproved(sheet.approved);
+const getStatusLabel = (sheet: { approved: boolean | null, is_draft: boolean }) => {
+    const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
     switch (status) {
         case 'approved':
             return { label: 'Approuvée', variant: 'success' };
@@ -54,14 +56,16 @@ const getStatusLabel = (sheet: { approved: boolean | null }) => {
             return { label: 'En attente', variant: 'warning' };
         case 'rejected':
             return { label: 'Rejetée', variant: 'destructive' };
+        case 'draft':
+            return { label: 'Brouillon', variant: 'secondary' };
         default:
             return { label: 'Inconnu', variant: 'default' };
     }
 };
 
 // 🎯 Icône statut
-const getStatusIcon = (approved: boolean | null) => {
-    const status = getStatusFromApproved(approved);
+const getStatusIcon = (approved: boolean | null, isDraft: boolean) => {
+    const status = getStatusFromApproved(approved, isDraft);
     switch (status) {
         case 'approved':
             return CheckCircle;
@@ -69,6 +73,8 @@ const getStatusIcon = (approved: boolean | null) => {
             return Clock;
         case 'rejected':
             return AlertTriangle;
+        case 'draft':
+            return FileText;
         default:
             return FileText;
     }
@@ -107,7 +113,7 @@ const departmentOptions = computed(() => {
 // 📊 Filtrage principal
 const filteredExpenseSheets = computed(() => {
     return props.expenseSheets.filter(sheet => {
-        const status = getStatusFromApproved(sheet.approved);
+        const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
         const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
         const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
         const matchesDepartment = departmentFilter.value === 'all' || sheet.department?.name === departmentFilter.value;
@@ -235,7 +241,7 @@ const breadcrumbs = [
                     <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
                         <td class="px-3 sm:px-6 py-2 sm:py-4">
                             <div class="flex items-center">
-                                <component :is="getStatusIcon(sheet.approved)" class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5" />
+                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5" />
                                 <span class="text-xs sm:text-sm font-medium">{{ sheet.form.name }}</span>
                             </div>
                         </td>

@@ -67,7 +67,11 @@ class ExpenseSheetController extends Controller
             'costs.*.requirements' => 'nullable|array',
             'department_id' => 'required|exists:departments,id',
             'target_user_id' => 'nullable|exists:users,id',
+            'is_draft' => 'required|boolean',
         ]);
+
+        // Convertir is_draft en booléen de manière fiable
+        $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
 
         // Département + relations nécessaires (heads + users)
         $department = \App\Models\Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
@@ -92,10 +96,11 @@ class ExpenseSheetController extends Controller
         $expenseSheet = \App\Models\ExpenseSheet::create([
             'user_id'         => $targetUserId ?: $currentUserId, // bénéficiaire
             'created_by'      => $currentUserId,                  // créateur réel
-            'status'          => 'En attente',
+            'status'          => $isDraft ? 'Brouillon' : 'En attente',
             'total'           => 0,
             'form_id'         => $id,
             'department_id'   => $validated['department_id'],
+            'is_draft'        => $isDraft,
         ]);
 
         $globalTotal = 0;
@@ -239,25 +244,29 @@ class ExpenseSheetController extends Controller
                 ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
         }
 
-        $user = auth()->user();
-        $department = $expenseSheet->department;
-        $heads = $department->heads;
+        // Ne pas envoyer de notifications pour les brouillons
+        if (!$isDraft) {
+            $user = auth()->user();
+            $department = $expenseSheet->department;
+            $heads = $department->heads;
 
-        if ($heads->contains($user) && $department->parent) {
-            $heads = $department->parent->heads;
+            if ($heads->contains($user) && $department->parent) {
+                $heads = $department->parent->heads;
+            }
+
+            $heads->each(function ($head) use ($expenseSheet) {
+                $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+            });
+
+            if(auth()->user()->id !== $expenseSheet->user->id) {
+                $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+            }
+
+            $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
         }
 
-        $heads->each(function ($head) use ($expenseSheet) {
-            $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
-        });
-
-        if(auth()->user()->id !== $expenseSheet->user->id) {
-            $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
-        }
-
-        $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
-
-        return redirect()->route('dashboard')->with('success', 'Note de frais enregistrée.');
+        $message = $isDraft ? 'Brouillon enregistré.' : 'Note de frais enregistrée.';
+        return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', $message);
     }
 
     /**
@@ -352,7 +361,7 @@ class ExpenseSheetController extends Controller
                 })->toArray(),
             ],
             'expenseSheet' => $expenseSheetData,
-            'departments' => $expenseSheet->user->departments()->with('users', 'heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -389,6 +398,26 @@ class ExpenseSheetController extends Controller
                 'validated_at' => null,
                 'department_id' => $validated['department_id'],
             ]);
+            // Si c'est un brouillon, on garde le statut brouillon
+            // Sinon on réinitialise l'approbation et on remet en attente pour resoumission
+            if ($expenseSheet->is_draft) {
+                $expenseSheet->update([
+                    'approved' => null,
+                    'status' => 'Brouillon',
+                    'refusal_reason' => null,
+                    'validated_by' => null,
+                    'validated_at' => null,
+                ]);
+            } else {
+                $expenseSheet->update([
+                    'approved' => null,
+                    'status' => 'En attente',
+                    'refusal_reason' => null,
+                    'validated_by' => null,
+                    'validated_at' => null,
+                    'is_draft' => false,
+                ]);
+            }
 
             $globalTotal = 0;
 
@@ -533,19 +562,25 @@ class ExpenseSheetController extends Controller
                     ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
             }
 
-            // Notifier les responsables de la resoumission
-            $department = $expenseSheet->department;
-            $heads = $department->heads;
+            // Notifier les responsables de la resoumission (sauf pour les brouillons)
+            if (!$expenseSheet->is_draft) {
+                $department = $expenseSheet->department;
+                $heads = $department->heads;
 
-            if ($heads->contains(auth()->user()) && $department->parent) {
-                $heads = $department->parent->heads;
+                if ($heads->contains(auth()->user()) && $department->parent) {
+                    $heads = $department->parent->heads;
+                }
+
+                $heads->each(function ($head) use ($expenseSheet) {
+                    $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+                });
             }
 
-            $heads->each(function ($head) use ($expenseSheet) {
-                $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
-            });
+            $message = $expenseSheet->is_draft
+                ? 'Brouillon modifié avec succès.'
+                : 'Note de frais modifiée et resoumise avec succès.';
 
-            return redirect()->route('dashboard')->with('success', 'Note de frais modifiée et resoumise avec succès.');
+            return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', $message);
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
@@ -594,7 +629,48 @@ class ExpenseSheetController extends Controller
             $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
         }
 
-        return redirect()->route('dashboard')->with('success', 'Note de frais mise à jour.');
+        return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', 'Note de frais mise à jour.');
+    }
+
+    public function submitDraft($id)
+    {
+        $expenseSheet = ExpenseSheet::findOrFail($id);
+
+        // Vérifier que c'est bien un brouillon
+        if (!$expenseSheet->is_draft) {
+            return back()->withErrors(['error' => 'Cette note de frais n\'est pas un brouillon.']);
+        }
+
+        // Vérifier les permissions
+        if (!auth()->user()->can('edit', $expenseSheet)) {
+            abort(403);
+        }
+
+        // Passer en statut "En attente" et retirer le flag brouillon
+        $expenseSheet->update([
+            'is_draft' => false,
+            'status' => 'En attente',
+        ]);
+
+        // Envoyer les notifications
+        $department = $expenseSheet->department;
+        $heads = $department->heads;
+
+        if ($heads->contains(auth()->user()) && $department->parent) {
+            $heads = $department->parent->heads;
+        }
+
+        $heads->each(function ($head) use ($expenseSheet) {
+            $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+        });
+
+        if(auth()->user()->id !== $expenseSheet->user->id) {
+            $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+        }
+
+        $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
+
+        return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', 'Note de frais soumise avec succès.');
     }
 
     public function generatePDF($id)
