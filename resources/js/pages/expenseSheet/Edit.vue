@@ -335,6 +335,7 @@ const submit = () => {
             console.log('Transform data:', data);
             const formData = new FormData();
             formData.append('_method', 'PUT');
+            formData.append('department_id', data.department_id);
 
             if (!data.costs || data.costs.length === 0) {
                 console.error('No costs in data!');
