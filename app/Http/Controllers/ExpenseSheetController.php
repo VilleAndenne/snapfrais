@@ -170,7 +170,8 @@ class ExpenseSheetController extends Controller
 
                 $googleKm = round($googleKm / 1000, 2);
                 $googleDistance = $googleKm;
-                $distance = $googleKm + $manualKm;
+                // Arrondir la distance totale à l'entier le plus proche avant le calcul
+                $distance = round($googleKm + $manualKm);
                 $total = round($distance * $rate->value, 2);
 
                 $route = [

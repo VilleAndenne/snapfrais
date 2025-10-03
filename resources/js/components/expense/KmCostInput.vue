@@ -28,12 +28,6 @@
             <label class="block font-medium text-sm mb-1">Adresse d’arrivée</label>
             <GoogleAddressInput v-model="arrival" />
         </div>
-
-        <!-- Km Google -->
-        <div>
-            <label class="block font-medium text-sm mb-1">Distance Google Maps</label>
-            <div>{{ Math.round(googleKm.toFixed(1)) }} km</div>
-        </div>
     </div>
 </template>
 
@@ -107,8 +101,7 @@ watch([googleKm, manualKm, justification, departure, arrival, steps], () => {
         steps: steps.value.filter(e => e),
         googleKm: Math.round(googleKm.value),
         manualKm: Math.round(manualKm.value),
-        justification: manualKm.value !== 0 ? justification.value : null,
-        totalKm: totalKm.value
+        totalKm: Math.round(totalKm.value)
     });
 }, { deep: true });
 const calculateDistance = async () => {
