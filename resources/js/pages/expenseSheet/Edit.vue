@@ -100,7 +100,7 @@
             <div>
                 <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
                 <p class="text-sm text-muted-foreground mb-4">
-                    Coûts ajoutés : {{ selectedCosts.length }}/7
+                    Coûts ajoutés : {{ selectedCosts.length }}/30
                 </p>
                 <CostPicker
                     :available-costs="costs"
@@ -265,7 +265,7 @@ onMounted(() => {
 });
 
 const addToRequest = (cost) => {
-    if (selectedCosts.value.length >= 7) return;
+    if (selectedCosts.value.length >= 30) return;
     const copy = JSON.parse(JSON.stringify(cost));
     selectedCosts.value.push(copy);
     costData.value.push({
