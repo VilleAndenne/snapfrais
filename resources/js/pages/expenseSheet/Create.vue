@@ -142,11 +142,15 @@
                 <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
-            <!-- Bouton d'envoi -->
-            <div class="flex justify-end pt-8">
+            <!-- Boutons d'envoi -->
+            <div class="flex justify-end gap-3 pt-8">
+                <Button @click="saveDraft" :disabled="!selectedCosts.length || form.processing" variant="outline">
+                    <Loader2Icon v-if="form.processing && isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ form.processing && isDraftSubmit ? 'Enregistrement...' : 'Enregistrer en brouillon' }}
+                </Button>
                 <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
-                    <Loader2Icon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                    {{ form.processing ? 'Envoi en cours...' : 'Envoyer la demande' }}
+                    <Loader2Icon v-if="form.processing && !isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ form.processing && !isDraftSubmit ? 'Envoi en cours...' : 'Envoyer la demande' }}
                 </Button>
             </div>
         </div>
@@ -158,7 +162,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import { Loader2Icon, Trash2Icon } from 'lucide-vue-next';
 import { onMounted, ref, computed, watch } from 'vue';
 
@@ -182,6 +186,7 @@ const form = useForm({
     costs: [],
     department_id: null,
     target_user_id: null, // agent pour qui la note est encodée (si responsable)
+    is_draft: false,
 });
 
 onMounted(() => {
@@ -268,9 +273,40 @@ const removeCost = (index) => {
 };
 
 const submitted = ref(false);
+const isDraftSubmit = ref(false);
+
+const saveDraft = () => {
+    isDraftSubmit.value = true;
+    submitForm(true);
+};
 
 const submit = () => {
     submitted.value = true;
+    isDraftSubmit.value = false;
+    submitForm(false);
+};
+
+const submitForm = (isDraft) => {
+    // Définir is_draft dans le form
+    form.is_draft = isDraft;
+
+    // Pour les brouillons, on ne valide pas les requirements
+    console.log('isDraft:', isDraft);
+    if (!isDraft) {
+        // 2) Valider les requirements avant envoi
+        if (!validateAllRequirements()) {
+            const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
+            if (firstErrorKey) {
+                const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
+                if (m) {
+                    const idx = Number(m[1]);
+                    const el = document.getElementById(`cost-card-${idx}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            return;
+        }
+    }
 
     // 1) Construire l'objet à poster
     form.costs = selectedCosts.value.map((cost, index) => {
@@ -300,21 +336,7 @@ const submit = () => {
         };
     });
 
-    // 2) Valider les requirements avant envoi
-    if (!validateAllRequirements()) {
-        const firstErrorKey = Object.keys(form.errors).find((k) => k.includes('.requirements.'));
-        if (firstErrorKey) {
-            const m = firstErrorKey.match(/costs\.(\d+)\.requirements\./);
-            if (m) {
-                const idx = Number(m[1]);
-                const el = document.getElementById(`cost-card-${idx}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-        return;
-    }
-
-    // 3) Envoi
+    // 2) Envoi
     form.post(`/expense-sheet/${props.form.id}`, {
         preserveState: true,
         onSuccess: () => {
@@ -328,6 +350,8 @@ const submit = () => {
         transform: (data) => {
             const fd = new FormData();
             fd.append('department_id', form.department_id);
+            fd.append('is_draft', isDraft);
+
             if (form.target_user_id) {
                 fd.append('target_user_id', form.target_user_id);
             }
@@ -352,6 +376,12 @@ const submit = () => {
                     });
                 }
             });
+
+            // Debug: afficher tout le contenu du FormData
+            console.log('FormData contents:');
+            for (let pair of fd.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
 
             return fd;
         },

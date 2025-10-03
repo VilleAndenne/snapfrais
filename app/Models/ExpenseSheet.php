@@ -21,11 +21,13 @@ class ExpenseSheet extends Model
         'validated_at',
         'approved',
         'refusal_reason',
-        'created_by'
+        'created_by',
+        'is_draft'
     ];
 
     protected $casts = [
         'route' => 'array',
+        'is_draft' => 'boolean',
     ];
 
     protected $appends = [

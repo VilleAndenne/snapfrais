@@ -224,7 +224,7 @@
                     <td class="muted">Statut</td>
                     <td>
                         <span class="status">
-{{ $sheet->approved === 1 ? 'Approuvée' : ($sheet->approved === 0 ? 'Refusée' : 'En attente') }}
+{{ $sheet->is_draft ? 'Brouillon' : ($sheet->approved === 1 ? 'Approuvée' : ($sheet->approved === 0 ? 'Refusée' : 'En attente')) }}
                             </span>
                         @if(($sheet->approved == false || ($sheet->status ?? null) == 'Refusée') && !empty($sheet->refusal_reason))
                             <div class="small muted">Motif: {{ $sheet->refusal_reason }}</div>

@@ -11,11 +11,19 @@
 
                 <div class="flex items-center gap-2">
                     <div class="mr-2 flex items-center gap-2">
-                        <Button v-if="canApprove" variant="success" size="sm" @click="approveExpenseSheet">
+                        <Button v-if="expenseSheet.is_draft && canEdit" variant="default" size="sm" @click="submitDraft">
+                            <CheckIcon class="mr-1 h-4 w-4" />
+                            Soumettre le brouillon
+                        </Button>
+                        <Button v-if="expenseSheet.is_draft && canEdit" variant="outline" size="sm" @click="editExpenseSheet">
+                            <XIcon class="mr-1 h-4 w-4" />
+                            Modifier
+                        </Button>
+                        <Button v-if="!expenseSheet.is_draft && canApprove" variant="success" size="sm" @click="approveExpenseSheet">
                             <CheckIcon class="mr-1 h-4 w-4" />
                             Approuver
                         </Button>
-                        <Button v-if="canReject" variant="destructive" size="sm" @click="openRejectModal">
+                        <Button v-if="!expenseSheet.is_draft && canReject" variant="destructive" size="sm" @click="openRejectModal">
                             <XIcon class="mr-1 h-4 w-4" />
                             Rejeter
                         </Button>
@@ -346,6 +354,9 @@ const confirmReject = () => {
 };
 const approveExpenseSheet = () => {
     useForm({ approval: true }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
+};
+const submitDraft = () => {
+    useForm({}).post('/expense-sheet/' + props.expenseSheet.id + '/submit-draft');
 };
 const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');

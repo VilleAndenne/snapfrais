@@ -31,6 +31,7 @@ const props = defineProps<{
         route: string;
         total: number;
         approved: boolean | null;
+        is_draft: boolean;
         created_at: string;
         form: {
             name: string;
@@ -43,6 +44,7 @@ const props = defineProps<{
         route: string;
         total: number;
         approved: boolean | null;
+        is_draft: boolean;
         created_at: string;
         form: {
             name: string;
@@ -68,15 +70,16 @@ const searchQuery = ref('');
 const statusFilter = ref('all');
 
 // 🔁 Conversion approved → status
-const getStatusFromApproved = (approved: boolean | null): 'approved' | 'pending' | 'rejected' => {
+const getStatusFromApproved = (approved: boolean | null, isDraft: boolean): 'approved' | 'pending' | 'rejected' | 'draft' => {
+    if (isDraft) return 'draft';
     if (approved == true) return 'approved';
     if (approved == false) return 'rejected';
     return 'pending';
 };
 
 // ✅ Label + variant (Badge)
-const getStatusLabel = (sheet: { approved: boolean | null }) => {
-    const status = getStatusFromApproved(sheet.approved);
+const getStatusLabel = (sheet: { approved: boolean | null, is_draft: boolean }) => {
+    const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
     switch (status) {
         case 'approved':
             return { label: 'Approuvée', variant: 'success' };
@@ -84,14 +87,16 @@ const getStatusLabel = (sheet: { approved: boolean | null }) => {
             return { label: 'En attente', variant: 'warning' };
         case 'rejected':
             return { label: 'Rejetée', variant: 'destructive' };
+        case 'draft':
+            return { label: 'Brouillon', variant: 'secondary' };
         default:
             return { label: 'Inconnu', variant: 'default' };
     }
 };
 
 // ✅ Icône correspondante
-const getStatusIcon = (approved: boolean | null) => {
-    const status = getStatusFromApproved(approved);
+const getStatusIcon = (approved: boolean | null, isDraft: boolean) => {
+    const status = getStatusFromApproved(approved, isDraft);
     switch (status) {
         case 'approved':
             return CheckCircle;
@@ -99,6 +104,8 @@ const getStatusIcon = (approved: boolean | null) => {
             return Clock;
         case 'rejected':
             return AlertTriangle;
+        case 'draft':
+            return FileText;
         default:
             return FileText;
     }
@@ -107,7 +114,7 @@ const getStatusIcon = (approved: boolean | null) => {
 const filteredExpenseSheets = computed(() => {
     return props.expenseSheets.filter(sheet => {
         const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const status = getStatusFromApproved(sheet.approved);
+        const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
         const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
         return matchesSearch && matchesStatus;
     });
@@ -116,7 +123,7 @@ const filteredExpenseSheets = computed(() => {
 const filteredExpenseToValidate = computed(() => {
     return props.expenseToValidate.filter(sheet => {
         const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const status = getStatusFromApproved(sheet.approved);
+        const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
         const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
         return matchesSearch && matchesStatus;
     });
@@ -227,14 +234,14 @@ const approveExpenseSheet = (id: number) => {
                                 class="hover:bg-muted/50 transition-colors">
                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <!-- Exemple dans <component :is="..."> -->
-                                        <component :is="getStatusIcon(sheet.approved)"
-                                                   class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5"
+                                        <component :is="getStatusIcon(sheet.approved, sheet.is_draft)"
+                                                   class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5 "
                                                    :class="{
-             'text-warning': getStatusFromApproved(sheet.approved) === 'pending',
-             'text-success': getStatusFromApproved(sheet.approved) === 'approved',
-             'text-destructive': getStatusFromApproved(sheet.approved) === 'rejected',
-             'text-muted-foreground': sheet.approved === undefined
+             'text-warning': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'pending',
+             'text-success': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'approved',
+             'text-destructive': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'rejected',
+             'text-secondary': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'draft',
+             'text-muted-foreground': sheet.approved === undefined && !sheet.is_draft
            }" />
 
                                         <span class="text-xs sm:text-sm font-medium text-card-foreground">{{ sheet.form.name
@@ -316,13 +323,14 @@ const approveExpenseSheet = (id: number) => {
                                 class="hover:bg-secondary/10 transition-colors">
                                 <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <component :is="getStatusIcon(sheet.status)"
+                                        <component :is="getStatusIcon(sheet.approved, sheet.is_draft)"
                                                    class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5"
                                                    :class="{
-                                  'text-warning': sheet.status === 'pending',
-                                  'text-success': sheet.status === 'approved',
-                                  'text-destructive': sheet.status === 'rejected',
-                                  'text-muted-foreground': !sheet.status
+                                  'text-warning': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'pending',
+                                  'text-success': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'approved',
+                                  'text-destructive': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'rejected',
+                                  'text-secondary': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'draft',
+                                  'text-muted-foreground': sheet.approved === undefined && !sheet.is_draft
                                 }" />
                                         <span class="text-xs sm:text-sm font-medium text-foreground">{{ sheet.form.name }}</span>
                                     </div>
