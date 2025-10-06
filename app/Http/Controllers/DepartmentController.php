@@ -138,7 +138,7 @@ class DepartmentController extends Controller
     public
     function destroy(string $id)
     {
-        if (!auth()->user()->can('destroy', Department::findOrFail($id))) {
+        if (!auth()->user()->can('delete', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         Department::destroy($id);

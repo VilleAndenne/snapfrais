@@ -2,7 +2,7 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Modifier le formulaire" />
 
-        <div class="container mx-auto p-4">
+        <div class="container p-4">
             <Card class="w-full">
                 <CardHeader>
                     <CardTitle>Modifier le formulaire</CardTitle>
