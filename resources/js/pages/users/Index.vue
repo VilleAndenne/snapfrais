@@ -1,72 +1,73 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+        <Head title="Utilisateurs" />
 
-            <Head title="Utilisateurs" />
-
-            <!-- En-tête avec titre et bouton d'ajout -->
-            <div class="flex items-center justify-between mb-4">
+        <div class="p-4">
+            <!-- Header -->
+            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 class="text-2xl font-semibold tracking-tight">Utilisateurs</h2>
-                <Button @click="addUser" class="flex items-center">
-                    <PlusIcon class="mr-2 h-4 w-4" />
-                    Ajouter un utilisateur
-                </Button>
-            </div>
+                <div class="flex items-center gap-2">
+                    <Input
+                        v-model="filters.search"
+                        placeholder="Rechercher par nom ou email..."
+                        class="w-[260px]"
+                    >
+                        <template #leading>
+                            <SearchIcon class="h-4 w-4 text-muted-foreground" />
+                        </template>
+                    </Input>
+                    <Button @click="addUser">
+                        <PlusIcon class="h-4 w-4 mr-2" />
+                        Ajouter
+                    </Button>
+                </div>
+            </header>
 
-            <!-- Barre de recherche -->
-            <div class="mb-4">
-                <form @submit.prevent="search">
-                    <div class="flex gap-2">
-                        <Input
-                            v-model="filters.search"
-                            placeholder="Rechercher par nom ou email..."
-                            class="max-w-sm"
-                        />
-                        <Button type="submit">Rechercher</Button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="w-full">
+            <Card>
                 <Table>
-                    <TableCaption>Une liste des utilisateurs.</TableCaption>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nom</TableHead>
                             <TableHead>Email</TableHead>
-                            <TableHead class="text-right">Actions</TableHead>
+                            <TableHead class="w-[100px] text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
+
                     <TableBody>
                         <TableRow v-for="user in users.data" :key="user.id">
                             <TableCell class="font-medium">{{ user.name }}</TableCell>
                             <TableCell>{{ user.email }}</TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-2">
-                                    <Link :href="'/users/' + user.id + '/edit'">
-                                        <Button variant="outline" size="sm">
-                                            Modifier
-                                        </Button>
-                                    </Link>
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        @click="confirmDelete(user)"
-                                    >
-                                        Supprimer
+                                    <Button variant="ghost" size="icon" @click="editUser(user.id)">
+                                        <PencilIcon class="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" @click="confirmDelete(user)">
+                                        <TrashIcon class="h-4 w-4 text-destructive" />
                                     </Button>
                                 </div>
                             </TableCell>
                         </TableRow>
+
                         <TableRow v-if="users.data.length === 0">
-                            <TableCell colspan="3" class="text-center">Pas d'utilisateur trouvé.</TableCell>
+                            <TableCell colspan="3" class="h-24 text-center">
+                                Pas d'utilisateur trouvé.
+                            </TableCell>
                         </TableRow>
                     </TableBody>
+
+                    <TableFooter v-if="users.total > 0">
+                        <TableRow>
+                            <TableCell colspan="3">
+                                Total: {{ users.total }} utilisateur{{ users.total > 1 ? 's' : '' }}
+                            </TableCell>
+                        </TableRow>
+                    </TableFooter>
                 </Table>
-            </div>
+            </Card>
 
             <!-- Pagination -->
-            <div class="mt-4 flex items-center justify-between">
+            <div class="mt-4 flex items-center justify-between" v-if="users.total > 0">
                 <div class="text-sm text-muted-foreground">
                     Affichage de {{ users.from }} à {{ users.to }} sur {{ users.total }} utilisateurs
                 </div>
@@ -89,68 +90,113 @@
                     </Button>
                 </div>
             </div>
+
+            <!-- Modal de confirmation de suppression -->
+            <AlertDialog v-model:open="showDeleteDialog">
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer cet utilisateur ?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Cette action ne peut pas être annulée. L'utilisateur "{{ userToDelete?.name }}" sera définitivement supprimé.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <Button variant="outline" @click="showDeleteDialog = false">Annuler</Button>
+                        <Button variant="destructive" @click="deleteUser" :disabled="isDeleting">
+                            <LoaderIcon v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
+                            Supprimer
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue'
+import { Head, usePage, router } from '@inertiajs/vue3'
+import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon } from 'lucide-vue-next'
+
+// shadcn/ui
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
 import {
     Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableHead,
     TableHeader,
-    TableRow
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import AppLayout from '@/layouts/AppLayout.vue';
-import Heading from '@/components/Heading.vue';
-import { usePage } from '@inertiajs/vue3';
-import { PlusIcon } from 'lucide-vue-next';
+    TableBody,
+    TableFooter,
+    TableHead,
+    TableRow,
+    TableCell
+} from '@/components/ui/table'
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter
+} from '@/components/ui/alert-dialog'
 
-const pageCtx = usePage();
+import AppLayout from '@/layouts/AppLayout.vue'
 
-// ✅ users reste synchronisé avec les props Inertia après chaque navigation
-const users = computed(() => pageCtx.props.users)
+const page = usePage()
 
-const filters = ref({ search: pageCtx.props.filters?.search ?? '' })
+// Props via Inertia (pagination-friendly)
+const users = computed(() => page.props.users)
+const initialSearch = page.props.filters?.search ?? ''
+
+// UI State
+const filters = ref({ search: initialSearch })
+const showDeleteDialog = ref(false)
+const userToDelete = ref(null)
+const isDeleting = ref(false)
 
 const breadcrumbs = [
-    {
-        title: 'Utilisateurs',
-        href: '/users'
-    }
-];
+    { title: 'Utilisateurs', href: route('users.index') }
+]
 
-// Fonction pour ajouter un utilisateur
+// Actions
 const addUser = () => {
-    router.visit('/users/create');
-};
+    router.visit(route('users.create'))
+}
 
-// Fonction pour la recherche
-const search = () => {
-    router.get('/users', filters.value, {
+const editUser = (id) => {
+    router.visit(route('users.edit', id))
+}
+
+// Recherche automatique à la frappe
+watch(() => filters.value.search, (val) => {
+    router.get(route('users.index'), { search: val, page: 1 }, {
         preserveState: true,
         replace: true
-    });
-};
-
-// Fonction pour la pagination
+    })
+})
 const goToPage = (targetPage) => {
-    router.get('/users', { ...filters.value, page: targetPage }, {
+    router.get(route('users.index'), { search: filters.value.search, page: targetPage }, {
         preserveState: true,
         replace: true
     })
 }
 
-// Fonction pour confirmer la suppression
 const confirmDelete = (user) => {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${user.name} ?`)) {
-        router.delete(`/users/${user.id}`);
-    }
-};
+    userToDelete.value = user
+    showDeleteDialog.value = true
+}
+
+const deleteUser = () => {
+    if (!userToDelete.value) return
+    isDeleting.value = true
+    router.delete(route('users.destroy', userToDelete.value.id), {
+        onSuccess: () => {
+            showDeleteDialog.value = false
+            userToDelete.value = null
+        },
+        onFinish: () => {
+            isDeleting.value = false
+        }
+    })
+}
 </script>

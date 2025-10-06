@@ -1,8 +1,8 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Départements" />
-        <div class="p-6 space-y-6">
-            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="p-4">
+            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 class="text-2xl font-semibold tracking-tight">Départements</h2>
                 <div class="flex items-center gap-2">
                     <Input
