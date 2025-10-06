@@ -119,6 +119,6 @@ class ExpenseSheetPolicy
     public function destroy(User $user, ExpenseSheet $expenseSheet)
     {
         // Seul un administrateur peut supprimer une note de frais
-        return $user->is_admin == true;
+        return $user->is_admin == true OR ($expenseSheet->user_id === $user->id && $expenseSheet->is_draft);
     }
 }
