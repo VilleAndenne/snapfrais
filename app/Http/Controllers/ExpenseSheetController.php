@@ -60,7 +60,7 @@ class ExpenseSheetController extends Controller
     public function store(Request $request, $id)
     {
         $validated = $request->validate([
-            'costs' => 'required|array|max:7',
+            'costs' => 'required|array|max:30',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
             'costs.*.date' => 'required|date',
@@ -378,7 +378,7 @@ class ExpenseSheetController extends Controller
         }
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
-            'costs' => 'required|array|max:7',
+            'costs' => 'required|array|max:30',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
             'costs.*.date' => 'required|date',
