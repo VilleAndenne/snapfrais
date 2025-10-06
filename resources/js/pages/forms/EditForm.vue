@@ -24,7 +24,7 @@
                                 </p>
                             </div>
 
-                            <div class="space-y-2">
+                            <div class="space-y-2">,,
                                 <Label for="description">Description</Label>
                                 <Textarea id="description" v-model="form.description" rows="3"
                                           :class="{ 'border-destructive': form.errors?.description }" />

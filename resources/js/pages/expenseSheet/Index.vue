@@ -223,74 +223,116 @@ const breadcrumbs = [
                 </Badge>
             </div>
 
-            <!-- Tableau -->
-            <div class="overflow-x-auto border rounded-xl">
+            <!-- Vue Mobile (cartes) - visible uniquement sur mobile -->
+            <div class="md:hidden space-y-3">
+                <Link
+                    v-for="sheet in filteredExpenseSheets"
+                    :key="sheet.id"
+                    :href="'/expense-sheet/' + sheet.id"
+                    class="block"
+                >
+                    <div class="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
+                        <!-- Header de la carte -->
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 flex-1 min-w-0">
+                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0 mt-0.5" />
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-medium text-sm truncate">{{ sheet.form.name }}</h3>
+                                    <p class="text-xs text-muted-foreground">{{ sheet.user?.name || 'Inconnu' }}</p>
+                                </div>
+                            </div>
+                            <Badge :variant="getStatusLabel(sheet).variant" class="text-xs flex-shrink-0">
+                                {{ getStatusLabel(sheet).label }}
+                            </Badge>
+                        </div>
+
+                        <!-- Informations -->
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="text-muted-foreground">Département</span>
+                                <span class="font-medium">{{ sheet.department?.name || 'Inconnu' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-muted-foreground">Montant</span>
+                                <span class="font-semibold text-sm">{{ sheet.total }} €</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-muted-foreground">Date de création</span>
+                                <div class="flex items-center gap-1">
+                                    <Calendar class="h-3 w-3" />
+                                    <span>{{ formatDate(sheet.created_at) }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bouton d'action -->
+                        <div class="pt-2 border-t">
+                            <button class="w-full px-3 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium transition-colors">
+                                Voir les détails
+                            </button>
+                        </div>
+                    </div>
+                </Link>
+
+                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
+                    <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
+                </div>
+            </div>
+
+            <!-- Vue Desktop (tableau) - visible sur tablette et + -->
+            <div class="hidden md:block overflow-x-auto border rounded-xl">
                 <table class="min-w-full divide-y">
                     <thead class="bg-muted">
                     <tr>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Type</th>
-                        <th class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Demandeur</th>
-                        <th class="hidden md:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Service</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Montant (€)</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Statut</th>
-                        <th class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs uppercase">Créé le</th>
-                        <th class="px-3 sm:px-6 py-2 sm:py-3 text-right text-xs uppercase">Actions</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Type</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Demandeur</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Service</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Montant (€)</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Statut</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Créé le</th>
+                        <th class="px-4 lg:px-6 py-3 text-right text-xs uppercase">Actions</th>
                     </tr>
                     </thead>
                     <tbody class="divide-y">
                     <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
-                        <td class="px-3 sm:px-6 py-2 sm:py-4">
-                            <div class="flex items-center">
-                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="mr-1 sm:mr-2 h-4 sm:h-5 w-4 sm:w-5" />
-                                <span class="text-xs sm:text-sm font-medium">{{ sheet.form.name }}</span>
+                        <td class="px-4 lg:px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0" />
+                                <span class="text-sm font-medium">{{ sheet.form.name }}</span>
                             </div>
                         </td>
-                        <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">{{ sheet.user?.name || 'Inconnu' }}</td>
-                        <td class="hidden md:table-cell px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">{{ sheet.department?.name || 'Inconnu' }}</td>
-                        <td class="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-semibold">{{ sheet.total }} €</td>
-                        <td class="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
+                        <td class="px-4 lg:px-6 py-4 text-sm">{{ sheet.user?.name || 'Inconnu' }}</td>
+                        <td class="px-4 lg:px-6 py-4 text-sm">{{ sheet.department?.name || 'Inconnu' }}</td>
+                        <td class="px-4 lg:px-6 py-4 text-sm font-semibold">{{ sheet.total }} €</td>
+                        <td class="px-4 lg:px-6 py-4">
                             <Badge :variant="getStatusLabel(sheet).variant" class="text-xs">
                                 {{ getStatusLabel(sheet).label }}
                             </Badge>
                         </td>
-                        <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">
-                            <div class="flex items-center">
-                                <Calendar class="mr-1 h-3 sm:h-4 w-3 sm:w-4" />
+                        <td class="px-4 lg:px-6 py-4 text-sm">
+                            <div class="flex items-center gap-1">
+                                <Calendar class="h-4 w-4" />
                                 {{ formatDate(sheet.created_at) }}
                             </div>
                         </td>
-                        <td class="px-3 sm:px-6 py-2 sm:py-4 text-right text-xs sm:text-sm">
+                        <td class="px-4 lg:px-6 py-4 text-right">
                             <Link :href="'/expense-sheet/' + sheet.id">
-                                <button class="px-2 sm:px-3 py-1 border rounded-md text-xs sm:text-sm">Voir</button>
+                                <button class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors">
+                                    Voir
+                                </button>
                             </Link>
                         </td>
                     </tr>
                     </tbody>
                 </table>
 
-                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-4 sm:p-6 text-muted-foreground">
-                    <FileText class="mx-auto h-8 sm:h-12 w-8 sm:w-12 mb-3 sm:mb-4" />
-                    <p class="text-xs sm:text-sm">Aucune note de frais trouvée selon vos critères.</p>
+                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground">
+                    <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
                 </div>
             </div>
         </div>
     </AppLayout>
 </template>
 
-<style scoped>
-/* Assurer que les tableaux sont responsifs */
-@media (max-width: 768px) {
-    table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-}
-
-/* Ajout d'une classe utilitaire pour les très petits écrans */
-@media (min-width: 480px) {
-    .xs\:flex-row {
-        flex-direction: row;
-    }
-}
-</style>

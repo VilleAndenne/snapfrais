@@ -2,21 +2,21 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Formulaires" />
 
-        <div class="p-4">
+        <div class="p-3 sm:p-4">
             <!-- Header -->
-            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-                <h2 class="text-2xl font-semibold tracking-tight">Formulaires</h2>
-                <div class="flex items-center gap-2">
+            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
+                <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Formulaires</h2>
+                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
                     <Input
                         v-model="filters.search"
                         placeholder="Rechercher un formulaire..."
-                        class="w-[260px]"
+                        class="w-full xs:w-[260px]"
                     >
                         <template #leading>
                             <SearchIcon class="h-4 w-4 text-muted-foreground" />
                         </template>
                     </Input>
-                    <Button @click="addForm">
+                    <Button @click="addForm" class="w-full xs:w-auto">
                         <PlusIcon class="h-4 w-4 mr-2" />
                         Ajouter
                     </Button>
@@ -24,57 +24,65 @@
             </header>
 
             <Card>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nom du formulaire</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead class="w-[120px] text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
+                <div class="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead class="text-xs sm:text-sm">Nom du formulaire</TableHead>
+                                <TableHead class="hidden sm:table-cell text-xs sm:text-sm">Description</TableHead>
+                                <TableHead class="w-[80px] sm:w-[120px] text-right text-xs sm:text-sm">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
 
-                    <TableBody>
-                        <TableRow v-for="form in currentRows" :key="form.id">
-                            <TableCell class="font-medium">{{ form.name }}</TableCell>
-                            <TableCell>{{ form.description }}</TableCell>
-                            <TableCell class="text-right">
-                                <div class="flex justify-end gap-2">
-                                    <Button variant="ghost" size="icon" @click="editForm(form.id)">
-                                        <PencilIcon class="h-4 w-4" />
+                        <TableBody>
+                            <TableRow v-for="form in currentRows" :key="form.id">
+                                <TableCell class="font-medium text-xs sm:text-sm">
+                                    <div class="flex flex-col">
+                                        <span>{{ form.name }}</span>
+                                        <span class="sm:hidden text-xs text-muted-foreground line-clamp-2">{{ form.description }}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell class="hidden sm:table-cell text-xs sm:text-sm">{{ form.description }}</TableCell>
+                                <TableCell class="text-right">
+                                <div class="flex justify-end gap-1 sm:gap-2">
+                                    <Button variant="ghost" size="icon" @click="editForm(form.id)" class="h-8 w-8 sm:h-10 sm:w-10">
+                                        <PencilIcon class="h-3 w-3 sm:h-4 sm:w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" @click="confirmDelete(form)">
-                                        <TrashIcon class="h-4 w-4 text-destructive" />
+                                    <Button variant="ghost" size="icon" @click="confirmDelete(form)" class="h-8 w-8 sm:h-10 sm:w-10">
+                                        <TrashIcon class="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
                                     </Button>
                                 </div>
                             </TableCell>
                         </TableRow>
 
                         <TableRow v-if="currentRows.length === 0">
-                            <TableCell colspan="3" class="h-24 text-center">Pas de formulaire trouvé.</TableCell>
+                            <TableCell colspan="3" class="h-20 sm:h-24 text-center text-xs sm:text-sm">Pas de formulaire trouvé.</TableCell>
                         </TableRow>
                     </TableBody>
 
                     <TableFooter v-if="totalCount > 0">
                         <TableRow>
-                            <TableCell colspan="3">
+                            <TableCell colspan="3" class="text-xs sm:text-sm">
                                 Total: {{ totalCount }} formulaire{{ totalCount > 1 ? 's' : '' }}
                             </TableCell>
                         </TableRow>
                     </TableFooter>
                 </Table>
+                </div>
             </Card>
 
             <!-- Pagination (affichée uniquement si pagination serveur) -->
-            <div v-if="isPaginated && totalCount > 0" class="mt-4 flex items-center justify-between">
-                <div class="text-sm text-muted-foreground">
+            <div v-if="isPaginated && totalCount > 0" class="mt-3 sm:mt-4 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2">
+                <div class="text-xs sm:text-sm text-muted-foreground">
                     Affichage de {{ meta.from }} à {{ meta.to }} sur {{ meta.total }} formulaires
                 </div>
-                <div class="flex gap-1">
+                <div class="flex gap-1 sm:gap-2 w-full xs:w-auto">
                     <Button
                         variant="outline"
                         size="sm"
                         :disabled="!meta.prev_page_url"
                         @click="goToPage(meta.current_page - 1)"
+                        class="flex-1 xs:flex-initial text-xs sm:text-sm"
                     >
                         Précédent
                     </Button>
@@ -83,6 +91,7 @@
                         size="sm"
                         :disabled="!meta.next_page_url"
                         @click="goToPage(meta.current_page + 1)"
+                        class="flex-1 xs:flex-initial text-xs sm:text-sm"
                     >
                         Suivant
                     </Button>
@@ -91,16 +100,16 @@
 
             <!-- Modal de confirmation de suppression -->
             <AlertDialog v-model:open="showDeleteDialog">
-                <AlertDialogContent>
+                <AlertDialogContent class="max-w-[90vw] sm:max-w-md">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer ce formulaire ?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogTitle class="text-base sm:text-lg">Supprimer ce formulaire ?</AlertDialogTitle>
+                        <AlertDialogDescription class="text-xs sm:text-sm">
                             Cette action est irréversible. Le formulaire "{{ formToDelete?.name }}" sera définitivement supprimé.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <Button variant="outline" @click="showDeleteDialog = false">Annuler</Button>
-                        <Button variant="destructive" @click="deleteForm" :disabled="isDeleting">
+                    <AlertDialogFooter class="flex-col xs:flex-row gap-2">
+                        <Button variant="outline" @click="showDeleteDialog = false" class="w-full xs:w-auto">Annuler</Button>
+                        <Button variant="destructive" @click="deleteForm" :disabled="isDeleting" class="w-full xs:w-auto">
                             <LoaderIcon v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
                             Supprimer
                         </Button>

@@ -1,31 +1,31 @@
 <template>
-    <div class="space-y-6">
+    <div class="space-y-4 sm:space-y-6">
         <!-- Départ -->
         <div>
-            <label class="block font-medium text-sm mb-1">Adresse de départ</label>
+            <label class="block font-medium text-xs sm:text-sm mb-1">Adresse de départ</label>
             <GoogleAddressInput v-model="departure" />
         </div>
 
         <!-- Étapes -->
         <div>
-            <label class="block font-medium text-sm mb-1">Étapes intermédiaires</label>
+            <label class="block font-medium text-xs sm:text-sm mb-1">Étapes intermédiaires</label>
             <div class="space-y-2">
                 <div v-for="(step, index) in steps" :key="index" class="flex items-center gap-2">
                     <GoogleAddressInput v-model="steps[index]" class="flex-1" />
-                    <Button variant="ghost" size="icon" @click="removeStep(index)">
-                        <Trash2Icon class="w-4 h-4 text-destructive" />
+                    <Button variant="ghost" size="icon" @click="removeStep(index)" class="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
+                        <Trash2Icon class="w-3 h-3 sm:w-4 sm:h-4 text-destructive" />
                     </Button>
                 </div>
             </div>
-            <Button variant="outline" size="sm" class="mt-2" @click="addStep">
-                <PlusIcon class="w-4 h-4 mr-1" />
+            <Button variant="outline" size="sm" class="mt-2 w-full xs:w-auto text-xs sm:text-sm" @click="addStep">
+                <PlusIcon class="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                 Ajouter une étape
             </Button>
         </div>
 
         <!-- Arrivée -->
         <div>
-            <label class="block font-medium text-sm mb-1">Adresse d’arrivée</label>
+            <label class="block font-medium text-xs sm:text-sm mb-1">Adresse d'arrivée</label>
             <GoogleAddressInput v-model="arrival" />
         </div>
     </div>
