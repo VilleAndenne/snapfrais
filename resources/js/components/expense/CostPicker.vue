@@ -9,10 +9,10 @@ const props = defineProps({
 const emit = defineEmits(['add'])
 
 const addCost = (cost) => {
-  if (props.selectedCosts.length < 7) {
+  if (props.selectedCosts.length < 30) {
     emit('add', JSON.parse(JSON.stringify(cost))) // Clone pour éviter les mutations
   } else {
-    alert("Vous avez atteint le maximum de 7 coûts pour une demande.")
+    alert("Vous avez atteint le maximum de 30 coûts pour une demande.")
   }
 }
 </script>
