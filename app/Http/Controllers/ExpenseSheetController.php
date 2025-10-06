@@ -25,7 +25,7 @@ class ExpenseSheetController extends Controller
      */
     public function index()
     {
-        $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+        $expenseSheets = ExpenseSheet::with(['form', 'costs', 'department.heads', 'user'])
             ->orderBy('created_at', 'desc')
             ->get()
             ->filter(fn($expenseSheet) => auth()->user()->can('view', $expenseSheet))

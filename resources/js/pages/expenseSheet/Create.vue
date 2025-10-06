@@ -2,8 +2,8 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Nouvelle note de frais" />
 
-        <div class="container mx-auto space-y-6 p-4">
-            <h1 class="text-2xl font-semibold text-foreground">Créer une note de frais</h1>
+        <div class="container mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
+            <h1 class="text-xl sm:text-2xl font-semibold text-foreground">Créer une note de frais</h1>
 
             <!-- Sélection du département -->
             <div class="flex flex-col space-y-2">
@@ -42,39 +42,39 @@
             </div>
 
             <!-- Coûts ajoutés -->
-            <div v-if="selectedCosts.length" class="space-y-6 border-t border-border pt-6">
-                <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
+            <div v-if="selectedCosts.length" class="space-y-4 sm:space-y-6 border-t border-border pt-4 sm:pt-6">
+                <h2 class="text-base sm:text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
                     :id="`cost-card-${index}`"
-                    class="relative space-y-4 rounded border border-border bg-card p-4 text-card-foreground"
+                    class="relative space-y-3 sm:space-y-4 rounded border border-border bg-card p-3 sm:p-4 text-card-foreground"
                 >
                     <!-- Boutons d'action -->
-                    <div class="absolute right-2 top-2 flex gap-2">
-                        <Button variant="ghost" size="icon" class="text-primary" @click="openDuplicateDialog(index)">
-                            <CopyIcon class="h-5 w-5" />
+                    <div class="absolute right-2 top-2 flex gap-1 sm:gap-2">
+                        <Button variant="ghost" size="icon" class="h-8 w-8 sm:h-10 sm:w-10 text-primary" @click="openDuplicateDialog(index)">
+                            <CopyIcon class="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
-                        <Button variant="ghost" size="icon" class="text-destructive" @click="removeCost(index)">
-                            <Trash2Icon class="h-5 w-5" />
+                        <Button variant="ghost" size="icon" class="h-8 w-8 sm:h-10 sm:w-10 text-destructive" @click="removeCost(index)">
+                            <Trash2Icon class="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
                     </div>
 
                     <!-- Détails du coût -->
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-bold">{{ cost.name }}</h3>
-                        <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
+                    <div class="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 pr-20 xs:pr-24">
+                        <h3 class="text-lg sm:text-xl font-bold">{{ cost.name }}</h3>
+                        <span class="text-xs sm:text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
-                    <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
+                    <p class="text-xs sm:text-sm text-muted-foreground">{{ cost.description }}</p>
 
                     <!-- Champ de date -->
                     <div class="mt-2">
-                        <Label for="cost-date" class="text-sm">Date du coût</Label>
+                        <Label for="cost-date" class="text-xs sm:text-sm">Date du coût</Label>
                         <input
                             type="date"
                             v-model="costData[index].date"
-                            class="w-full rounded border border-border bg-background p-2 text-foreground"
+                            class="w-full rounded border border-border bg-background p-1.5 sm:p-2 text-sm sm:text-base text-foreground"
                             @change="updateRate(index, cost)"
                         />
                         <span v-if="form.errors[`costs.${index}.date`]" class="text-sm text-red-600">
@@ -89,8 +89,8 @@
                             :travel_mode="getActiveTransport(cost, costData[index].date) === 'bike' ? 'BICYCLING' : 'DRIVING'"
                         />
                         <!-- Résumé remboursement km -->
-                        <div class="mt-3 rounded border border-border bg-muted/40 p-3">
-                            <div class="flex flex-col gap-x-4 gap-y-2 text-sm">
+                        <div class="mt-3 rounded border border-border bg-muted/40 p-2 sm:p-3">
+                            <div class="flex flex-col gap-x-4 gap-y-1.5 sm:gap-y-2 text-xs sm:text-sm">
                                 <span class="font-medium">Estimation</span>
                                 <span
                                     >• Mode :
@@ -133,38 +133,40 @@
 
             <!-- Coûts disponibles -->
             <div>
-                <h2 class="mb-2 text-lg font-medium text-foreground">Types de coûts disponibles</h2>
-                <p class="mb-4 text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/30</p>
+                <h2 class="mb-2 text-base sm:text-lg font-medium text-foreground">Types de coûts disponibles</h2>
+                <p class="mb-3 sm:mb-4 text-xs sm:text-sm text-muted-foreground">Coûts ajoutés : {{ selectedCosts.length }}/30</p>
                 <CostPicker :available-costs="costs" :selected-costs="selectedCosts" @add="addToRequest" />
             </div>
 
             <!-- Boutons d'envoi -->
-            <div class="flex justify-end gap-3 pt-8">
-                <Button @click="saveDraft" :disabled="!selectedCosts.length || form.processing" variant="outline">
+            <div class="flex flex-col xs:flex-row justify-end gap-2 sm:gap-3 pt-6 sm:pt-8">
+                <Button @click="saveDraft" :disabled="!selectedCosts.length || form.processing" variant="outline" class="w-full xs:w-auto">
                     <Loader2Icon v-if="form.processing && isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
-                    {{ form.processing && isDraftSubmit ? 'Enregistrement...' : 'Enregistrer en brouillon' }}
+                    <span class="hidden sm:inline">{{ form.processing && isDraftSubmit ? 'Enregistrement...' : 'Enregistrer en brouillon' }}</span>
+                    <span class="sm:hidden">{{ form.processing && isDraftSubmit ? 'Enregistrement...' : 'Brouillon' }}</span>
                 </Button>
-                <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
+                <Button @click="submit" :disabled="!selectedCosts.length || form.processing" class="w-full xs:w-auto">
                     <Loader2Icon v-if="form.processing && !isDraftSubmit" class="mr-2 h-4 w-4 animate-spin" />
-                    {{ form.processing && !isDraftSubmit ? 'Envoi en cours...' : 'Envoyer la demande' }}
+                    <span class="hidden sm:inline">{{ form.processing && !isDraftSubmit ? 'Envoi en cours...' : 'Envoyer la demande' }}</span>
+                    <span class="sm:hidden">{{ form.processing && !isDraftSubmit ? 'Envoi...' : 'Envoyer' }}</span>
                 </Button>
             </div>
         </div>
 
         <!-- Modal de duplication -->
         <Dialog v-model:open="duplicateDialog.isOpen">
-            <DialogContent>
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Dupliquer le coût</DialogTitle>
-                    <DialogDescription> Combien de copies de "{{ duplicateDialog.costName }}" voulez-vous créer ? </DialogDescription>
+                    <DialogTitle class="text-base sm:text-lg">Dupliquer le coût</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm"> Combien de copies de "{{ duplicateDialog.costName }}" voulez-vous créer ? </DialogDescription>
                 </DialogHeader>
-                <div class="py-4">
-                    <Label for="duplicate-count">Nombre de copies</Label>
+                <div class="py-3 sm:py-4">
+                    <Label for="duplicate-count" class="text-xs sm:text-sm">Nombre de copies</Label>
                     <Input id="duplicate-count" type="number" min="1" max="20" v-model.number="duplicateDialog.count" class="mt-2" />
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" @click="duplicateDialog.isOpen = false">Annuler</Button>
-                    <Button @click="confirmDuplicate">Dupliquer</Button>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="duplicateDialog.isOpen = false" class="w-full xs:w-auto">Annuler</Button>
+                    <Button @click="confirmDuplicate" class="w-full xs:w-auto">Dupliquer</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

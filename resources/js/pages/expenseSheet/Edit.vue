@@ -2,8 +2,8 @@
     <AppLayout>
         <Head title="Modifier la note de frais" />
 
-        <div class="container mx-auto p-4 space-y-6">
-            <h1 class="text-2xl font-semibold">Modifier la note de frais</h1>
+        <div class="container mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+            <h1 class="text-xl sm:text-2xl font-semibold">Modifier la note de frais</h1>
 
             <!-- Sélection du département -->
             <div class="flex flex-col space-y-2">
@@ -45,28 +45,28 @@
                 </span>
             </div>
 
-            <div v-if="selectedCosts.length" class="space-y-6 pt-6 border-t border-border">
-                <h2 class="text-lg font-medium text-foreground">Votre demande</h2>
+            <div v-if="selectedCosts.length" class="space-y-4 sm:space-y-6 pt-4 sm:pt-6 border-t border-border">
+                <h2 class="text-base sm:text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-4 border border-border rounded space-y-4 bg-card text-card-foreground relative"
+                    class="p-3 sm:p-4 border border-border rounded space-y-3 sm:space-y-4 bg-card text-card-foreground relative"
                 >
                     <Button
                         variant="ghost"
                         size="icon"
-                        class="absolute top-2 right-2 text-destructive"
+                        class="absolute top-2 right-2 h-8 w-8 sm:h-10 sm:w-10 text-destructive"
                         @click="removeCost(index)"
                     >
-                        <Trash2Icon class="w-5 h-5" />
+                        <Trash2Icon class="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
 
-                    <div class="flex justify-between items-center ">
-                        <h3 class="text-xl font-bold text-foreground">{{ cost.name }}</h3>
-                        <span class="text-sm italic text-muted-foreground">{{ cost.type }}</span>
+                    <div class="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-2 pr-12 xs:pr-14">
+                        <h3 class="text-lg sm:text-xl font-bold text-foreground">{{ cost.name }}</h3>
+                        <span class="text-xs sm:text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
-                    <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
+                    <p class="text-xs sm:text-sm text-muted-foreground">{{ cost.description }}</p>
 
                     <div v-if="cost.type === 'km'">
                         <KmCostInput v-model="costData[index].kmData" />
@@ -78,12 +78,12 @@
                         <PercentageCostInput v-model="costData[index].percentageData" />
                     </div>
 
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-foreground">Date du coût</label>
+                    <div class="mt-3 sm:mt-4">
+                        <label class="block text-xs sm:text-sm font-medium text-foreground">Date du coût</label>
                         <input
                             type="date"
                             v-model="costData[index].date"
-                            class="mt-1 block w-full rounded-md border-input bg-background text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            class="mt-1 block w-full rounded-md border-input bg-background text-foreground shadow-sm focus:border-primary focus:ring-primary text-sm"
                             required
                         />
                     </div>
@@ -98,8 +98,8 @@
             </div>
 
             <div>
-                <h2 class="text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
-                <p class="text-sm text-muted-foreground mb-4">
+                <h2 class="text-base sm:text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
+                <p class="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                     Coûts ajoutés : {{ selectedCosts.length }}/30
                 </p>
                 <CostPicker
@@ -109,10 +109,11 @@
                 />
             </div>
 
-            <div class="flex justify-end pt-8">
-                <Button @click="submit" :disabled="!selectedCosts.length || form.processing">
+            <div class="flex justify-end pt-6 sm:pt-8">
+                <Button @click="submit" :disabled="!selectedCosts.length || form.processing" class="w-full xs:w-auto">
                     <Loader2Icon v-if="form.processing" class="w-4 h-4 animate-spin mr-2" />
-                    {{ form.processing ? "Mise à jour en cours..." : "Mettre à jour la demande" }}
+                    <span class="hidden sm:inline">{{ form.processing ? "Mise à jour en cours..." : "Mettre à jour la demande" }}</span>
+                    <span class="sm:hidden">{{ form.processing ? "Mise à jour..." : "Mettre à jour" }}</span>
                 </Button>
             </div>
         </div>

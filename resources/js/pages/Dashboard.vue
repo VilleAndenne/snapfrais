@@ -207,8 +207,43 @@ const approveExpenseSheet = (id: number) => {
                     </Badge>
                 </div>
 
-                <div class="rounded-xl border border-border bg-card overflow-hidden">
-                    <div v-if="filteredExpenseSheets.length > 0" class="overflow-x-auto">
+                <!-- Vue Mobile (cartes) -->
+                <div v-if="filteredExpenseSheets.length > 0" class="md:hidden space-y-3">
+                    <div v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 flex-1 min-w-0">
+                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0 mt-0.5"
+                                           :class="{
+                                               'text-warning': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'pending',
+                                               'text-success': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'approved',
+                                               'text-destructive': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'rejected',
+                                               'text-secondary': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'draft'
+                                           }" />
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-medium text-sm truncate">{{ sheet.form.name }}</h3>
+                                    <p class="text-xs text-muted-foreground">{{ formatDate(sheet.created_at) }}</p>
+                                </div>
+                            </div>
+                            <Badge :variant="getStatusLabel(sheet).variant" class="text-xs flex-shrink-0">
+                                {{ getStatusLabel(sheet).label }}
+                            </Badge>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">Montant</span>
+                            <span class="font-semibold">{{ sheet.total }} €</span>
+                        </div>
+                        <div class="pt-2 border-t">
+                            <Link :href="'/expense-sheet/' + sheet.id" class="w-full px-3 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
+                                <Eye class="h-4 w-4" />
+                                Voir les détails
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vue Desktop (tableau) -->
+                <div v-if="filteredExpenseSheets.length > 0" class="hidden md:block rounded-xl border border-border bg-card overflow-hidden">
+                    <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-border">
                             <thead class="bg-muted">
                             <tr>
@@ -274,13 +309,15 @@ const approveExpenseSheet = (id: number) => {
                             </tbody>
                         </table>
                     </div>
-                    <div v-else class="flex flex-col items-center justify-center py-8 sm:py-12 px-4 text-center">
-                        <FileText class="h-8 sm:h-12 w-8 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
-                        <h3 class="text-base sm:text-lg font-medium text-card-foreground">Aucune note de frais</h3>
-                        <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-                            Vous n'avez pas encore créé de note de frais ou aucune ne correspond à vos filtres.
-                        </p>
-                    </div>
+                </div>
+
+                <!-- Message vide (visible sur mobile et desktop) -->
+                <div v-if="filteredExpenseSheets.length === 0" class="flex flex-col items-center justify-center py-8 sm:py-12 px-4 text-center border rounded-xl">
+                    <FileText class="h-8 sm:h-12 w-8 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                    <h3 class="text-base sm:text-lg font-medium text-card-foreground">Aucune note de frais</h3>
+                    <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
+                        Vous n'avez pas encore créé de note de frais ou aucune ne correspond à vos filtres.
+                    </p>
                 </div>
             </section>
 
@@ -293,8 +330,58 @@ const approveExpenseSheet = (id: number) => {
                     </Badge>
                 </div>
 
-                <div class="rounded-xl border border-secondary/50 bg-secondary/10 overflow-hidden">
-                    <div v-if="filteredExpenseToValidate.length > 0" class="overflow-x-auto">
+                <!-- Vue Mobile (cartes) -->
+                <div v-if="filteredExpenseToValidate.length > 0" class="md:hidden space-y-3">
+                    <div v-for="sheet in filteredExpenseToValidate" :key="sheet.id" class="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 flex-1 min-w-0">
+                                <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0 mt-0.5"
+                                           :class="{
+                                               'text-warning': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'pending',
+                                               'text-success': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'approved',
+                                               'text-destructive': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'rejected',
+                                               'text-secondary': getStatusFromApproved(sheet.approved, sheet.is_draft) === 'draft'
+                                           }" />
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-medium text-sm truncate">{{ sheet.form.name }}</h3>
+                                    <p class="text-xs text-muted-foreground">{{ sheet.user?.name || 'Utilisateur inconnu' }}</p>
+                                </div>
+                            </div>
+                            <Badge :variant="getStatusLabel(sheet).variant" class="text-xs flex-shrink-0">
+                                {{ getStatusLabel(sheet).label }}
+                            </Badge>
+                        </div>
+
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="text-muted-foreground">Montant</span>
+                                <span class="font-semibold">{{ sheet.total }} €</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-muted-foreground">Date de création</span>
+                                <div class="flex items-center gap-1">
+                                    <Calendar class="h-3 w-3" />
+                                    <span>{{ formatDate(sheet.created_at) }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 pt-2 border-t">
+                            <button @click="approveExpenseSheet(sheet.id)" class="flex-1 px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
+                                <CheckCircle class="h-4 w-4" />
+                                Valider
+                            </button>
+                            <Link :href="'/expense-sheet/' + sheet.id" class="flex-1 px-3 py-2 bg-accent text-accent-foreground hover:bg-accent/90 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
+                                <Eye class="h-4 w-4" />
+                                Voir
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vue Desktop (tableau) -->
+                <div v-if="filteredExpenseToValidate.length > 0" class="hidden md:block rounded-xl border border-secondary/50 bg-secondary/10 overflow-hidden">
+                    <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-secondary/20">
                             <thead class="bg-secondary/20">
                             <tr>
@@ -372,14 +459,15 @@ const approveExpenseSheet = (id: number) => {
                             </tbody>
                         </table>
                     </div>
-                    <div v-else class="flex flex-col items-center justify-center py-8 sm:py-12 px-4 text-center">
-                        <CheckCircle class="h-8 sm:h-12 w-8 sm:w-12 text-secondary mb-3 sm:mb-4" />
-                        <h3 class="text-base sm:text-lg font-medium text-foreground">Aucune note de frais à valider</h3>
-                        <p class="mt-1 text-xs sm:text-sm text-secondary-foreground/80">
-                            Vous n'avez pas de notes de frais en attente de validation ou aucune ne correspond à vos
-                            filtres.
-                        </p>
-                    </div>
+                </div>
+
+                <!-- Message vide -->
+                <div v-if="filteredExpenseToValidate.length === 0" class="flex flex-col items-center justify-center py-8 sm:py-12 px-4 text-center border rounded-xl">
+                    <CheckCircle class="h-8 sm:h-12 w-8 sm:w-12 text-secondary mb-3 sm:mb-4" />
+                    <h3 class="text-base sm:text-lg font-medium text-foreground">Aucune note de frais à valider</h3>
+                    <p class="mt-1 text-xs sm:text-sm text-secondary-foreground/80">
+                        Vous n'avez pas de notes de frais en attente de validation ou aucune ne correspond à vos filtres.
+                    </p>
                 </div>
             </section>
         </div>
@@ -394,31 +482,5 @@ const approveExpenseSheet = (id: number) => {
 
 .hover\:shadow-md:hover {
     transform: translateY(-2px);
-}
-
-/* Assurer que les tableaux sont responsifs */
-@media (max-width: 768px) {
-    table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-}
-
-/* Ajout d'une classe utilitaire pour les très petits écrans */
-@media (min-width: 480px) {
-    .xs\:inline {
-        display: inline;
-    }
-
-    .xs\:flex-row {
-        flex-direction: row;
-    }
-}
-
-@media (max-width: 479px) {
-    .hidden.xs\:inline {
-        display: none;
-    }
 }
 </style>

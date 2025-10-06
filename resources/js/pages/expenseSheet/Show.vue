@@ -2,33 +2,34 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`Note de frais #${expenseSheet.id}`" />
 
-        <div class="container mx-auto space-y-6 p-4">
-            <div class="flex items-start justify-between">
+        <div class="container mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
-                    <h1 class="text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
-                    <p class="text-sm text-muted-foreground">Créée le {{ formatDate(expenseSheet.created_at) }}</p>
+                    <h1 class="text-xl sm:text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
+                    <p class="text-xs sm:text-sm text-muted-foreground">Créée le {{ formatDate(expenseSheet.created_at) }}</p>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <div class="mr-2 flex items-center gap-2">
-                        <Button v-if="expenseSheet.is_draft && canEdit" variant="default" size="sm" @click="submitDraft">
-                            <CheckIcon class="mr-1 h-4 w-4" />
-                            Soumettre le brouillon
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <Button v-if="expenseSheet.is_draft && canEdit" variant="default" size="sm" @click="submitDraft" class="text-xs sm:text-sm">
+                            <CheckIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                            <span class="hidden xs:inline">Soumettre le brouillon</span>
+                            <span class="xs:hidden">Soumettre</span>
                         </Button>
-                        <Button v-if="expenseSheet.is_draft && canEdit" variant="outline" size="sm" @click="editExpenseSheet">
-                            <XIcon class="mr-1 h-4 w-4" />
+                        <Button v-if="expenseSheet.is_draft && canEdit" variant="outline" size="sm" @click="editExpenseSheet" class="text-xs sm:text-sm">
+                            <XIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Modifier
                         </Button>
-                        <Button v-if="!expenseSheet.is_draft && canApprove" variant="success" size="sm" @click="approveExpenseSheet">
-                            <CheckIcon class="mr-1 h-4 w-4" />
+                        <Button v-if="!expenseSheet.is_draft && canApprove" variant="success" size="sm" @click="approveExpenseSheet" class="text-xs sm:text-sm">
+                            <CheckIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Approuver
                         </Button>
-                        <Button v-if="!expenseSheet.is_draft && canReject" variant="destructive" size="sm" @click="openRejectModal">
-                            <XIcon class="mr-1 h-4 w-4" />
+                        <Button v-if="!expenseSheet.is_draft && canReject" variant="destructive" size="sm" @click="openRejectModal" class="text-xs sm:text-sm">
+                            <XIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Rejeter
                         </Button>
-                        <Button v-if="expenseSheet.approved == false && canDestroy" variant="destructive" size="sm" @click="openDeleteModal">
-                            <TrashIcon class="mr-1 h-4 w-4" />
+                        <Button v-if="expenseSheet.approved == false && canDestroy" variant="destructive" size="sm" @click="openDeleteModal" class="text-xs sm:text-sm">
+                            <TrashIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Supprimer
                         </Button>
                     </div>
@@ -60,17 +61,17 @@
             <!-- Bannière de refus -->
             <div
                 v-if="expenseSheet.approved == false"
-                class="flex items-start gap-3 rounded-lg border-l-4 border-destructive bg-gradient-to-r from-destructive/10 to-destructive/5 px-5 py-4 shadow-sm transition-all duration-200 hover:shadow-md"
+                class="flex flex-col sm:flex-row items-start gap-3 rounded-lg border-l-4 border-destructive bg-gradient-to-r from-destructive/10 to-destructive/5 px-3 sm:px-5 py-3 sm:py-4 shadow-sm transition-all duration-200 hover:shadow-md"
             >
-                <div class="flex-shrink-0 rounded-full bg-destructive/10 p-2">
-                    <AlertCircleIcon class="h-5 w-5 text-destructive" />
+                <div class="flex-shrink-0 rounded-full bg-destructive/10 p-1.5 sm:p-2">
+                    <AlertCircleIcon class="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
                 </div>
                 <div class="flex-1 space-y-1.5">
-                    <h3 class="flex items-center gap-2 font-medium text-destructive">
+                    <h3 class="flex items-center gap-2 font-medium text-destructive text-sm sm:text-base">
                         Note de frais refusée
                         <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive/70"></span>
                     </h3>
-                    <div class="space-y-1 text-sm text-destructive/90">
+                    <div class="space-y-1 text-xs sm:text-sm text-destructive/90">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Refusée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -81,8 +82,8 @@
                         </p>
                     </div>
                 </div>
-                <div v-if="canEdit" class="flex-shrink-0">
-                    <Button variant="outline" size="sm" @click="editExpenseSheet" class="border-destructive text-destructive hover:bg-destructive hover:text-white">
+                <div v-if="canEdit" class="flex-shrink-0 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" @click="editExpenseSheet" class="w-full sm:w-auto border-destructive text-destructive hover:bg-destructive hover:text-white text-xs sm:text-sm">
                         Modifier et resoumettre
                     </Button>
                 </div>
@@ -91,17 +92,17 @@
             <!-- Bannière approbation -->
             <div
                 v-if="expenseSheet.approved == true"
-                class="flex items-start gap-3 rounded-lg border-l-4 border-green-400 bg-green-100 px-5 py-4 text-green-800 shadow-sm transition-all duration-200 hover:shadow-md dark:border-green-700 dark:bg-green-900 dark:text-green-200"
+                class="flex items-start gap-3 rounded-lg border-l-4 border-green-400 bg-green-100 px-3 sm:px-5 py-3 sm:py-4 text-green-800 shadow-sm transition-all duration-200 hover:shadow-md dark:border-green-700 dark:bg-green-900 dark:text-green-200"
             >
-                <div class="flex-shrink-0 rounded-full bg-green-200 p-2 dark:bg-green-700">
-                    <CheckIcon class="h-5 w-5 text-green-600 dark:text-green-300" />
+                <div class="flex-shrink-0 rounded-full bg-green-200 p-1.5 sm:p-2 dark:bg-green-700">
+                    <CheckIcon class="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-300" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="flex items-center gap-2 font-medium">
+                    <h3 class="flex items-center gap-2 font-medium text-sm sm:text-base">
                         Note de frais approuvée
                         <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-600 dark:bg-green-300"></span>
                     </h3>
-                    <div class="space-y-1 text-sm">
+                    <div class="space-y-1 text-xs sm:text-sm">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Approuvée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -113,31 +114,31 @@
             <!-- Informations générales -->
             <Card class="bg-card text-card-foreground">
                 <CardHeader>
-                    <CardTitle>Informations générales</CardTitle>
+                    <CardTitle class="text-base sm:text-lg">Informations générales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
-                            <h3 class="text-sm font-medium text-muted-foreground">Demandeur</h3>
-                            <p class="mt-1 flex items-center">
-                                <Avatar class="mr-2 h-6 w-6">
-                                    <AvatarFallback>{{ getInitials(expenseSheet.user.name) }}</AvatarFallback>
+                            <h3 class="text-xs sm:text-sm font-medium text-muted-foreground">Demandeur</h3>
+                            <p class="mt-1 flex items-center text-sm sm:text-base">
+                                <Avatar class="mr-2 h-5 w-5 sm:h-6 sm:w-6">
+                                    <AvatarFallback class="text-xs">{{ getInitials(expenseSheet.user.name) }}</AvatarFallback>
                                 </Avatar>
                                 {{ expenseSheet.user.name }}
                             </p>
                         </div>
                         <div v-if="expenseSheet.user_id !== expenseSheet.created_by && expenseSheet.creator">
-                            <h3 class="text-sm font-medium text-muted-foreground">Encodeur</h3>
-                            <p class="mt-1 flex items-center">
-                                <Avatar class="mr-2 h-6 w-6">
-                                    <AvatarFallback>{{ getInitials(expenseSheet.creator.name) }}</AvatarFallback>
+                            <h3 class="text-xs sm:text-sm font-medium text-muted-foreground">Encodeur</h3>
+                            <p class="mt-1 flex items-center text-sm sm:text-base">
+                                <Avatar class="mr-2 h-5 w-5 sm:h-6 sm:w-6">
+                                    <AvatarFallback class="text-xs">{{ getInitials(expenseSheet.creator.name) }}</AvatarFallback>
                                 </Avatar>
                                 {{ expenseSheet.creator.name }}
                             </p>
                         </div>
                         <div>
-                            <h3 class="text-sm font-medium text-muted-foreground">Département</h3>
-                            <p class="mt-1">{{ expenseSheet.department?.name || 'Non spécifié' }}</p>
+                            <h3 class="text-xs sm:text-sm font-medium text-muted-foreground">Département</h3>
+                            <p class="mt-1 text-sm sm:text-base">{{ expenseSheet.department?.name || 'Non spécifié' }}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -146,35 +147,35 @@
             <!-- Détails des coûts -->
             <Card class="bg-card text-card-foreground">
                 <CardHeader>
-                    <CardTitle>Détails des coûts</CardTitle>
+                    <CardTitle class="text-base sm:text-lg">Détails des coûts</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="space-y-6">
-                        <div v-for="(cost, index) in expenseSheet.costs" :key="index" class="space-y-4 rounded border bg-background p-4">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-xl font-bold text-foreground">{{ cost.form_cost.name }}</h3>
-                                <div class="flex items-center gap-2">
+                    <div class="space-y-4 sm:space-y-6">
+                        <div v-for="(cost, index) in expenseSheet.costs" :key="index" class="space-y-3 sm:space-y-4 rounded border bg-background p-3 sm:p-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <h3 class="text-lg sm:text-xl font-bold text-foreground">{{ cost.form_cost.name }}</h3>
+                                <div class="flex flex-wrap items-center gap-2">
                                     <!-- Badge transport -->
-                                    <Badge variant="secondary" class="flex items-center gap-1">
-                                        <component :is="transportIcon(resolveTransport(cost))" class="h-3.5 w-3.5" />
+                                    <Badge variant="secondary" class="flex items-center gap-1 text-xs">
+                                        <component :is="transportIcon(resolveTransport(cost))" class="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                                         {{ transportLabel(resolveTransport(cost)) }}
                                     </Badge>
                                     <!-- Ancien texte -->
-                                    <span class="text-sm italic text-muted-foreground"> {{ getActiveRate(cost, cost.date) }} / {{ cost.type }} </span>
+                                    <span class="text-xs sm:text-sm italic text-muted-foreground"> {{ getActiveRate(cost, cost.date) }} / {{ cost.type }} </span>
                                 </div>
                             </div>
-                            <p class="text-sm text-muted-foreground">{{ cost.description }}</p>
+                            <p class="text-xs sm:text-sm text-muted-foreground">{{ cost.description }}</p>
 
                             <!-- Date du coût -->
-                            <div class="flex items-center gap-2">
-                                <h4 class="text-sm font-medium text-muted-foreground">Date du coût :</h4>
-                                <p>{{ formatDate(cost.date) }}</p>
+                            <div class="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2">
+                                <h4 class="text-xs sm:text-sm font-medium text-muted-foreground">Date du coût :</h4>
+                                <p class="text-sm sm:text-base">{{ formatDate(cost.date) }}</p>
                             </div>
 
                             <!-- Affichage route -->
                             <div v-if="cost.route" class="space-y-2">
-                                <h4 class="text-sm font-medium text-muted-foreground">Route :</h4>
-                                <ul class="list-disc pl-5">
+                                <h4 class="text-xs sm:text-sm font-medium text-muted-foreground">Route :</h4>
+                                <ul class="list-disc pl-4 sm:pl-5 text-xs sm:text-sm space-y-1">
                                     <li><span class="font-semibold">Départ :</span> {{ cost.route.departure }}</li>
                                     <li v-if="cost.route.steps && cost.route.steps.length > 0">
                                         <span class="font-semibold">Étapes :</span>
@@ -194,8 +195,8 @@
 
                             <!-- Requirements -->
                             <div v-if="cost.requirements" class="space-y-2">
-                                <h4 class="text-sm font-medium text-muted-foreground">Annexes :</h4>
-                                <ul class="list-disc pl-5">
+                                <h4 class="text-xs sm:text-sm font-medium text-muted-foreground">Annexes :</h4>
+                                <ul class="list-disc pl-4 sm:pl-5 text-xs sm:text-sm space-y-1">
                                     <li v-for="(requirement, key) in parseRequirements(cost.requirements)" :key="key" class="text-foreground">
                                         <span class="font-semibold">{{ key }} :</span>
                                         <span v-if="requirement.file">
@@ -221,14 +222,14 @@
                             </div>
 
                             <div v-if="cost.amount">
-                                <h4 class="text-sm font-medium text-muted-foreground">Montant payé :</h4>
-                                <p class="font-bold">{{ formatCurrency(cost.amount) }}</p>
+                                <h4 class="text-xs sm:text-sm font-medium text-muted-foreground">Montant payé :</h4>
+                                <p class="text-sm sm:text-base font-bold">{{ formatCurrency(cost.amount) }}</p>
                             </div>
 
                             <!-- Montant estimé -->
                             <div>
-                                <h4 class="text-sm font-medium text-muted-foreground">Montant dû estimé :</h4>
-                                <p class="font-bold">{{ formatCurrency(cost.total) }}</p>
+                                <h4 class="text-xs sm:text-sm font-medium text-muted-foreground">Montant dû estimé :</h4>
+                                <p class="text-sm sm:text-base font-bold">{{ formatCurrency(cost.total) }}</p>
                             </div>
                         </div>
                     </div>
@@ -238,38 +239,38 @@
 
         <!-- Modal rejet -->
         <Dialog :open="isRejectModalOpen" @update:open="isRejectModalOpen = $event">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Justification du refus</DialogTitle>
-                    <DialogDescription>Veuillez fournir une raison pour le refus.</DialogDescription>
+                    <DialogTitle class="text-base sm:text-lg">Justification du refus</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">Veuillez fournir une raison pour le refus.</DialogDescription>
                 </DialogHeader>
-                <div class="space-y-4 py-4">
+                <div class="space-y-3 sm:space-y-4 py-3 sm:py-4">
                     <div class="space-y-2">
-                        <Label for="rejection-reason">Motif du refus</Label>
+                        <Label for="rejection-reason" class="text-xs sm:text-sm">Motif du refus</Label>
                         <Textarea
                             id="rejection-reason"
                             v-model="rejectionReason"
                             placeholder="Veuillez expliquer pourquoi cette note de frais est rejetée..."
-                            class="min-h-[100px]"
+                            class="min-h-[80px] sm:min-h-[100px] text-sm"
                         />
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" @click="closeRejectModal">Annuler</Button>
-                    <Button variant="destructive" @click="confirmReject" :disabled="!rejectionReason.trim()">Confirmer le refus </Button>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="closeRejectModal" class="w-full xs:w-auto">Annuler</Button>
+                    <Button variant="destructive" @click="confirmReject" :disabled="!rejectionReason.trim()" class="w-full xs:w-auto">Confirmer le refus </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
         <Dialog :open="isDeleteModalOpen" @update:open="isDeleteModalOpen = $event">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Confirmation de supression</DialogTitle>
-                    <DialogDescription>Etes-vous sûr de vouloir supprimer cette note de frais ?</DialogDescription>
+                    <DialogTitle class="text-base sm:text-lg">Confirmation de suppression</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">Êtes-vous sûr de vouloir supprimer cette note de frais ?</DialogDescription>
                 </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" @click="closeDeleteModal">Annuler</Button>
-                    <Button variant="destructive" @click="confirmDelete">Supprimer</Button>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="closeDeleteModal" class="w-full xs:w-auto">Annuler</Button>
+                    <Button variant="destructive" @click="confirmDelete" class="w-full xs:w-auto">Supprimer</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
