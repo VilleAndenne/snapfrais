@@ -282,12 +282,13 @@ class ExpenseSheetController extends Controller
         $canApprove = auth()->user()->can('approve', $expenseSheet);
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
+        $canDestroy = auth()->user()->can('destroy', $expenseSheet);
         return Inertia::render('expenseSheet/Show', [
             'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy', 'creator']),
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canEdit' => $canEdit,
-            'canDestroy' => auth()->user()->can('destroy', $expenseSheet),
+            'canDestroy' => $canDestroy,
         ]);
     }
 

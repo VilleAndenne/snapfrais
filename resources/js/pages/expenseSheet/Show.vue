@@ -12,12 +12,12 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="flex flex-wrap items-center gap-2">
                         <Button v-if="expenseSheet.is_draft && canEdit" variant="default" size="sm" @click="submitDraft" class="text-xs sm:text-sm">
-                            <CheckIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                            <ArrowUp class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             <span class="hidden xs:inline">Soumettre le brouillon</span>
                             <span class="xs:hidden">Soumettre</span>
                         </Button>
-                        <Button v-if="expenseSheet.is_draft && canEdit" variant="outline" size="sm" @click="editExpenseSheet" class="text-xs sm:text-sm">
-                            <XIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                        <Button v-if="expenseSheet.is_draft && canEdit" variant="ghost" size="sm" @click="editExpenseSheet" class="text-xs sm:text-sm">
+                            <PencilIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Modifier
                         </Button>
                         <Button v-if="!expenseSheet.is_draft && canApprove" variant="success" size="sm" @click="approveExpenseSheet" class="text-xs sm:text-sm">
@@ -28,7 +28,7 @@
                             <XIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Rejeter
                         </Button>
-                        <Button v-if="expenseSheet.approved == false && canDestroy" variant="destructive" size="sm" @click="openDeleteModal" class="text-xs sm:text-sm">
+                        <Button v-if="canDestroy" variant="destructive" size="sm" @click="openDeleteModal" class="text-xs sm:text-sm">
                             <TrashIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Supprimer
                         </Button>
@@ -108,6 +108,33 @@
                             <span>{{ expenseSheet.validated_by.name }}</span>
                         </p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Bannière brouillon -->
+            <div
+                v-if="expenseSheet.is_draft"
+                class="flex flex-col sm:flex-row items-start gap-3 rounded-lg border-l-4 border-blue-400 bg-gradient-to-r from-blue-50 to-blue-25 px-3 sm:px-5 py-3 sm:py-4 shadow-sm transition-all duration-200 hover:shadow-md dark:border-blue-600 dark:from-blue-950/50 dark:to-blue-950/25"
+            >
+                <div class="flex-shrink-0 rounded-full bg-blue-100 p-1.5 sm:p-2 dark:bg-blue-900">
+                    <PencilIcon class="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div class="flex-1 space-y-1.5">
+                    <h3 class="flex items-center gap-2 font-medium text-blue-700 dark:text-blue-300 text-sm sm:text-base">
+                        Ceci est un brouillon
+                        <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600/70 dark:bg-blue-400/70"></span>
+                    </h3>
+                    <div class="space-y-1 text-xs sm:text-sm text-blue-600/90 dark:text-blue-400/90">
+                        <p>
+                            Cette note de frais n'a pas encore été soumise pour validation. Vous pouvez la modifier et la soumettre quand vous serez prêt.
+                        </p>
+                    </div>
+                </div>
+                <div v-if="canEdit" class="flex-shrink-0 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" @click="submitDraft" class="w-full sm:w-auto border-blue-400 text-blue-600 hover:bg-blue-600 hover:text-white dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-600 text-xs sm:text-sm">
+                        <ArrowUp class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                        Soumettre maintenant
+                    </Button>
                 </div>
             </div>
 
@@ -210,8 +237,8 @@
                                                 "
                                             >
                                                 <a :href="requirement.value" target="_blank" class="text-primary underline">{{
-                                                    requirement.value
-                                                }}</a>
+                                                        requirement.value
+                                                    }}</a>
                                             </template>
                                             <template v-else>
                                                 {{ requirement.value }}
@@ -294,6 +321,8 @@ import { formatCurrency, formatDate, getActiveRate, getStatusLabel } from '@/uti
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertCircleIcon,
+    PencilIcon,
+    ArrowUp,
     BikeIcon,
     CarIcon,
     CheckIcon,
