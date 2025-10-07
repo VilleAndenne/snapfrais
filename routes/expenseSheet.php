@@ -18,3 +18,4 @@ Route::delete('/expense-sheet/{id}', [ExpenseSheetController::class, 'destroy'])
 Route::get('/expense-sheets/{id}/pdf', [\App\Http\Controllers\ExpenseSheetController::class, 'generatePDF'])
     ->middleware(\App\Http\Middleware\AllowFrameSameOrigin::class)->middleware('auth')
     ->name('expenseSheets.pdf');
+Route::post('/expense-sheet/{id}/duplicate', [ExpenseSheetController::class, 'duplicate'])->name('expense-sheet.duplicate')->middleware('auth');

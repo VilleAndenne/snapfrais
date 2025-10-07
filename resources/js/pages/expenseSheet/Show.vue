@@ -43,6 +43,10 @@
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem @click="openDuplicateModal">
+                                <CopyIcon class="mr-2 h-4 w-4" />
+                                Dupliquer
+                            </DropdownMenuItem>
                             <DropdownMenuItem @click="printExpenseSheet">
                                 <PrinterIcon class="mr-2 h-4 w-4" />
                                 Imprimer
@@ -301,6 +305,25 @@
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <!-- Modal duplication -->
+        <Dialog :open="isDuplicateModalOpen" @update:open="isDuplicateModalOpen = $event">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="text-base sm:text-lg">Dupliquer la note de frais</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">
+                        Une copie de cette note de frais sera créée en brouillon. Les pièces jointes et annexes ne seront pas dupliquées.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="closeDuplicateModal" class="w-full xs:w-auto">Annuler</Button>
+                    <Button @click="confirmDuplicate" class="w-full xs:w-auto">
+                        <CopyIcon class="mr-2 h-4 w-4" />
+                        Dupliquer
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 
     <ExpenseSheetPdf ref="pdfContent" :expenseSheet="expenseSheet" class="hidden" />
@@ -326,6 +349,7 @@ import {
     BikeIcon,
     CarIcon,
     CheckIcon,
+    CopyIcon,
     DownloadIcon,
     FootprintsIcon,
     MoreVerticalIcon,
@@ -367,6 +391,21 @@ const confirmDelete = () => {
     closeDeleteModal();
 };
 
+// Modal de duplication
+const isDuplicateModalOpen = ref(false);
+
+const openDuplicateModal = () => {
+    isDuplicateModalOpen.value = true;
+};
+const closeDuplicateModal = () => {
+    isDuplicateModalOpen.value = false;
+};
+
+const confirmDuplicate = () => {
+    duplicateExpenseSheet();
+    closeDuplicateModal();
+};
+
 const openRejectModal = () => {
     rejectionReason.value = '';
     isRejectModalOpen.value = true;
@@ -391,8 +430,11 @@ const submitDraft = () => {
 const editExpenseSheet = () => {
     router.visit('/expense-sheet/' + props.expenseSheet.id + '/edit');
 };
+const duplicateExpenseSheet = () => {
+    useForm({}).post('/expense-sheet/' + props.expenseSheet.id + '/duplicate');
+};
 const printExpenseSheet = () => {
-    /* ... ton code d’impression inchangé ... */
+    /* ... ton code d'impression inchangé ... */
 };
 
 const getInitials = (name: string) =>

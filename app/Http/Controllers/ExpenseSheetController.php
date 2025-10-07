@@ -690,4 +690,51 @@ class ExpenseSheetController extends Controller
         ])->setPaper('a4', 'landscape')
             ->stream('note_de_frais_' . $id . '.pdf'); // inline
     }
+
+    public function duplicate($id)
+    {
+        $originalExpenseSheet = ExpenseSheet::with(['costs', 'department', 'user'])->findOrFail($id);
+
+        // Vérifier les permissions
+        if (!auth()->user()->can('view', $originalExpenseSheet)) {
+            abort(403);
+        }
+
+        // Créer une nouvelle note de frais en brouillon
+        $newExpenseSheet = ExpenseSheet::create([
+            'user_id' => $originalExpenseSheet->user_id,
+            'created_by' => auth()->id(),
+            'status' => 'Brouillon',
+            'total' => 0,
+            'form_id' => $originalExpenseSheet->form_id,
+            'department_id' => $originalExpenseSheet->department_id,
+            'is_draft' => true,
+        ]);
+
+        $globalTotal = 0;
+
+        // Dupliquer tous les coûts
+        foreach ($originalExpenseSheet->costs as $originalCost) {
+            $newExpenseSheet->costs()->create([
+                'form_cost_id' => $originalCost->form_cost_id,
+                'type' => $originalCost->type,
+                'distance' => $originalCost->distance,
+                'google_distance' => $originalCost->google_distance,
+                'route' => $originalCost->route,
+                'total' => $originalCost->total,
+                'date' => $originalCost->date,
+                'amount' => $originalCost->amount,
+                'requirements' => null, // Ne pas dupliquer les requirements (fichiers/valeurs)
+                'expense_sheet_id' => $newExpenseSheet->id
+            ]);
+
+            $globalTotal += $originalCost->total;
+        }
+
+        // Mettre à jour le total
+        $newExpenseSheet->update(['total' => $globalTotal]);
+
+        return redirect()->route('expense-sheet.show', $newExpenseSheet->id)
+            ->with('success', 'Note de frais dupliquée avec succès.');
+    }
 }
