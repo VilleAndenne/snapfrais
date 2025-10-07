@@ -379,6 +379,7 @@ class ExpenseSheetController extends Controller
         }
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
+            'target_user_id' => 'required|exists:users,id',
             'costs' => 'required|array|max:30',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
@@ -398,6 +399,8 @@ class ExpenseSheetController extends Controller
                 'validated_by' => null,
                 'validated_at' => null,
                 'department_id' => $validated['department_id'],
+                'user_id' => $validated['target_user_id'],
+                'created_by' => auth()->user()->id,
             ]);
             // Si c'est un brouillon, on garde le statut brouillon
             // Sinon on réinitialise l'approbation et on remet en attente pour resoumission
