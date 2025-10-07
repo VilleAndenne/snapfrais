@@ -83,7 +83,7 @@ class ExpenseSheetPolicy
         // - C'est un brouillon OU
         // - Le statut est "rejeté" (approved === 0/false)
         return $expenseSheet->user_id === $user->id &&
-               ($expenseSheet->is_draft || $expenseSheet->approved === 0);
+            ($expenseSheet->is_draft || $expenseSheet->approved === 0);
     }
 
     /**
@@ -118,7 +118,10 @@ class ExpenseSheetPolicy
 
     public function destroy(User $user, ExpenseSheet $expenseSheet)
     {
-        // Seul un administrateur peut supprimer une note de frais
-        return $user->is_admin == true OR ($expenseSheet->user_id === $user->id && $expenseSheet->is_draft);
+        // Seul un administrateur ou le propriétaire d'un brouillon non approuvé peut supprimer une note de frais
+        if ($expenseSheet->approved == true) {
+            return false;
+        }
+        return $user->is_admin == true || ($expenseSheet->user_id === $user->id && $expenseSheet->is_draft);
     }
 }
