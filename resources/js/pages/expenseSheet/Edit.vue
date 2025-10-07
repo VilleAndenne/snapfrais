@@ -1,9 +1,9 @@
 <template>
-    <AppLayout>
+    <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Modifier la note de frais" />
 
-        <div class="container mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
-            <h1 class="text-xl sm:text-2xl font-semibold">Modifier la note de frais</h1>
+        <div class="container mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
+            <h1 class="text-xl sm:text-2xl font-semibold text-foreground">Modifier la note de frais</h1>
 
             <!-- Sélection du département -->
             <div class="flex flex-col space-y-2">
@@ -45,14 +45,16 @@
                 </span>
             </div>
 
-            <div v-if="selectedCosts.length" class="space-y-4 sm:space-y-6 pt-4 sm:pt-6 border-t border-border">
+            <!-- Coûts ajoutés -->
+            <div v-if="selectedCosts.length" class="space-y-4 sm:space-y-6 border-t border-border pt-4 sm:pt-6">
                 <h2 class="text-base sm:text-lg font-medium text-foreground">Votre demande</h2>
 
                 <div
                     v-for="(cost, index) in selectedCosts"
                     :key="index"
-                    class="p-3 sm:p-4 border border-border rounded space-y-3 sm:space-y-4 bg-card text-card-foreground relative"
+                    class="relative space-y-3 sm:space-y-4 rounded border border-border bg-card p-3 sm:p-4 text-card-foreground"
                 >
+                    <!-- Bouton supprimer -->
                     <Button
                         variant="ghost"
                         size="icon"
@@ -62,12 +64,25 @@
                         <Trash2Icon class="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
 
-                    <div class="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-2 pr-12 xs:pr-14">
+                    <!-- En-tête coût -->
+                    <div class="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 pr-20 xs:pr-24">
                         <h3 class="text-lg sm:text-xl font-bold text-foreground">{{ cost.name }}</h3>
                         <span class="text-xs sm:text-sm italic text-muted-foreground">{{ cost.type }}</span>
                     </div>
                     <p class="text-xs sm:text-sm text-muted-foreground">{{ cost.description }}</p>
 
+                    <!-- Date du coût -->
+                    <div class="mt-2">
+                        <Label for="cost-date" class="text-xs sm:text-sm">Date du coût</Label>
+                        <input
+                            type="date"
+                            v-model="costData[index].date"
+                            class="w-full rounded border border-border bg-background p-1.5 sm:p-2 text-sm sm:text-base text-foreground"
+                            required
+                        />
+                    </div>
+
+                    <!-- Champs dynamiques selon le type de coût -->
                     <div v-if="cost.type === 'km'">
                         <KmCostInput v-model="costData[index].kmData" />
                     </div>
@@ -78,16 +93,7 @@
                         <PercentageCostInput v-model="costData[index].percentageData" />
                     </div>
 
-                    <div class="mt-3 sm:mt-4">
-                        <label class="block text-xs sm:text-sm font-medium text-foreground">Date du coût</label>
-                        <input
-                            type="date"
-                            v-model="costData[index].date"
-                            class="mt-1 block w-full rounded-md border-input bg-background text-foreground shadow-sm focus:border-primary focus:ring-primary text-sm"
-                            required
-                        />
-                    </div>
-
+                    <!-- Prérequis -->
                     <CostRequierementInput
                         v-if="cost.requirements?.length"
                         :requirements="cost.requirements"
@@ -97,9 +103,10 @@
                 </div>
             </div>
 
+            <!-- Coûts disponibles -->
             <div>
-                <h2 class="text-base sm:text-lg font-medium text-foreground mb-2">Types de coûts disponibles</h2>
-                <p class="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                <h2 class="mb-2 text-base sm:text-lg font-medium text-foreground">Types de coûts disponibles</h2>
+                <p class="mb-3 sm:mb-4 text-xs sm:text-sm text-muted-foreground">
                     Coûts ajoutés : {{ selectedCosts.length }}/30
                 </p>
                 <CostPicker
@@ -109,9 +116,10 @@
                 />
             </div>
 
-            <div class="flex justify-end pt-6 sm:pt-8">
+            <!-- Bouton d'envoi -->
+            <div class="flex flex-col xs:flex-row justify-end gap-2 sm:gap-3 pt-6 sm:pt-8">
                 <Button @click="submit" :disabled="!selectedCosts.length || form.processing" class="w-full xs:w-auto">
-                    <Loader2Icon v-if="form.processing" class="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                     <span class="hidden sm:inline">{{ form.processing ? "Mise à jour en cours..." : "Mettre à jour la demande" }}</span>
                     <span class="sm:hidden">{{ form.processing ? "Mise à jour..." : "Mettre à jour" }}</span>
                 </Button>
@@ -160,6 +168,13 @@ const form = useForm({
     _method: 'PUT',
 });
 
+// Breadcrumbs (alignés avec Create.vue)
+const breadcrumbs = [
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Notes de frais', href: '/expense-sheet' },
+    { title: 'Modifier une note de frais' },
+];
+
 // Département sélectionné (pour afficher les utilisateurs)
 const selectedDepartment = computed(() => {
     return departments.value.find((d) => d.id === form.department_id) || null;
@@ -168,7 +183,7 @@ const selectedDepartment = computed(() => {
 // Vérifie si l'utilisateur est head du département sélectionné
 const isHeadOfSelectedDept = computed(() => {
     if (!selectedDepartment.value) return false;
-    return selectedDepartment.value.heads.some((h) => h.id === props.authUser.id);
+    return (selectedDepartment.value.heads || []).some((h) => h.id === props.authUser.id);
 });
 
 // Quand le département change : si head -> pré-sélectionne l'utilisateur existant ou soi-même, sinon reset
@@ -176,7 +191,6 @@ watch(
     () => form.department_id,
     () => {
         if (isHeadOfSelectedDept.value) {
-            // Garder le target_user_id existant ou mettre soi-même
             if (!form.target_user_id) {
                 form.target_user_id = props.authUser.id;
             }
@@ -188,16 +202,13 @@ watch(
 
 const getActiveRate = (cost) => {
     const today = new Date().toISOString().split("T")[0];
-    const activeRate = cost.reimbursement_rates.find(
+    const activeRate = (cost.reimbursement_rates || []).find(
         (rate) => rate.start_date <= today && (!rate.end_date || rate.end_date >= today)
     );
     return activeRate?.value ?? 0;
 };
 
 onMounted(() => {
-    console.log('Form costs:', props.form.costs);
-    console.log('Expense sheet costs:', props.expenseSheet.costs);
-
     // Initialiser les départements
     departments.value = props.departments || [];
 
@@ -206,18 +217,17 @@ onMounted(() => {
     form.target_user_id = props.expenseSheet.user_id;
 
     costs.value = props.form.costs;
-    selectedCosts.value = props.expenseSheet.costs.map((item) => {
-        const foundCost = costs.value.find((c) => c.id === item.cost_id);
-        if (!foundCost) {
-            console.warn('Cost not found:', item.cost_id);
-            return null;
-        }
-        return {
-            ...foundCost,
-            ...item
-        };
-    }).filter(Boolean);
 
+    // Hydratation des coûts sélectionnés à partir de la note existante
+    selectedCosts.value = props.expenseSheet.costs
+        .map((item) => {
+            const foundCost = costs.value.find((c) => c.id === item.cost_id);
+            if (!foundCost) return null;
+            return { ...foundCost, ...item };
+        })
+        .filter(Boolean);
+
+    // Hydratation des données de formulaire pour chaque coût
     costData.value = props.expenseSheet.costs.map((item) => {
         let data = {};
         if (item.type === 'km') {
@@ -240,15 +250,12 @@ onMounted(() => {
             };
         }
 
-        // Extraire les valeurs des requirements pour l'initialisation
         const requirementsValues = {};
         if (item.requirements_data) {
             Object.entries(item.requirements_data).forEach(([key, value]) => {
                 if (value?.value !== undefined) {
-                    // Pour les champs texte, on stocke directement la valeur
                     requirementsValues[key] = value.value;
                 }
-                // Pour les fichiers, on ne les ajoute pas ici, ils seront gérés via existingData
             });
         }
 
@@ -260,9 +267,6 @@ onMounted(() => {
             date: item.date || new Date().toISOString().split('T')[0],
         };
     });
-
-    console.log('Selected costs:', selectedCosts.value);
-    console.log('Cost data:', costData.value);
 });
 
 const addToRequest = (cost) => {
@@ -292,7 +296,7 @@ const submit = () => {
 
         const requirements = {};
 
-        // Ajouter les nouvelles valeurs depuis costData
+        // Nouvelles valeurs
         if (costData.value[index].requirements) {
             Object.entries(costData.value[index].requirements).forEach(([reqId, req]) => {
                 if (req instanceof File) {
@@ -303,10 +307,9 @@ const submit = () => {
             });
         }
 
-        // Conserver les fichiers existants non modifiés
+        // Conserver les fichiers existants
         if (cost.requirements_data) {
             Object.entries(cost.requirements_data).forEach(([reqId, existingData]) => {
-                // Si ce requirement n'a pas été modifié (pas dans requirements) et c'est un fichier
                 if (!requirements[reqId] && existingData?.file) {
                     requirements[reqId] = { existing_file: existingData.file };
                 }
@@ -321,25 +324,20 @@ const submit = () => {
         };
     });
 
-    console.log('Form costs before submit:', form.costs);
-
     form.post("/expense-sheet/" + props.expenseSheet.id, {
         onSuccess: () => {
             window.location.href = '/dashboard';
         },
         onError: (errors) => {
-            console.log('Submit errors:', errors);
             alert("Une erreur est survenue lors de la mise à jour : " + Object.values(errors).join(', '));
         },
         forceFormData: true,
         transform: (data) => {
-            console.log('Transform data:', data);
             const formData = new FormData();
             formData.append('_method', 'PUT');
             formData.append('department_id', data.department_id);
 
             if (!data.costs || data.costs.length === 0) {
-                console.error('No costs in data!');
                 return formData;
             }
 
@@ -347,10 +345,8 @@ const submit = () => {
                 formData.append(`costs[${index}][cost_id]`, cost.cost_id);
                 formData.append(`costs[${index}][date]`, cost.date);
 
-                // Ajouter les données du coût
                 Object.entries(cost.data).forEach(([key, value]) => {
                     if (Array.isArray(value)) {
-                        // Pour les tableaux (comme steps), ajouter chaque élément
                         value.forEach((item, itemIndex) => {
                             formData.append(`costs[${index}][data][${key}][${itemIndex}]`, item);
                         });
@@ -359,13 +355,11 @@ const submit = () => {
                     }
                 });
 
-                // Ajouter les requirements correctement
                 if (cost.requirements) {
                     Object.entries(cost.requirements).forEach(([reqId, req]) => {
                         if (req.file instanceof File) {
                             formData.append(`costs[${index}][requirements][${reqId}][file]`, req.file);
                         } else if (req.existing_file) {
-                            // Fichier existant non modifié
                             formData.append(`costs[${index}][requirements][${reqId}][existing_file]`, req.existing_file);
                         } else if (req.value) {
                             formData.append(`costs[${index}][requirements][${reqId}][value]`, req.value);
@@ -374,24 +368,8 @@ const submit = () => {
                 }
             });
 
-            // Debug: afficher le contenu du FormData
-            for (let pair of formData.entries()) {
-                console.log(pair[0]+ ': ' + pair[1]);
-            }
-
             return formData;
         }
     });
-};
-
-const getExistingFiles = (requirementsData) => {
-    if (!requirementsData) return {};
-    const files = {};
-    Object.entries(requirementsData).forEach(([key, value]) => {
-        if (value?.file) {
-            files[key] = value.file;
-        }
-    });
-    return files;
 };
 </script>
