@@ -96,18 +96,20 @@ class ExpenseSheetPolicy
         } elseif ($user->is_admin == true) {
             return true;
         }
-        // Récupérer le service lié à l'expenseSheet
         $department = $expenseSheet->department;
 
-        // Vérifier si l'utilisateur est responsable du service ou d'un service parent
         while ($department) {
+            // Si l'utilisateur est responsable du service
             if ($department->heads->contains($user)) {
+                // Si l'auteur est aussi responsable du même service, accès refusé
+                if ($department->heads->contains($expenseSheet->user)) {
+                    return false;
+                }
                 return true;
             }
             $department = $department->parent;
         }
 
-        // Si aucun service parent ne donne l'autorisation, renvoyer false
         return false;
     }
 
