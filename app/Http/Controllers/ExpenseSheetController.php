@@ -94,13 +94,13 @@ class ExpenseSheetController extends Controller
 
         // Création de la note de frais
         $expenseSheet = \App\Models\ExpenseSheet::create([
-            'user_id'         => $targetUserId ?: $currentUserId, // bénéficiaire
-            'created_by'      => $currentUserId,                  // créateur réel
-            'status'          => $isDraft ? 'Brouillon' : 'En attente',
-            'total'           => 0,
-            'form_id'         => $id,
-            'department_id'   => $validated['department_id'],
-            'is_draft'        => $isDraft,
+            'user_id' => $targetUserId ?: $currentUserId, // bénéficiaire
+            'created_by' => $currentUserId,                  // créateur réel
+            'status' => $isDraft ? 'Brouillon' : 'En attente',
+            'total' => 0,
+            'form_id' => $id,
+            'department_id' => $validated['department_id'],
+            'is_draft' => $isDraft,
         ]);
 
         $globalTotal = 0;
@@ -194,7 +194,7 @@ class ExpenseSheetController extends Controller
                     foreach ($steps as $index => $address) {
                         $route['steps'][] = [
                             'address' => $address,
-                            'order'   => $index + 1,
+                            'order' => $index + 1,
                         ];
                     }
                 }
@@ -219,15 +219,15 @@ class ExpenseSheetController extends Controller
             }
 
             $expenseSheet->costs()->create([
-                'form_cost_id'     => $formCost->id,
-                'type'             => $type,
-                'distance'         => $distance,
-                'google_distance'  => $googleDistance,
-                'route'            => $route,
-                'total'            => $total,
-                'date'             => $date,
-                'amount'           => $data['paidAmount'] ?? null,
-                'requirements'     => json_encode($requirements),
+                'form_cost_id' => $formCost->id,
+                'type' => $type,
+                'distance' => $distance,
+                'google_distance' => $googleDistance,
+                'route' => $route,
+                'total' => $total,
+                'date' => $date,
+                'amount' => $data['paidAmount'] ?? null,
+                'requirements' => json_encode($requirements),
                 'expense_sheet_id' => $expenseSheet->id
             ]);
 
@@ -258,7 +258,7 @@ class ExpenseSheetController extends Controller
                 $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
             });
 
-            if(auth()->user()->id !== $expenseSheet->user->id) {
+            if (auth()->user()->id !== $expenseSheet->user->id) {
                 $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
             }
 
@@ -319,8 +319,8 @@ class ExpenseSheetController extends Controller
                 $route = $cost->route ?? [];
                 $steps = [];
                 if (isset($route['steps']) && is_array($route['steps'])) {
-                    $steps = array_map(function($step) {
-                         return is_array($step) ? ($step['address'] ?? '') : $step;
+                    $steps = array_map(function ($step) {
+                        return is_array($step) ? ($step['address'] ?? '') : $step;
                     }, $route['steps']);
                 }
 
@@ -379,7 +379,7 @@ class ExpenseSheetController extends Controller
         }
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
-            'target_user_id' => 'required|exists:users,id',
+            'target_user_id' => 'nullable|exists:users,id',
             'costs' => 'required|array|max:30',
             'costs.*.cost_id' => 'required|exists:form_costs,id',
             'costs.*.data' => 'required|array',
@@ -399,7 +399,7 @@ class ExpenseSheetController extends Controller
                 'validated_by' => null,
                 'validated_at' => null,
                 'department_id' => $validated['department_id'],
-                'user_id' => $validated['target_user_id'],
+                'user_id' => $validated['target_user_id'] ?? $expenseSheet->user_id,
                 'created_by' => auth()->user()->id,
             ]);
             // Si c'est un brouillon, on garde le statut brouillon
@@ -510,7 +510,7 @@ class ExpenseSheetController extends Controller
                         foreach ($steps as $index => $address) {
                             $route['steps'][] = [
                                 'address' => $address,
-                                'order'   => $index + 1,
+                                'order' => $index + 1,
                             ];
                         }
                     }
@@ -540,15 +540,15 @@ class ExpenseSheetController extends Controller
                 }
 
                 $expenseSheet->costs()->create([
-                    'form_cost_id'     => $formCost->id,
-                    'type'             => $type,
-                    'distance'         => $distance,
-                    'google_distance'  => $googleDistance,
-                    'route'            => $route,
-                    'total'            => $total,
-                    'date'             => $date,
-                    'amount'           => $data['paidAmount'] ?? null,
-                    'requirements'     => json_encode($requirements),
+                    'form_cost_id' => $formCost->id,
+                    'type' => $type,
+                    'distance' => $distance,
+                    'google_distance' => $googleDistance,
+                    'route' => $route,
+                    'total' => $total,
+                    'date' => $date,
+                    'amount' => $data['paidAmount'] ?? null,
+                    'requirements' => json_encode($requirements),
                     'expense_sheet_id' => $expenseSheet->id
                 ]);
 
@@ -668,7 +668,7 @@ class ExpenseSheetController extends Controller
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
         });
 
-        if(auth()->user()->id !== $expenseSheet->user->id) {
+        if (auth()->user()->id !== $expenseSheet->user->id) {
             $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
         }
 
