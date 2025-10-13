@@ -92,8 +92,7 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                     if (isset($costSums[$key])) {
                         // Si c'est un coût de type KM, on ajoute la distance arrondie
                         if (strtolower($cost->formCost->type) === 'km') {
-                            $route = is_array($cost->route) ? $cost->route : json_decode($cost->route, true);
-                            $googleDistance = isset($route['google_distance']) ? (float) $route['google_distance'] : 0;
+                            $googleDistance = $cost->google_distance;
                             $costSums[$key] += round($googleDistance);
                         } else {
                             // Sinon, on ajoute le montant en euros
