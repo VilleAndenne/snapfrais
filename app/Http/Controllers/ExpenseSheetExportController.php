@@ -56,7 +56,7 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                 'expenseSheets.expenseSheetCosts.formCost.form'
             ])->get();
 
-        // Préparer entêtes dynamiques
+        // Préparer entêtes dynamiques : collecter tous les types de coûts uniques
         $headers = ['Username'];
         $costTypes = [];
 
@@ -66,7 +66,11 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                     // Déterminer le préfixe selon le type
                     $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
-                    $costTypes[$key] = $cost->formCost->type;
+
+                    // Stocker le type de coût si pas déjà présent
+                    if (!isset($costTypes[$key])) {
+                        $costTypes[$key] = $cost->formCost->type;
+                    }
                 }
             }
         }
@@ -76,7 +80,6 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
         // Construire les lignes
         $data = [];
         foreach ($users as $user) {
-            $row = [$user->name];
             $costSums = array_fill_keys(array_keys($costTypes), 0);
 
             foreach ($user->expenseSheets as $expenseSheet) {
@@ -92,11 +95,23 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                 }
             }
 
-            foreach (array_keys($costTypes) as $key) {
-                $row[] = $costSums[$key];
+            // Vérifier si l'utilisateur a au moins un montant non-nul
+            $hasNonZeroAmount = false;
+            foreach ($costSums as $sum) {
+                if ($sum > 0) {
+                    $hasNonZeroAmount = true;
+                    break;
+                }
             }
 
-            $data[] = $row;
+            // N'ajouter la ligne que si l'utilisateur a au moins un montant
+            if ($hasNonZeroAmount) {
+                $row = [$user->name];
+                foreach (array_keys($costTypes) as $key) {
+                    $row[] = $costSums[$key];
+                }
+                $data[] = $row;
+            }
         }
 
         // Générer Excel en mémoire (fichier temporaire)
