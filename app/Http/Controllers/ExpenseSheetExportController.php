@@ -27,6 +27,7 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
     public function export(Request $request)
     {
+        // Vérifie que l'utilisateur à la permission d'exporter
         if (!auth()->user()->can('export', ExpenseSheet::class)) {
             abort(403);
         }
@@ -89,8 +90,16 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
                     if (isset($costSums[$key])) {
-                        $amount = (float) $cost->amount;
-                        $costSums[$key] += $amount;
+                        // Si c'est un coût de type KM, on ajoute la distance arrondie
+                        if (strtolower($cost->formCost->type) === 'km') {
+                            $route = is_array($cost->route) ? $cost->route : json_decode($cost->route, true);
+                            $googleDistance = isset($route['google_distance']) ? (float) $route['google_distance'] : 0;
+                            $costSums[$key] += round($googleDistance);
+                        } else {
+                            // Sinon, on ajoute le montant en euros
+                            $amount = (float) $cost->amount;
+                            $costSums[$key] += $amount;
+                        }
                     }
                 }
             }
