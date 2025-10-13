@@ -63,39 +63,31 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name.' ('.$cost->formCost->form->name.')';
+                    // Déterminer le préfixe selon le type
+                    $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
+                    $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
                     $costTypes[$key] = $cost->formCost->type;
                 }
             }
         }
 
         $headers = array_merge($headers, array_keys($costTypes));
-        $headers[] = 'Total Général (€)';
-        $headers[] = 'Total Km';
 
         // Construire les lignes
         $data = [];
         foreach ($users as $user) {
             $row = [$user->name];
             $costSums = array_fill_keys(array_keys($costTypes), 0);
-            $totalGeneral = 0;
-            $totalKm = 0;
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    $key = $cost->formCost->name.' ('.$cost->formCost->form->name.')';
+                    // Utiliser la même logique de clé qu'au-dessus
+                    $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
+                    $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
                     if (isset($costSums[$key])) {
                         $amount = (float) $cost->amount;
                         $costSums[$key] += $amount;
-                        $totalGeneral   += $amount;
-
-                        if (strtolower($cost->formCost->type) === 'km') {
-                            $route = is_array($cost->route) ? $cost->route : (array) $cost->route;
-                            $googleKm = isset($route['google_km']) ? (float) $route['google_km'] : 0;
-                            $manualKm = isset($route['manual_km']) ? (float) $route['manual_km'] : 0;
-                            $totalKm += ($googleKm + $manualKm);
-                        }
                     }
                 }
             }
@@ -103,9 +95,6 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
             foreach (array_keys($costTypes) as $key) {
                 $row[] = $costSums[$key];
             }
-
-            $row[] = $totalGeneral;
-            $row[] = $totalKm;
 
             $data[] = $row;
         }
