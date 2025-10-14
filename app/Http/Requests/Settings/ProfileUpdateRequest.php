@@ -25,6 +25,9 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'notify_expense_sheet_to_approval' => ['sometimes', 'boolean'],
+            'notify_receipt_expense_sheet' => ['sometimes', 'boolean'],
+            'notify_remind_approval' => ['sometimes', 'boolean'],
         ];
     }
 }

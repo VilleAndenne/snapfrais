@@ -31,6 +31,11 @@ class RemindApprovalExpenseSheetNotification extends Notification
      */
     public function via(object $notifiable): array
     {
+        // Vérifier si l'utilisateur souhaite recevoir ce type de notification
+        if (!$notifiable->notify_remind_approval) {
+            return [];
+        }
+
         return ['mail'];
     }
 
