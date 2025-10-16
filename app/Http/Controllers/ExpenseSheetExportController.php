@@ -45,14 +45,24 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
             return back()->withErrors(['end_date' => 'La date de fin doit être postérieure à la date de début.']);
         }
 
+        // Récupérer uniquement les utilisateurs avec des coûts SRH
         $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
             $q->where('approved', true)
-                ->whereBetween('validated_at', [$startDate, $endDate]);
+                ->whereBetween('validated_at', [$startDate, $endDate])
+                ->whereHas('expenseSheetCosts.formCost', function ($costQuery) {
+                    $costQuery->where('processing_department', 'SRH');
+                });
         })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
                     $q->where('approved', true)
                         ->whereBetween('validated_at', [$startDate, $endDate]);
+                },
+                'expenseSheets.expenseSheetCosts' => function ($q) {
+                    // Filtrer pour ne prendre que les coûts SRH
+                    $q->whereHas('formCost', function ($costQuery) {
+                        $costQuery->where('processing_department', 'SRH');
+                    });
                 },
                 'expenseSheets.expenseSheetCosts.formCost.form'
             ])->get();
@@ -64,6 +74,11 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
+                    // Vérifier que le coût est bien SRH (double vérification)
+                    if ($cost->formCost->processing_department !== 'SRH') {
+                        continue;
+                    }
+
                     // Déterminer le préfixe selon le type
                     $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
@@ -85,6 +100,11 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
+                    // Vérifier que le coût est bien SRH (double vérification)
+                    if ($cost->formCost->processing_department !== 'SRH') {
+                        continue;
+                    }
+
                     // Utiliser la même logique de clé qu'au-dessus
                     $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
@@ -170,9 +190,13 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
         ]);
 
         // 🆕 2) Récupérer les IDs des notes de frais comprises dans la période et approuvées
+        //        et qui contiennent au moins un coût SRH
         $expenseSheetIds = ExpenseSheet::query()
             ->where('approved', true)
             ->whereBetween('validated_at', [$startDate, $endDate])
+            ->whereHas('expenseSheetCosts.formCost', function ($q) {
+                $q->where('processing_department', 'SRH');
+            })
             ->pluck('id')
             ->all();
 
