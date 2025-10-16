@@ -29,6 +29,11 @@ class ReceiptExpenseSheet extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
+        // Vérifier si l'utilisateur souhaite recevoir ce type de notification
+        if (!$notifiable->notify_receipt_expense_sheet) {
+            return [];
+        }
+
         return ['mail'];
     }
 

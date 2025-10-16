@@ -28,6 +28,9 @@ class User extends Authenticatable
         'email',
         'password',
         'is_admin',
+        'notify_expense_sheet_to_approval',
+        'notify_receipt_expense_sheet',
+        'notify_remind_approval',
     ];
 
     protected $appends = ['is_head'];
@@ -57,6 +60,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notify_expense_sheet_to_approval' => 'boolean',
+            'notify_receipt_expense_sheet' => 'boolean',
+            'notify_remind_approval' => 'boolean',
         ];
     }
 

@@ -21,6 +21,11 @@ class ExpenseSheetToApproval extends Notification implements ShouldQueue
 
     public function via(object $notifiable)
     {
+        // Vérifier si l'utilisateur souhaite recevoir ce type de notification
+        if (!$notifiable->notify_expense_sheet_to_approval) {
+            return [];
+        }
+
         return ['mail'];
     }
 
