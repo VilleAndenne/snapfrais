@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Jobs\SendDsfReimbursementEmail;
 use App\Models\ExpenseSheet;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use setasign\Fpdi\Fpdi;
 use PhpOffice\PhpWord\IOFactory;
@@ -84,31 +84,8 @@ class DsfReimbursementService
             }
         }
 
-        // Envoyer par email
-        $this->sendReimbursementEmail($expenseSheet, $dsfCosts, $filePath, $attachments);
-    }
-
-    /**
-     * Envoie l'email avec le PDF de demande de remboursement (avec annexes fusionnées)
-     */
-    private function sendReimbursementEmail(ExpenseSheet $expenseSheet, $dsfCosts, string $pdfPath, array $attachments): void
-    {
-        $recipientEmail = 'sebastien.merveille@ac.andenne.be';
-
-        // Compter les annexes
-        $attachmentCount = count($attachments);
-        $convertedCount = count(array_filter($attachments, fn($a) => $a['is_converted'] ?? false));
-
-        Mail::send('emails.dsf-reimbursement', [
-            'expenseSheet' => $expenseSheet,
-            'dsfCosts' => $dsfCosts,
-            'attachmentCount' => $attachmentCount,
-            'convertedCount' => $convertedCount,
-        ], function ($message) use ($expenseSheet, $pdfPath, $recipientEmail) {
-            $message->to($recipientEmail)
-                ->subject('Demande de remboursement DSF - Note de frais #' . $expenseSheet->id)
-                ->attach(Storage::path($pdfPath));
-        });
+        // Dispatcher le job pour envoyer l'email de manière asynchrone
+        SendDsfReimbursementEmail::dispatch($expenseSheet, $dsfCosts, $filePath, $attachments);
     }
 
     /**

@@ -31,7 +31,11 @@ class User extends Authenticatable
         'notify_expense_sheet_to_approval',
         'notify_receipt_expense_sheet',
         'notify_remind_approval',
+        'bank_account_number',
+        'address',
     ];
+
+    protected $casts = ['bank_account_number' => 'encrypted', 'address' => 'encrypted'];
 
     protected $appends = ['is_head'];
 
@@ -63,6 +67,7 @@ class User extends Authenticatable
             'notify_expense_sheet_to_approval' => 'boolean',
             'notify_receipt_expense_sheet' => 'boolean',
             'notify_remind_approval' => 'boolean',
+            'bank_account_number' => 'encrypted',
         ];
     }
 
