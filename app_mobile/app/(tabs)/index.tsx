@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, Link, useFocusEffect } from 'expo-router';
 import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Platform, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,8 +14,8 @@ type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
 
 function getStatusFromApproved(approved: boolean | null, isDraft: boolean): StatusType {
   if (isDraft) return 'draft';
-  if (approved === true) return 'approved';
-  if (approved === false) return 'rejected';
+  if (approved === 1) return 'approved';
+  if (approved === 0) return 'rejected';
   return 'pending';
 }
 
@@ -67,7 +67,7 @@ function getStatusIcon(status: StatusType): string {
 export default function DashboardScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,11 +77,39 @@ export default function DashboardScreen() {
   const [toValidate, setToValidate] = useState<ExpenseSheet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
-  // Fetch data on mount
+  // Refresh user data on mount
   useEffect(() => {
-    fetchData();
+    const init = async () => {
+      try {
+        await refreshUser(); // Refresh user data from API
+        console.log('Dashboard - User refreshed');
+      } catch (error) {
+        console.error('Error refreshing user:', error);
+      }
+    };
+    init();
   }, []);
+
+  // Fetch data when user is available or changes
+  useEffect(() => {
+    if (user) {
+      console.log('Dashboard - User available, fetching data. is_head:', user.is_head);
+      fetchData();
+    }
+  }, [user?.is_head]);
+
+  // Refresh data when screen comes into focus (after submitting/validating expense sheets)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Dashboard - Screen focused, refreshing data');
+      // Only refresh if we've already loaded data once (avoid double loading on mount)
+      if (user && hasInitiallyLoaded) {
+        fetchData();
+      }
+    }, [user, hasInitiallyLoaded])
+  );
 
   const fetchData = async () => {
     try {
@@ -94,10 +122,39 @@ export default function DashboardScreen() {
         user?.is_head ? api.getExpenseSheetsToValidate().catch(() => ({ expenseSheets: [] })) : Promise.resolve({ expenseSheets: [] }),
       ]);
 
+      console.log('Dashboard - Expense sheets received:', expenseSheetsResponse.expenseSheets.length);
+      console.log('Dashboard - Expense sheets statuses:', expenseSheetsResponse.expenseSheets.map(s => ({
+        id: s.id,
+        is_draft: s.is_draft,
+        approved: s.approved,
+        status: getStatusFromApproved(s.approved ?? null, s.is_draft)
+      })));
+
+      console.log('Dashboard - TO VALIDATE received:', toValidateResponse.expenseSheets.length);
+      console.log('Dashboard - TO VALIDATE details:', toValidateResponse.expenseSheets.map(s => ({
+        id: s.id,
+        user_id: s.user_id,
+        user_name: s.user?.name,
+        is_draft: s.is_draft,
+        approved: s.approved,
+        form_name: s.form?.name,
+        total: s.total
+      })));
+      console.log('Dashboard - Current user:', {
+        id: user?.id,
+        name: user?.name,
+        is_head: user?.is_head,
+        is_admin: user?.is_admin
+      });
+      console.log('Dashboard - ToValidate response:', toValidateResponse.expenseSheets.length, 'sheets');
+
       setForms(formsResponse.forms);
       setExpenseSheets(expenseSheetsResponse.expenseSheets);
       if (user?.is_head) {
+        console.log('Dashboard - Setting toValidate with', toValidateResponse.expenseSheets.length, 'sheets');
         setToValidate(toValidateResponse.expenseSheets);
+      } else {
+        console.log('Dashboard - User is NOT head, skipping toValidate');
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -111,6 +168,7 @@ export default function DashboardScreen() {
       );
     } finally {
       setIsLoading(false);
+      setHasInitiallyLoaded(true);
     }
   };
 
@@ -126,7 +184,7 @@ export default function DashboardScreen() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    return expenseSheets.filter(sheet => {
+    const filtered = expenseSheets.filter(sheet => {
       // Filtrer par mois en cours
       const sheetDate = new Date(sheet.created_at);
       const isCurrentMonth = sheetDate.getMonth() === currentMonth &&
@@ -139,18 +197,36 @@ export default function DashboardScreen() {
       const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
       const matchesStatus = statusFilter === 'all' || status === statusFilter;
 
-      return isCurrentMonth && matchesSearch && matchesStatus;
+      const shouldInclude = isCurrentMonth && matchesSearch && matchesStatus;
+
+      console.log('Dashboard - Filtering sheet:', {
+        id: sheet.id,
+        created_at: sheet.created_at,
+        isCurrentMonth,
+        matchesSearch,
+        status,
+        statusFilter,
+        matchesStatus,
+        shouldInclude
+      });
+
+      return shouldInclude;
     });
+
+    console.log('Dashboard - Filtered result:', {
+      total: expenseSheets.length,
+      filtered: filtered.length,
+      statuses: filtered.map(s => getStatusFromApproved(s.approved ?? null, s.is_draft))
+    });
+
+    return filtered;
   }, [expenseSheets, searchQuery, statusFilter]);
 
   const filteredToValidate = useMemo(() => {
-    return toValidate.filter(sheet => {
-      const matchesSearch = sheet.form?.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
-      const matchesStatus = statusFilter === 'all' || status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [toValidate, searchQuery, statusFilter]);
+    // Afficher toutes les notes à valider sans filtre de date
+    // (contrairement à "Mes notes de frais" qui filtre par mois en cours)
+    return toValidate;
+  }, [toValidate]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
@@ -158,6 +234,64 @@ export default function DashboardScreen() {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+
+  const handleApprove = async (sheetId: number) => {
+    // Trouver la note de frais pour afficher les détails
+    const sheet = toValidate.find(s => s.id === sheetId);
+    const userName = sheet?.user?.name || 'Utilisateur inconnu';
+    const amount = sheet?.total ? `${sheet.total.toFixed(2)} €` : '0.00 €';
+
+    Alert.alert(
+      'Valider la note de frais',
+      `Voulez-vous valider la note de frais de ${userName} pour un montant de ${amount} ?\n\nCette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Valider',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await api.approveExpenseSheet(sheetId, true);
+              Alert.alert('Succès', 'Note de frais validée avec succès');
+              await fetchData();
+            } catch (error) {
+              console.error('Error approving expense sheet:', error);
+              Alert.alert('Erreur', 'Impossible de valider la note de frais');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReject = async (sheetId: number) => {
+    Alert.prompt(
+      'Rejeter la note de frais',
+      'Veuillez indiquer la raison du rejet :',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Rejeter',
+          style: 'destructive',
+          onPress: async (reason?: string) => {
+            if (!reason || reason.trim() === '') {
+              Alert.alert('Erreur', 'Veuillez indiquer une raison pour le rejet');
+              return;
+            }
+            try {
+              await api.approveExpenseSheet(sheetId, false, reason);
+              Alert.alert('Succès', 'Note de frais rejetée');
+              await fetchData();
+            } catch (error) {
+              console.error('Error rejecting expense sheet:', error);
+              Alert.alert('Erreur', 'Impossible de rejeter la note de frais');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   // Loading state
@@ -219,7 +353,7 @@ export default function DashboardScreen() {
                 <ThemedView style={styles.formCard}>
                   <ThemedText style={styles.formName}>{form.name}</ThemedText>
                   <ThemedText style={styles.formDescription}>{form.description}</ThemedText>
-                  <View style={styles.formArrow}>
+                  <View style={[styles.formArrow, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 122, 255, 0.1)' }]}>
                     <IconSymbol
                       size={20}
                       name="chevron.right"
@@ -287,7 +421,7 @@ export default function DashboardScreen() {
           {filteredExpenseSheets.length > 0 ? (
             <View style={styles.expensesContainer}>
               {filteredExpenseSheets.map((sheet) => {
-                const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
+                const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
                 const statusColor = getStatusColor(status);
                 return (
                   <TouchableOpacity
@@ -308,7 +442,7 @@ export default function DashboardScreen() {
                             />
                             <View style={styles.expenseTextContainer}>
                               <ThemedText style={styles.expenseFormName} numberOfLines={1}>
-                                {sheet.form.name}
+                                {sheet.form?.name || 'Sans titre'}
                               </ThemedText>
                               <ThemedText style={styles.expenseDate}>
                                 {formatDate(sheet.created_at)}
@@ -321,9 +455,9 @@ export default function DashboardScreen() {
                             </Text>
                           </View>
                         </View>
-                        <View style={styles.expenseCardFooter}>
+                        <View style={[styles.expenseCardFooter, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(128, 128, 128, 0.2)' }]}>
                           <ThemedText style={styles.expenseLabel}>Montant</ThemedText>
-                          <ThemedText style={styles.expenseAmount}>{sheet.total.toFixed(2)} €</ThemedText>
+                          <ThemedText style={styles.expenseAmount}>{(sheet.total ?? 0).toFixed(2)} €</ThemedText>
                         </View>
                       </ThemedView>
                   </TouchableOpacity>
@@ -331,11 +465,11 @@ export default function DashboardScreen() {
               })}
             </View>
           ) : (
-            <ThemedView style={styles.emptyState}>
+            <ThemedView style={[styles.emptyState, { borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(128, 128, 128, 0.2)' }]}>
               <IconSymbol size={48} name="doc.text" color={isDark ? '#8E8E93' : '#8E8E93'} />
               <ThemedText style={styles.emptyTitle}>Aucune note de frais</ThemedText>
               <ThemedText style={styles.emptyDescription}>
-                Vous n'avez pas encore créé de note de frais ou aucune ne correspond à vos filtres.
+                Vous n&apos;avez pas encore créé de note de frais ou aucune ne correspond à vos filtres.
               </ThemedText>
             </ThemedView>
           )}
@@ -356,84 +490,93 @@ export default function DashboardScreen() {
             {filteredToValidate.length > 0 ? (
               <View style={styles.expensesContainer}>
                 {filteredToValidate.map((sheet) => {
-                  const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
+                  const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
                   const statusColor = getStatusColor(status);
                   return (
-                    <ThemedView key={sheet.id} style={styles.expenseCard}>
-                      <View style={styles.expenseCardHeader}>
-                        <View style={styles.expenseCardTitle}>
-                          <IconSymbol
-                            size={20}
-                            name={getStatusIcon(status)}
-                            color={statusColor}
-                            style={styles.expenseIcon}
-                          />
-                          <View style={styles.expenseTextContainer}>
-                            <ThemedText style={styles.expenseFormName} numberOfLines={1}>
-                              {sheet.form.name}
-                            </ThemedText>
-                            <ThemedText style={styles.expenseDate}>
-                              {sheet.user?.name || 'Utilisateur inconnu'}
-                            </ThemedText>
+                    <TouchableOpacity
+                      key={sheet.id}
+                      onPress={() => router.push(`/expense/${sheet.id}`)}
+                      activeOpacity={0.7}
+                    >
+                      <ThemedView style={styles.expenseCard}>
+                        <View style={styles.expenseCardHeader}>
+                          <View style={styles.expenseCardTitle}>
+                            <IconSymbol
+                              size={20}
+                              name={getStatusIcon(status)}
+                              color={statusColor}
+                              style={styles.expenseIcon}
+                            />
+                            <View style={styles.expenseTextContainer}>
+                              <ThemedText style={styles.expenseFormName} numberOfLines={1}>
+                                {sheet.form?.name || 'Sans titre'}
+                              </ThemedText>
+                              <ThemedText style={styles.expenseDate}>
+                                {sheet.user?.name || 'Utilisateur inconnu'}
+                              </ThemedText>
+                            </View>
+                          </View>
+                          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                            <Text style={[styles.statusText, { color: statusColor }]}>
+                              {getStatusLabel(status)}
+                            </Text>
                           </View>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                          <Text style={[styles.statusText, { color: statusColor }]}>
-                            {getStatusLabel(status)}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.expenseCardDetails}>
-                        <View style={styles.expenseDetailRow}>
-                          <ThemedText style={styles.expenseLabel}>Montant</ThemedText>
-                          <ThemedText style={styles.expenseAmount}>{sheet.total.toFixed(2)} €</ThemedText>
-                        </View>
-                        <View style={styles.expenseDetailRow}>
-                          <ThemedText style={styles.expenseLabel}>Date de création</ThemedText>
-                          <View style={styles.dateContainer}>
-                            <IconSymbol size={14} name="calendar" color={isDark ? '#8E8E93' : '#8E8E93'} />
-                            <ThemedText style={styles.expenseDate}>
-                              {formatDate(sheet.created_at)}
-                            </ThemedText>
+                        <View style={styles.expenseCardDetails}>
+                          <View style={styles.expenseDetailRow}>
+                            <ThemedText style={styles.expenseLabel}>Montant</ThemedText>
+                            <ThemedText style={styles.expenseAmount}>{(sheet.total ?? 0).toFixed(2)} €</ThemedText>
+                          </View>
+                          <View style={styles.expenseDetailRow}>
+                            <ThemedText style={styles.expenseLabel}>Date de création</ThemedText>
+                            <View style={styles.dateContainer}>
+                              <IconSymbol size={14} name="calendar" color={isDark ? '#8E8E93' : '#8E8E93'} />
+                              <ThemedText style={styles.expenseDate}>
+                                {formatDate(sheet.created_at)}
+                              </ThemedText>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                      <View style={styles.expenseCardActions}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, { backgroundColor: Colors[colorScheme].tint }]}
-                          onPress={() => {
-                            console.log('Approve expense sheet:', sheet.id);
-                          }}
-                        >
-                          <IconSymbol size={16} name="checkmark.circle.fill" color="#fff" />
-                          <Text style={styles.actionButtonText}>Valider</Text>
-                        </TouchableOpacity>
-                        <Link href={`/expense/${sheet.id}`} asChild>
+                        <View style={[styles.expenseCardActions, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(128, 128, 128, 0.2)' }]}>
+                          <TouchableOpacity
+                            style={[styles.actionButton, { backgroundColor: '#34C759' }]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleApprove(sheet.id);
+                            }}
+                          >
+                            <IconSymbol size={16} name="checkmark.circle.fill" color="#fff" />
+                            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Valider</Text>
+                          </TouchableOpacity>
                           <TouchableOpacity
                             style={[
                               styles.actionButton,
                               { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' },
                             ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              router.push(`/expense/${sheet.id}`);
+                            }}
                           >
                             <IconSymbol
                               size={16}
                               name="eye"
                               color={isDark ? '#fff' : '#000'}
                             />
-                            <ThemedText style={styles.actionButtonTextSecondary}>Voir</ThemedText>
+                            <ThemedText style={styles.actionButtonTextSecondary}>Voir détails</ThemedText>
                           </TouchableOpacity>
-                        </Link>
-                      </View>
-                    </ThemedView>
+                        </View>
+                      </ThemedView>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
             ) : (
-              <ThemedView style={styles.emptyState}>
+              <ThemedView style={[styles.emptyState, { borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(128, 128, 128, 0.2)' }]}>
                 <IconSymbol size={48} name="checkmark.circle.fill" color="#34C759" />
                 <ThemedText style={styles.emptyTitle}>Aucune note de frais à valider</ThemedText>
                 <ThemedText style={styles.emptyDescription}>
-                  Vous n'avez pas de notes de frais en attente de validation ou aucune ne correspond à vos filtres.
+                  Vous n&apos;avez pas de notes de frais en attente de validation ou aucune ne correspond à vos filtres.
                 </ThemedText>
               </ThemedView>
             )}
@@ -540,7 +683,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -634,7 +776,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
   expenseLabel: {
     fontSize: 12,
@@ -663,7 +804,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
   },
   actionButton: {
     flex: 1,
@@ -674,6 +814,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     gap: 6,
+  },
+  actionButtonSmall: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
   },
   actionButtonText: {
     color: '#fff',
@@ -691,7 +838,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
     borderStyle: 'dashed',
   },
   emptyTitle: {

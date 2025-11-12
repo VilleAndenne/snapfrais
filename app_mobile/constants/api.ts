@@ -3,9 +3,7 @@
  */
 
 // Base URL for API
-export const API_BASE_URL = __DEV__
-  ? 'http://127.0.0.1:8000/api'  // Development
-  : 'https://your-production-domain.com/api';  // Production
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -23,6 +21,7 @@ export const API_ENDPOINTS = {
   EXPENSE_SHEETS_VALIDATE: '/expense-sheets/validate',
   EXPENSE_SHEET_DETAILS: (id: number) => `/expense-sheets/${id}`,
   EXPENSE_SHEET_CREATE: (formId: number) => `/expense-sheet/${formId}`,
+  EXPENSE_SHEET_APPROVE: (id: number) => `/expense-sheets/${id}/approve`,
 } as const;
 
 // Storage Keys

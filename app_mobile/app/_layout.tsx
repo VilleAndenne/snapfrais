@@ -49,10 +49,10 @@ function RootLayoutNav() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Accueil" }} />
         <Stack.Screen name="expense/[id]" options={{ presentation: 'modal', title: 'Détail de la note' }} />
         <Stack.Screen name="expense/edit/[id]" options={{ presentation: 'modal', title: 'Modifier la note' }} />
-        <Stack.Screen name="expense/new" options={{ presentation: 'modal', title: 'Nouvelle note' }} />
+        <Stack.Screen name="expense/create" options={{ title: 'Nouvelle note' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

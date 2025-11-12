@@ -13,8 +13,8 @@ type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
 
 function getStatusFromApproved(approved: boolean | null | undefined, isDraft: boolean): StatusType {
   if (isDraft) return 'draft';
-  if (approved === true) return 'approved';
-  if (approved === false) return 'rejected';
+  if (approved === 1) return 'approved';
+  if (approved === 0) return 'rejected';
   return 'pending';
 }
 
@@ -59,6 +59,7 @@ export default function ExpenseDetailScreen() {
   const [canApprove, setCanApprove] = useState(false);
   const [canReject, setCanReject] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const openUrl = async (url: string) => {
     try {
@@ -103,6 +104,81 @@ export default function ExpenseDetailScreen() {
     }
   };
 
+  const handleApprove = async () => {
+    if (!expenseSheet) return;
+
+    Alert.alert(
+      'Approuver la note de frais',
+      `Voulez-vous approuver la note de frais de ${expenseSheet.user?.name} pour un montant de ${expenseSheet.total.toFixed(2)} € ?\n\nCette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Approuver',
+          style: 'default',
+          onPress: async () => {
+            try {
+              setIsProcessing(true);
+              await api.approveExpenseSheet(Number(id), true);
+              Alert.alert(
+                'Succès',
+                'Note de frais approuvée avec succès',
+                [{ text: 'OK', onPress: () => router.back() }]
+              );
+            } catch (error) {
+              console.error('Error approving expense sheet:', error);
+              Alert.alert(
+                'Erreur',
+                error instanceof Error ? error.message : 'Impossible d\'approuver la note de frais'
+              );
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReject = async () => {
+    if (!expenseSheet) return;
+
+    Alert.prompt(
+      'Rejeter la note de frais',
+      `Veuillez indiquer la raison du rejet de la note de frais de ${expenseSheet.user?.name} :`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Rejeter',
+          style: 'destructive',
+          onPress: async (reason?: string) => {
+            if (!reason || reason.trim() === '') {
+              Alert.alert('Erreur', 'Veuillez indiquer une raison pour le rejet');
+              return;
+            }
+            try {
+              setIsProcessing(true);
+              await api.approveExpenseSheet(Number(id), false, reason);
+              Alert.alert(
+                'Succès',
+                'Note de frais rejetée',
+                [{ text: 'OK', onPress: () => router.back() }]
+              );
+            } catch (error) {
+              console.error('Error rejecting expense sheet:', error);
+              Alert.alert(
+                'Erreur',
+                error instanceof Error ? error.message : 'Impossible de rejeter la note de frais'
+              );
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
+  };
+
   if (isLoading || !expenseSheet) {
     return (
       <ThemedView style={styles.container}>
@@ -134,20 +210,98 @@ export default function ExpenseDetailScreen() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          {/* Statut */}
-          <View style={[styles.statusBanner, { backgroundColor: statusColor + '20' }]}>
-            <IconSymbol
-              size={24}
-              name={status === 'approved' ? 'checkmark.circle.fill' :
-                    status === 'rejected' ? 'xmark.circle.fill' :
-                    status === 'draft' ? 'doc.text' :
-                    'clock.fill'}
-              color={statusColor}
-            />
-            <ThemedText style={[styles.statusText, { color: statusColor }]}>
-              {getStatusLabel(status)}
-            </ThemedText>
-          </View>
+
+          {/* Informations de validation/statut - EN HAUT */}
+          {(status === 'approved' || status === 'rejected' || status === 'pending') && (
+            <ThemedView style={[
+              styles.card,
+              status === 'rejected' ? styles.rejectionCard :
+              status === 'approved' ? styles.validationCard :
+              styles.pendingCard
+            ]}>
+              <View style={styles.validationHeader}>
+                <IconSymbol
+                  size={28}
+                  name={
+                    status === 'approved' ? 'checkmark.circle.fill' :
+                    status === 'rejected' ? 'exclamationmark.triangle.fill' :
+                    'clock.fill'
+                  }
+                  color={
+                    status === 'approved' ? '#34C759' :
+                    status === 'rejected' ? '#FF3B30' :
+                    '#FF9500'
+                  }
+                />
+                <ThemedText style={[
+                  styles.validationHeaderTitle,
+                  {
+                    color: status === 'approved' ? '#34C759' :
+                           status === 'rejected' ? '#FF3B30' :
+                           '#FF9500'
+                  }
+                ]}>
+                  {status === 'approved' ? 'Note approuvée' :
+                   status === 'rejected' ? 'Note rejetée' :
+                   'Demande en attente de validation'}
+                </ThemedText>
+              </View>
+
+              {/* Informations du validateur (pour approved et rejected) */}
+              {(status === 'approved' || status === 'rejected') && expenseSheet.validated_by && (
+                <View style={styles.validationInfo}>
+                  <View style={styles.validationRow}>
+                    <IconSymbol size={20} name="person.fill" color={isDark ? '#999' : '#666'} />
+                    <ThemedText style={styles.validationLabel}>
+                      {status === 'approved' ? 'Approuvé par :' : 'Rejeté par :'}
+                    </ThemedText>
+                    <ThemedText style={styles.validationValue}>{expenseSheet.validated_by.name}</ThemedText>
+                  </View>
+
+                  {expenseSheet.validated_at && (
+                    <View style={styles.validationRow}>
+                      <IconSymbol size={20} name="calendar" color={isDark ? '#999' : '#666'} />
+                      <ThemedText style={styles.validationLabel}>Date :</ThemedText>
+                      <ThemedText style={styles.validationValue}>
+                        {new Date(expenseSheet.validated_at).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Message pour pending */}
+              {status === 'pending' && (
+                <View style={styles.pendingInfo}>
+                  <ThemedText style={styles.pendingMessage}>
+                    Votre note de frais est en cours de traitement par votre responsable.
+                  </ThemedText>
+                </View>
+              )}
+
+              {/* Raison du rejet */}
+              {status === 'rejected' && expenseSheet.refusal_reason && (
+                <>
+                  <View style={styles.rejectionDivider} />
+                  <View style={styles.rejectionReasonSection}>
+                    <View style={styles.rejectionReasonHeader}>
+                      <IconSymbol size={20} name="exclamationmark.bubble.fill" color="#FF3B30" />
+                      <ThemedText style={styles.rejectionReasonLabel}>Raison du rejet</ThemedText>
+                    </View>
+                    <View style={styles.rejectionReasonContent}>
+                      <ThemedText style={styles.rejectionReason}>{expenseSheet.refusal_reason}</ThemedText>
+                    </View>
+                  </View>
+                </>
+              )}
+            </ThemedView>
+          )}
 
           {/* Montant */}
           <View style={styles.amountSection}>
@@ -172,7 +326,7 @@ export default function ExpenseDetailScreen() {
               </ThemedText>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]} />
 
             <View style={styles.infoRow}>
               <View style={styles.infoLabel}>
@@ -184,7 +338,7 @@ export default function ExpenseDetailScreen() {
 
             {expenseSheet.user && (
               <>
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]} />
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabel}>
                     <IconSymbol size={20} name="person.fill" color={isDark ? '#999' : '#666'} />
@@ -197,7 +351,7 @@ export default function ExpenseDetailScreen() {
 
             {expenseSheet.department && (
               <>
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]} />
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabel}>
                     <IconSymbol size={20} name="building.2" color={isDark ? '#999' : '#666'} />
@@ -210,7 +364,7 @@ export default function ExpenseDetailScreen() {
 
             {expenseSheet.distance && (
               <>
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]} />
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabel}>
                     <IconSymbol size={20} name="car.fill" color={isDark ? '#999' : '#666'} />
@@ -229,7 +383,7 @@ export default function ExpenseDetailScreen() {
               {expenseSheet.costs.map((cost, index) => (
                 <ThemedView key={cost.id} style={styles.card}>
                   {/* En-tête du coût */}
-                  <View style={styles.costHeader}>
+                  <View style={[styles.costHeader, { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]}>
                     <View style={styles.costInfo}>
                       <ThemedText style={styles.costType}>{cost?.form_cost?.name || cost.type}</ThemedText>
                       <ThemedText style={styles.costTypeDetail}>{cost.type}</ThemedText>
@@ -267,7 +421,7 @@ export default function ExpenseDetailScreen() {
                         : null;
 
                       return (
-                        <View style={styles.routeSection}>
+                        <View style={[styles.routeSection, { backgroundColor: isDark ? '#1C1C1E' : '#f5f5f5' }]}>
                           <View style={styles.routeHeader}>
                             <IconSymbol size={16} name="car.fill" color={Colors[colorScheme].tint} />
                             <ThemedText style={styles.routeTitle}>Route</ThemedText>
@@ -318,7 +472,7 @@ export default function ExpenseDetailScreen() {
 
                           {/* Total KM */}
                           {totalKm && (
-                            <View style={styles.routeTotalKm}>
+                            <View style={[styles.routeTotalKm, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]}>
                               <ThemedText style={styles.routeTotalKmLabel}>Total des KM:</ThemedText>
                               <ThemedText style={styles.routeTotalKmValue}>{totalKm} km</ThemedText>
                             </View>
@@ -346,7 +500,7 @@ export default function ExpenseDetailScreen() {
                       if (reqKeys.length === 0) return null;
 
                       return (
-                        <View style={styles.requirementsSection}>
+                        <View style={[styles.requirementsSection, { backgroundColor: isDark ? '#1C1C1E' : '#f5f5f5' }]}>
                           <View style={styles.requirementsHeader}>
                             <IconSymbol size={16} name="doc.text" color={Colors[colorScheme].tint} />
                             <ThemedText style={styles.requirementsTitle}>Annexes</ThemedText>
@@ -402,67 +556,39 @@ export default function ExpenseDetailScreen() {
             </View>
           )}
 
-          {/* Raison de rejet */}
-          {status === 'rejected' && expenseSheet.refusal_reason && (
-            <ThemedView style={[styles.card, styles.rejectionCard]}>
-              <View style={styles.rejectionHeader}>
-                <IconSymbol size={24} name="exclamationmark.triangle.fill" color="#FF3B30" />
-                <ThemedText style={styles.rejectionTitle}>Raison du rejet</ThemedText>
-              </View>
-              <ThemedText style={styles.rejectionReason}>{expenseSheet.refusal_reason}</ThemedText>
-            </ThemedView>
-          )}
-
           {/* Actions de validation (pour les managers) */}
           {(canApprove || canReject) && status === 'pending' && (
             <View style={styles.validationActions}>
               {canReject && (
                 <TouchableOpacity
                   style={[styles.validationButton, styles.rejectButton]}
-                  onPress={() => {
-                    Alert.alert(
-                      'Rejeter la note',
-                      'Voulez-vous vraiment rejeter cette note de frais ?',
-                      [
-                        { text: 'Annuler', style: 'cancel' },
-                        {
-                          text: 'Rejeter',
-                          style: 'destructive',
-                          onPress: () => {
-                            // TODO: Implement reject API call
-                            Alert.alert('Info', 'Fonctionnalité à implémenter');
-                          }
-                        },
-                      ]
-                    );
-                  }}
+                  onPress={handleReject}
+                  disabled={isProcessing}
                 >
-                  <IconSymbol size={20} name="xmark.circle.fill" color="#fff" />
-                  <ThemedText style={styles.validationButtonText}>Rejeter</ThemedText>
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <IconSymbol size={20} name="xmark.circle.fill" color="#fff" />
+                      <ThemedText style={styles.validationButtonText}>Rejeter</ThemedText>
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
               {canApprove && (
                 <TouchableOpacity
                   style={[styles.validationButton, styles.approveButton]}
-                  onPress={() => {
-                    Alert.alert(
-                      'Approuver la note',
-                      'Voulez-vous approuver cette note de frais ?',
-                      [
-                        { text: 'Annuler', style: 'cancel' },
-                        {
-                          text: 'Approuver',
-                          onPress: () => {
-                            // TODO: Implement approve API call
-                            Alert.alert('Info', 'Fonctionnalité à implémenter');
-                          }
-                        },
-                      ]
-                    );
-                  }}
+                  onPress={handleApprove}
+                  disabled={isProcessing}
                 >
-                  <IconSymbol size={20} name="checkmark.circle.fill" color="#fff" />
-                  <ThemedText style={styles.validationButtonText}>Approuver</ThemedText>
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <IconSymbol size={20} name="checkmark.circle.fill" color="#fff" />
+                      <ThemedText style={styles.validationButtonText}>Approuver</ThemedText>
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -472,7 +598,7 @@ export default function ExpenseDetailScreen() {
 
       {/* Actions de soumission (pour brouillons) */}
       {status === 'draft' && canEdit && (
-        <View style={styles.actions}>
+        <View style={[styles.actions, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0' }]}>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={() => {
@@ -496,7 +622,7 @@ export default function ExpenseDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.submitButton, { backgroundColor: Colors[colorScheme].tint }]}
-            onPress={() => {
+            onPress={async () => {
               Alert.alert(
                 'Soumettre la note',
                 'Voulez-vous soumettre cette note de frais pour validation ?',
@@ -504,9 +630,21 @@ export default function ExpenseDetailScreen() {
                   { text: 'Annuler', style: 'cancel' },
                   {
                     text: 'Soumettre',
-                    onPress: () => {
-                      // TODO: Implement submit API call
-                      router.back();
+                    onPress: async () => {
+                      try {
+                        await api.updateExpenseSheet(Number(id), { is_draft: false });
+                        Alert.alert(
+                          'Succès',
+                          'Note de frais soumise avec succès',
+                          [{ text: 'OK', onPress: () => router.back() }]
+                        );
+                      } catch (error) {
+                        console.error('Error submitting expense sheet:', error);
+                        Alert.alert(
+                          'Erreur',
+                          error instanceof Error ? error.message : 'Une erreur est survenue'
+                        );
+                      }
                     }
                   },
                 ]
@@ -561,7 +699,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   statusText: {
     fontSize: 16,
@@ -569,13 +707,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   amountSection: {
-    marginTop: 8,
+    marginTop: 0,
     marginBottom: 24,
+    paddingTop: 8,
   },
   amount: {
     fontSize: 48,
     fontWeight: 'bold',
     marginBottom: 8,
+    lineHeight: 56,
   },
   title: {
     fontSize: 20,
@@ -615,7 +755,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
     marginVertical: 8,
   },
   sectionTitle: {
@@ -636,7 +775,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   costInfo: {
     flex: 1,
@@ -680,7 +818,6 @@ const styles = StyleSheet.create({
   routeSection: {
     marginTop: 12,
     padding: 12,
-    backgroundColor: '#f5f5f5',
     borderRadius: 8,
   },
   routeHeader: {
@@ -741,7 +878,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   routeTotalKmLabel: {
     fontSize: 14,
@@ -755,7 +891,6 @@ const styles = StyleSheet.create({
   requirementsSection: {
     marginTop: 12,
     padding: 12,
-    backgroundColor: '#f5f5f5',
     borderRadius: 8,
   },
   requirementsHeader: {
@@ -848,8 +983,90 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  validationCard: {
+    backgroundColor: '#34C75915',
+    borderLeftWidth: 4,
+    borderLeftColor: '#34C759',
+  },
   rejectionCard: {
-    backgroundColor: '#FF3B3010',
+    backgroundColor: '#FF3B3015',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF3B30',
+  },
+  pendingCard: {
+    backgroundColor: '#FF950015',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  validationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  validationHeaderTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    flex: 1,
+  },
+  validationInfo: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  validationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  validationLabel: {
+    fontSize: 15,
+    opacity: 0.7,
+    fontWeight: '600',
+    minWidth: 110,
+  },
+  validationValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  pendingInfo: {
+    paddingTop: 4,
+  },
+  pendingMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.8,
+    fontStyle: 'italic',
+  },
+  rejectionDivider: {
+    height: 1,
+    backgroundColor: '#FF3B3040',
+    marginVertical: 16,
+  },
+  rejectionReasonSection: {
+    gap: 12,
+  },
+  rejectionReasonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rejectionReasonLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FF3B30',
+  },
+  rejectionReasonContent: {
+    backgroundColor: '#FF3B3008',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF3B30',
+  },
+  rejectionReason: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#1a1a1a',
   },
   rejectionHeader: {
     flexDirection: 'row',
@@ -862,17 +1079,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF3B30',
   },
-  rejectionReason: {
-    fontSize: 16,
-    lineHeight: 24,
-    opacity: 0.8,
-  },
   actions: {
     flexDirection: 'row',
     gap: 12,
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   actionButton: {
     flex: 1,

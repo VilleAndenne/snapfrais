@@ -297,7 +297,14 @@ export default function CreateExpenseScreen() {
         // Add cost data
         Object.entries(data).forEach(([key, value]) => {
           if (value !== null && value !== undefined) {
-            formData.append(`costs[${index}][data][${key}]`, value.toString());
+            // Si c'est un tableau (comme steps), on l'envoie sous forme de tableau
+            if (Array.isArray(value)) {
+              value.forEach((item, itemIndex) => {
+                formData.append(`costs[${index}][data][${key}][${itemIndex}]`, item.toString());
+              });
+            } else {
+              formData.append(`costs[${index}][data][${key}]`, value.toString());
+            }
           }
         });
 
@@ -349,15 +356,6 @@ export default function CreateExpenseScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <IconSymbol size={28} name="xmark.circle.fill" color={isDark ? '#fff' : '#000'} />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Créer une note de frais</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
-
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Form name */}
@@ -376,13 +374,20 @@ export default function CreateExpenseScreen() {
               Département <ThemedText style={styles.required}>*</ThemedText>
             </ThemedText>
             <TouchableOpacity onPress={showDepartmentPicker}>
-              <ThemedView style={[styles.selectButton, isDark && styles.selectButtonDark]}>
+              <ThemedView style={[
+                styles.selectButton,
+                isDark && styles.selectButtonDark,
+                submitted && !selectedDepartmentId && styles.selectButtonError
+              ]}>
                 <ThemedText style={[styles.selectButtonText, !selectedDepartmentId && styles.placeholderText]}>
                   {selectedDepartment?.name || 'Sélectionner un département'}
                 </ThemedText>
                 <IconSymbol size={20} name="chevron.down" color={isDark ? '#999' : '#666'} />
               </ThemedView>
             </TouchableOpacity>
+            {submitted && !selectedDepartmentId && (
+              <ThemedText style={styles.errorText}>Veuillez sélectionner un département</ThemedText>
+            )}
             {departments.length > 0 && (
               <ThemedText style={styles.helperText}>
                 {departments.length} département(s) disponible(s)
@@ -506,23 +511,28 @@ export default function CreateExpenseScreen() {
       </ScrollView>
 
       {/* Actions */}
-      <View style={styles.actions}>
+      <View style={[styles.actions, isDark && styles.actionsDark]}>
         <TouchableOpacity
-          style={[styles.actionButton, styles.draftButton]}
+          style={[
+            styles.actionButton,
+            styles.draftButton,
+            isDark && styles.draftButtonDark,
+            (isSubmitting || selectedCosts.length === 0) && styles.buttonDisabled,
+          ]}
           onPress={handleSaveDraft}
           disabled={isSubmitting || selectedCosts.length === 0}
         >
           {isSubmitting && isDraftSubmit ? (
-            <ActivityIndicator size="small" color="#666" />
+            <ActivityIndicator size="small" color={isDark ? '#fff' : '#666'} />
           ) : (
-            <ThemedText style={styles.draftButtonText}>Brouillon</ThemedText>
+            <ThemedText style={[styles.draftButtonText, isDark && styles.draftButtonTextDark]}>Brouillon</ThemedText>
           )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.actionButton,
             styles.submitButton,
-            { backgroundColor: Colors[colorScheme].tint },
+            { backgroundColor: '#34C759' },
             (isSubmitting || selectedCosts.length === 0) && styles.buttonDisabled,
           ]}
           onPress={handleSubmitForm}
@@ -553,29 +563,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.7,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  placeholder: {
-    width: 36,
-  },
   scrollView: {
     flex: 1,
   },
   content: {
     paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 120,
   },
   formHeader: {
@@ -622,12 +615,21 @@ const styles = StyleSheet.create({
   selectButtonDark: {
     borderColor: '#333',
   },
+  selectButtonError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
   selectButtonText: {
     fontSize: 16,
     flex: 1,
   },
   placeholderText: {
     opacity: 0.5,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#FF3B30',
+    marginTop: 4,
   },
   helperText: {
     fontSize: 12,
@@ -646,6 +648,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
+  actionsDark: {
+    borderTopColor: '#333',
+  },
   actionButton: {
     flex: 1,
     paddingVertical: 16,
@@ -656,10 +661,16 @@ const styles = StyleSheet.create({
   draftButton: {
     backgroundColor: '#e0e0e0',
   },
+  draftButtonDark: {
+    backgroundColor: '#2C2C2E',
+  },
   draftButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#666',
+  },
+  draftButtonTextDark: {
+    color: '#fff',
   },
   submitButton: {
     shadowColor: '#000',

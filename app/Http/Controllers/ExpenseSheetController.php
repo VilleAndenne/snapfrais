@@ -227,11 +227,15 @@ class ExpenseSheetController extends Controller
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
+                    // Récupérer le nom du requirement depuis la base de données
+                    $requirementModel = \App\Models\FormCostRequirement::find($key);
+                    $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
+
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
                         $path = $requirement['file']->store('requirements', 'public');
-                        $requirements[$key] = ['file' => $path];
+                        $requirements[$requirementName] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
-                        $requirements[$key] = ['value' => $requirement['value']];
+                        $requirements[$requirementName] = ['value' => $requirement['value']];
                     }
                 }
             }
@@ -256,10 +260,14 @@ class ExpenseSheetController extends Controller
 
         if ($globalTotal <= 0) {
             $expenseSheet->delete();
+            \Log::error("Note de frais à 0€ détectée et supprimée (web)", [
+                'expense_sheet_id' => $expenseSheet->id,
+                'user_id' => auth()->id(),
+            ]);
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+                ->with('error', 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.');
         }
 
         // Ne pas envoyer de notifications pour les brouillons
@@ -606,10 +614,14 @@ class ExpenseSheetController extends Controller
 
             if ($globalTotal <= 0) {
                 $expenseSheet->delete();
+                \Log::error("Note de frais à 0€ détectée et supprimée (web update)", [
+                    'expense_sheet_id' => $expenseSheet->id,
+                    'user_id' => auth()->id(),
+                ]);
                 return redirect()
                     ->back()
                     ->withInput()
-                    ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+                    ->with('error', 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.');
             }
 
             // Notifier les responsables de la resoumission (sauf pour les brouillons)

@@ -210,6 +210,20 @@ class ApiService {
       throw new Error('Unknown error occurred');
     }
   }
+
+  async approveExpenseSheet(id: number, approval: boolean, reason?: string): Promise<any> {
+    return this.request(API_ENDPOINTS.EXPENSE_SHEET_APPROVE(id), {
+      method: 'POST',
+      body: JSON.stringify({ approval, reason }),
+    });
+  }
+
+  async updateExpenseSheet(id: number, data: { is_draft: boolean }): Promise<any> {
+    return this.request(API_ENDPOINTS.EXPENSE_SHEET_DETAILS(id), {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 // Export singleton instance

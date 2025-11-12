@@ -98,8 +98,12 @@ export function CostCard({
 
       {/* Date field */}
       <View style={styles.field}>
-        <ThemedText style={styles.fieldLabel}>Date du coût</ThemedText>
-        <ThemedView style={[styles.input, isDark && styles.inputDark]}>
+        <ThemedText style={styles.fieldLabel}>Date du coût <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+        <ThemedView style={[
+          styles.input,
+          isDark && styles.inputDark,
+          submitted && !costData.date && styles.inputError
+        ]}>
           <IconSymbol size={20} name="calendar" color={isDark ? '#999' : '#666'} />
           <TextInput
             value={costData.date}
@@ -109,11 +113,14 @@ export function CostCard({
             style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
           />
         </ThemedView>
+        {submitted && !costData.date && (
+          <ThemedText style={styles.errorText}>Ce champ est obligatoire</ThemedText>
+        )}
       </View>
 
       {/* Cost type specific inputs */}
       {cost.type === 'km' && (
-        <View style={styles.kmSection}>
+        <ThemedView style={[styles.kmSection, isDark && styles.kmSectionDark]}>
           {(() => {
             const currentDate = costData.date || new Date().toISOString().split('T')[0];
             const currentRate = getActiveRate(currentDate);
@@ -151,9 +158,14 @@ export function CostCard({
             );
           })()}
 
+          {/* Error message if distance not calculated */}
+          {submitted && !costData.kmData?.totalKm && (
+            <ThemedText style={styles.errorText}>Veuillez calculer la distance en entrant les adresses de départ et d'arrivée</ThemedText>
+          )}
+
           {/* Display calculated amount */}
           {costData.kmData?.totalKm && (
-            <View style={styles.kmCalculation}>
+            <ThemedView style={[styles.kmCalculation, isDark && styles.kmCalculationDark]}>
               <View style={styles.kmCalculationRow}>
                 <ThemedText style={styles.kmLabel}>Distance:</ThemedText>
                 <ThemedText style={styles.kmValue}>{costData.kmData.totalKm} km</ThemedText>
@@ -170,42 +182,66 @@ export function CostCard({
                   {(costData.reimbursementAmount || 0).toFixed(2)} €
                 </ThemedText>
               </View>
-            </View>
+            </ThemedView>
           )}
-        </View>
+        </ThemedView>
       )}
 
       {cost.type === 'fixed' && (
         <View style={styles.field}>
-          <ThemedText style={styles.fieldLabel}>Montant fixe</ThemedText>
-          <ThemedView style={[styles.input, isDark && styles.inputDark]}>
+          <ThemedText style={styles.fieldLabel}>Montant fixe <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+          <ThemedView style={[
+            styles.input,
+            isDark && styles.inputDark,
+            submitted && (!costData.fixedAmount || costData.fixedAmount <= 0) && styles.inputError
+          ]}>
             <TextInput
-              value={costData.fixedAmount?.toString() || ''}
-              onChangeText={(value) => onUpdateData({ fixedAmount: parseFloat(value) || 0 })}
+              value={costData.fixedAmountText || ''}
+              onChangeText={(value) => {
+                // Accepter seulement chiffres, virgule et point
+                const cleanValue = value.replace(/[^0-9.,]/g, '');
+                const normalizedValue = cleanValue.replace(',', '.');
+                onUpdateData({
+                  fixedAmountText: cleanValue,
+                  fixedAmount: parseFloat(normalizedValue) || 0
+                });
+              }}
               placeholder="0.00"
               placeholderTextColor={isDark ? '#666' : '#999'}
-              keyboardType="decimal-pad"
+              keyboardType="numeric"
               style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
             />
             <ThemedText style={styles.currency}>€</ThemedText>
           </ThemedView>
+          {submitted && (!costData.fixedAmount || costData.fixedAmount <= 0) && (
+            <ThemedText style={styles.errorText}>Veuillez entrer un montant valide</ThemedText>
+          )}
         </View>
       )}
 
       {cost.type === 'percentage' && (
         <View style={styles.percentageSection}>
           <View style={styles.field}>
-            <ThemedText style={styles.fieldLabel}>Montant payé</ThemedText>
-            <ThemedView style={[styles.input, isDark && styles.inputDark]}>
+            <ThemedText style={styles.fieldLabel}>Montant payé <ThemedText style={styles.required}>*</ThemedText></ThemedText>
+            <ThemedView style={[
+              styles.input,
+              isDark && styles.inputDark,
+              submitted && (!costData.percentageData?.paidAmount || costData.percentageData.paidAmount <= 0) && styles.inputError
+            ]}>
               <TextInput
-                value={costData.percentageData?.paidAmount?.toString() || ''}
+                value={costData.percentageData?.paidAmountText || ''}
                 onChangeText={(value) => {
-                  const paidAmount = parseFloat(value) || 0;
+                  // Accepter seulement chiffres, virgule et point
+                  const cleanValue = value.replace(/[^0-9.,]/g, '');
+                  // Remplacer la virgule par un point pour parseFloat
+                  const normalizedValue = cleanValue.replace(',', '.');
+                  const paidAmount = parseFloat(normalizedValue) || 0;
                   const percentage = costData.percentageData?.percentage || 0;
                   const reimbursedAmount = (paidAmount * percentage) / 100;
                   onUpdateData({
                     percentageData: {
                       ...costData.percentageData,
+                      paidAmountText: cleanValue, // Garder la valeur brute avec virgule
                       paidAmount,
                       reimbursedAmount,
                     },
@@ -213,21 +249,24 @@ export function CostCard({
                 }}
                 placeholder="0.00"
                 placeholderTextColor={isDark ? '#666' : '#999'}
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
                 style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
               />
               <ThemedText style={styles.currency}>€</ThemedText>
             </ThemedView>
+            {submitted && (!costData.percentageData?.paidAmount || costData.percentageData.paidAmount <= 0) && (
+              <ThemedText style={styles.errorText}>Veuillez entrer un montant valide</ThemedText>
+            )}
           </View>
 
-          <View style={styles.percentageInfo}>
+          <ThemedView style={[styles.percentageInfo, isDark && styles.percentageInfoDark]}>
             <ThemedText style={styles.percentageLabel}>
               Pourcentage: {costData.percentageData?.percentage || 0}%
             </ThemedText>
             <ThemedText style={styles.reimbursedAmount}>
               Remboursé: {(costData.percentageData?.reimbursedAmount || 0).toFixed(2)} €
             </ThemedText>
-          </View>
+          </ThemedView>
         </View>
       )}
 
@@ -309,9 +348,22 @@ const styles = StyleSheet.create({
   inputDark: {
     borderColor: '#333',
   },
+  inputError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
   textInput: {
     flex: 1,
     fontSize: 14,
+  },
+  required: {
+    color: '#FF3B30',
+    fontWeight: 'bold',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#FF3B30',
+    marginTop: 4,
   },
   currency: {
     fontSize: 16,
@@ -319,10 +371,13 @@ const styles = StyleSheet.create({
   },
   kmSection: {
     padding: 12,
-    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     marginTop: 8,
     gap: 12,
+    backgroundColor: '#f5f5f5',
+  },
+  kmSectionDark: {
+    backgroundColor: '#1C1C1E',
   },
   kmPlaceholder: {
     fontSize: 14,
@@ -331,11 +386,15 @@ const styles = StyleSheet.create({
   },
   kmCalculation: {
     padding: 12,
-    backgroundColor: '#fff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
     gap: 8,
+  },
+  kmCalculationDark: {
+    borderColor: '#333',
+    backgroundColor: '#2C2C2E',
   },
   kmCalculationRow: {
     flexDirection: 'row',
@@ -370,9 +429,12 @@ const styles = StyleSheet.create({
   },
   percentageInfo: {
     padding: 12,
-    backgroundColor: '#f5f5f5',
     borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     gap: 4,
+  },
+  percentageInfoDark: {
+    backgroundColor: '#1C1C1E',
   },
   percentageLabel: {
     fontSize: 14,

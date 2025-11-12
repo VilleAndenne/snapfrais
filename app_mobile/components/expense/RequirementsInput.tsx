@@ -132,7 +132,7 @@ export function RequirementsInput({
   }
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={[styles.container, isDark && styles.containerDark]}>
       <ThemedText style={styles.title}>Prérequis</ThemedText>
 
       {requirements.map((requirement) => {
@@ -204,7 +204,7 @@ export function RequirementsInput({
           </View>
         );
       })}
-    </View>
+    </ThemedView>
   );
 }
 
@@ -214,6 +214,9 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
+  },
+  containerDark: {
+    backgroundColor: '#1C1C1E',
   },
   title: {
     fontSize: 15,

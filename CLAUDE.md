@@ -1,0 +1,1 @@
+- L'application mobile se trouve dans le dossier app_mobile
