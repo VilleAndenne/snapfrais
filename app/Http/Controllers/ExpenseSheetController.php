@@ -227,9 +227,15 @@ class ExpenseSheetController extends Controller
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
-                    // Récupérer le nom du requirement depuis la base de données
-                    $requirementModel = \App\Models\FormCostRequirement::find($key);
-                    $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
+                    // Déterminer le nom du requirement
+                    // Si $key est numérique, c'est un ID, sinon c'est déjà le nom
+                    if (is_numeric($key)) {
+                        $requirementModel = \App\Models\FormCostRequirement::find($key);
+                        $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
+                    } else {
+                        // $key est déjà le nom du requirement
+                        $requirementName = $key;
+                    }
 
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
                         $path = $requirement['file']->store('requirements', 'public');

@@ -457,7 +457,7 @@ export default function DashboardScreen() {
                         </View>
                         <View style={[styles.expenseCardFooter, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(128, 128, 128, 0.2)' }]}>
                           <ThemedText style={styles.expenseLabel}>Montant</ThemedText>
-                          <ThemedText style={styles.expenseAmount}>{(sheet.total ?? 0).toFixed(2)} €</ThemedText>
+                          <ThemedText style={styles.expenseAmount}>{(Number(sheet.total) || 0).toFixed(2)} €</ThemedText>
                         </View>
                       </ThemedView>
                   </TouchableOpacity>
