@@ -10,6 +10,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ExpenseSheetController extends Controller
 {
@@ -232,7 +233,7 @@ class ExpenseSheetController extends Controller
                         $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
 
                         if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                            $path = $requirement['file']->store('requirements', 'public');
+                            $path = Storage::putFile('requirements', $requirement['file']);
                             $requirements[$requirementName] = ['file' => $path];
                         } elseif (is_array($requirement) && isset($requirement['value'])) {
                             $requirements[$requirementName] = ['value' => $requirement['value']];
