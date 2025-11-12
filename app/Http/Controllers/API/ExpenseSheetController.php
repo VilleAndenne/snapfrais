@@ -233,7 +233,7 @@ class ExpenseSheetController extends Controller
                         $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
 
                         if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                            $path = Storage::putFile('requirements', $requirement['file']);
+                            $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
                             $requirements[$requirementName] = ['file' => $path];
                         } elseif (is_array($requirement) && isset($requirement['value'])) {
                             $requirements[$requirementName] = ['value' => $requirement['value']];
