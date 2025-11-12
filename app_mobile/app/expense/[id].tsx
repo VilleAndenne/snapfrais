@@ -109,7 +109,7 @@ export default function ExpenseDetailScreen() {
 
     Alert.alert(
       'Approuver la note de frais',
-      `Voulez-vous approuver la note de frais de ${expenseSheet.user?.name} pour un montant de ${expenseSheet.total.toFixed(2)} € ?\n\nCette action est irréversible.`,
+      `Voulez-vous approuver la note de frais de ${expenseSheet.user?.name} pour un montant de ${(Number(expenseSheet.total) || 0).toFixed(2)} € ?\n\nCette action est irréversible.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -305,7 +305,7 @@ export default function ExpenseDetailScreen() {
 
           {/* Montant */}
           <View style={styles.amountSection}>
-            <ThemedText style={styles.amount}>{(expenseSheet.total ?? 0).toFixed(2)} €</ThemedText>
+            <ThemedText style={styles.amount}>{(Number(expenseSheet.total) || 0).toFixed(2)} €</ThemedText>
             <ThemedText style={styles.title}>{expenseSheet.form?.name}</ThemedText>
           </View>
 
@@ -395,7 +395,7 @@ export default function ExpenseDetailScreen() {
                         })}
                       </ThemedText>
                     </View>
-                    <ThemedText style={styles.costAmount}>{cost.total.toFixed(2)} €</ThemedText>
+                    <ThemedText style={styles.costAmount}>{(Number(cost.total) || 0).toFixed(2)} €</ThemedText>
                   </View>
 
                   {/* Détails supplémentaires */}
@@ -405,7 +405,7 @@ export default function ExpenseDetailScreen() {
                       <View style={styles.costDetailRow}>
                         <IconSymbol size={16} name="creditcard" color={isDark ? '#999' : '#666'} />
                         <ThemedText style={styles.costDetailLabel}>Montant payé:</ThemedText>
-                        <ThemedText style={styles.costDetailValue}>{cost.amount.toFixed(2)} €</ThemedText>
+                        <ThemedText style={styles.costDetailValue}>{(Number(cost.amount) || 0).toFixed(2)} €</ThemedText>
                       </View>
                     )}
 
@@ -483,14 +483,16 @@ export default function ExpenseDetailScreen() {
 
                     {/* Annexes / Requirements */}
                     {(() => {
-                      if (!cost.requirements) return null;
+                      // Utiliser requirements_with_urls qui contient les URLs complètes
+                      const requirementsData = cost.requirements_with_urls || cost.requirements;
+                      if (!requirementsData) return null;
 
                       // Parser les requirements (peuvent être une string JSON ou déjà un objet)
                       let reqData: Record<string, any> = {};
                       try {
-                        reqData = typeof cost.requirements === 'string'
-                          ? JSON.parse(cost.requirements)
-                          : cost.requirements;
+                        reqData = typeof requirementsData === 'string'
+                          ? JSON.parse(requirementsData)
+                          : requirementsData;
                       } catch {
                         return null;
                       }

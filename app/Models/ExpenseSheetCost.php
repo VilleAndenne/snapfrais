@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ExpenseSheetCost extends Model
 {
@@ -24,6 +25,8 @@ class ExpenseSheetCost extends Model
         'requirements' => 'array',
     ];
 
+    protected $appends = ['file_url'];
+
     public function expenseSheet()
     {
         return $this->belongsTo(ExpenseSheet::class);
@@ -40,5 +43,10 @@ class ExpenseSheetCost extends Model
             \App\Models\ExpenseSheetExport::class,
             'expense_sheet_export_expense_sheets'
         )->withTimestamps();
+    }
+
+    public function getFileUrlAttribute()
+    {
+        return Storage::url($this->requirements['file'] ?? '');
     }
 }
