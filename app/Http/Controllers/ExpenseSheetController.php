@@ -59,16 +59,34 @@ class ExpenseSheetController extends Controller
 
     public function store(Request $request, $id)
     {
-        $validated = $request->validate([
-            'costs' => 'required|array|max:30',
-            'costs.*.cost_id' => 'required|exists:form_costs,id',
-            'costs.*.data' => 'required|array',
-            'costs.*.date' => 'required|date',
-            'costs.*.requirements' => 'nullable|array',
-            'department_id' => 'required|exists:departments,id',
-            'target_user_id' => 'nullable|exists:users,id',
-            'is_draft' => 'required|boolean',
-        ]);
+        try {
+            \Log::info('ExpenseSheet store called', [
+                'formId' => $id,
+                'user_id' => auth()->id(),
+                'has_costs' => $request->has('costs'),
+                'is_draft' => $request->input('is_draft'),
+                'all_keys' => array_keys($request->all()),
+            ]);
+
+        try {
+            $validated = $request->validate([
+                'costs' => 'required|array|max:30',
+                'costs.*.cost_id' => 'required|exists:form_costs,id',
+                'costs.*.data' => 'required|array',
+                'costs.*.date' => 'required|date',
+                'costs.*.requirements' => 'nullable|array',
+                'department_id' => 'required|exists:departments,id',
+                'target_user_id' => 'nullable|exists:users,id',
+                'is_draft' => 'required|boolean',
+            ]);
+            \Log::info('Validation passed');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed', [
+                'errors' => $e->errors(),
+                'request_data' => $request->except(['_token'])
+            ]);
+            throw $e;
+        }
 
         // Convertir is_draft en booléen de manière fiable
         $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
@@ -209,11 +227,21 @@ class ExpenseSheetController extends Controller
             $requirements = [];
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
+                    // Déterminer le nom du requirement
+                    // Si $key est numérique, c'est un ID, sinon c'est déjà le nom
+                    if (is_numeric($key)) {
+                        $requirementModel = \App\Models\FormCostRequirement::find($key);
+                        $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
+                    } else {
+                        // $key est déjà le nom du requirement
+                        $requirementName = $key;
+                    }
+
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
-                        $requirements[$key] = ['file' => $path];
+                        $path = $requirement['file']->store('requirements', 'public');
+                        $requirements[$requirementName] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
-                        $requirements[$key] = ['value' => $requirement['value']];
+                        $requirements[$requirementName] = ['value' => $requirement['value']];
                     }
                 }
             }
@@ -238,10 +266,14 @@ class ExpenseSheetController extends Controller
 
         if ($globalTotal <= 0) {
             $expenseSheet->delete();
+            \Log::error("Note de frais à 0€ détectée et supprimée (web)", [
+                'expense_sheet_id' => $expenseSheet->id,
+                'user_id' => auth()->id(),
+            ]);
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+                ->with('error', 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.');
         }
 
         // Ne pas envoyer de notifications pour les brouillons
@@ -266,7 +298,35 @@ class ExpenseSheetController extends Controller
         }
 
         $message = $isDraft ? 'Brouillon enregistré.' : 'Note de frais enregistrée.';
+
+        // API request: return JSON
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'expense_sheet' => $expenseSheet->load(['costs', 'department', 'user']),
+            ], 201);
+        }
+
+        // Web request: redirect
         return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', $message);
+
+        } catch (\Exception $e) {
+            \Log::error('ExpenseSheet store error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // API request: return JSON error
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 500);
+            }
+
+            throw $e;
+        }
     }
 
     /**
@@ -560,10 +620,14 @@ class ExpenseSheetController extends Controller
 
             if ($globalTotal <= 0) {
                 $expenseSheet->delete();
+                \Log::error("Note de frais à 0€ détectée et supprimée (web update)", [
+                    'expense_sheet_id' => $expenseSheet->id,
+                    'user_id' => auth()->id(),
+                ]);
                 return redirect()
                     ->back()
                     ->withInput()
-                    ->with('error', 'Le total de la note de frais ne peut pas être nul. Veuillez vérifier les coûts saisis.');
+                    ->with('error', 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.');
             }
 
             // Notifier les responsables de la resoumission (sauf pour les brouillons)
@@ -629,6 +693,12 @@ class ExpenseSheetController extends Controller
 
         if ($validated['approval']) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
+
+            // Générer et envoyer le PDF pour les coûts DSF
+            $dsfService = new \App\Services\DsfReimbursementService();
+            if ($dsfService->hasDsfCosts($expenseSheet)) {
+                $dsfService->generateAndSendReimbursementPdf($expenseSheet);
+            }
         } else {
             $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
         }

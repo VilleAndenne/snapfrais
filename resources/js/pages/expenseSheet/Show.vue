@@ -75,7 +75,7 @@
                         Note de frais refusée
                         <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive/70"></span>
                     </h3>
-                    <div class="space-y-1 text-xs sm:text-sm text-destructive/90">
+                    <div class="space-y-1 text-xs sm:text-sm text-destructive/90 dark:text-red-200">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Refusée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
