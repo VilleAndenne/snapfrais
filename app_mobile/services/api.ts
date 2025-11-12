@@ -141,18 +141,32 @@ class ApiService {
   }
 
   async createExpenseSheet(formId: number, data: FormData): Promise<any> {
+    console.log('========== createExpenseSheet START ==========');
+    console.log('createExpenseSheet - formId:', formId);
+
     const token = await this.getToken();
+    console.log('createExpenseSheet - Token retrieved:', token ? `Present (length: ${token.length}, first 20 chars: ${token.substring(0, 20)}...)` : 'MISSING!!!');
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
     try {
+      const url = `${this.baseURL}${API_ENDPOINTS.EXPENSE_SHEET_CREATE(formId)}`;
+      console.log('createExpenseSheet - Full URL:', url);
+
       const headers: HeadersInit = {
         'Accept': 'application/json',
       };
 
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('createExpenseSheet - Authorization header SET successfully');
+      } else {
+        console.error('createExpenseSheet - ERROR: No token found! Cannot authenticate!');
       }
+
+      console.log('createExpenseSheet - Headers keys:', Object.keys(headers));
+      console.log('createExpenseSheet - Complete headers object:', JSON.stringify(headers, null, 2));
 
       const response = await fetch(
         `${this.baseURL}${API_ENDPOINTS.EXPENSE_SHEET_CREATE(formId)}`,
@@ -164,18 +178,29 @@ class ApiService {
         }
       );
 
+      console.log('createExpenseSheet - Request sent, waiting for response...');
+
       clearTimeout(timeoutId);
 
+      console.log('createExpenseSheet - Response status:', response.status);
+
       if (!response.ok) {
-        const error: ApiError = await response.json().catch(() => ({
-          message: `HTTP Error ${response.status}`,
-        }));
+        const errorText = await response.text();
+        console.error('createExpenseSheet - Error response:', errorText);
+
+        let error: ApiError;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { message: `HTTP Error ${response.status}: ${errorText}` };
+        }
         throw new Error(error.message || `HTTP Error ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
       clearTimeout(timeoutId);
+      console.error('createExpenseSheet - Exception:', error);
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           throw new Error('Request timeout');

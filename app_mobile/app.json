@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cette application a besoin d'accéder à votre caméra pour prendre des photos de reçus et documents.",
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour sélectionner des reçus et documents.",
+        "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour sauvegarder des documents."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +24,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "output": "static",

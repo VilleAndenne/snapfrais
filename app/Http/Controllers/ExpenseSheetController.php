@@ -59,16 +59,34 @@ class ExpenseSheetController extends Controller
 
     public function store(Request $request, $id)
     {
-        $validated = $request->validate([
-            'costs' => 'required|array|max:30',
-            'costs.*.cost_id' => 'required|exists:form_costs,id',
-            'costs.*.data' => 'required|array',
-            'costs.*.date' => 'required|date',
-            'costs.*.requirements' => 'nullable|array',
-            'department_id' => 'required|exists:departments,id',
-            'target_user_id' => 'nullable|exists:users,id',
-            'is_draft' => 'required|boolean',
-        ]);
+        try {
+            \Log::info('ExpenseSheet store called', [
+                'formId' => $id,
+                'user_id' => auth()->id(),
+                'has_costs' => $request->has('costs'),
+                'is_draft' => $request->input('is_draft'),
+                'all_keys' => array_keys($request->all()),
+            ]);
+
+        try {
+            $validated = $request->validate([
+                'costs' => 'required|array|max:30',
+                'costs.*.cost_id' => 'required|exists:form_costs,id',
+                'costs.*.data' => 'required|array',
+                'costs.*.date' => 'required|date',
+                'costs.*.requirements' => 'nullable|array',
+                'department_id' => 'required|exists:departments,id',
+                'target_user_id' => 'nullable|exists:users,id',
+                'is_draft' => 'required|boolean',
+            ]);
+            \Log::info('Validation passed');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed', [
+                'errors' => $e->errors(),
+                'request_data' => $request->except(['_token'])
+            ]);
+            throw $e;
+        }
 
         // Convertir is_draft en booléen de manière fiable
         $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
@@ -210,7 +228,7 @@ class ExpenseSheetController extends Controller
             if (isset($costItem['requirements'])) {
                 foreach ($costItem['requirements'] as $key => $requirement) {
                     if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                        $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
+                        $path = $requirement['file']->store('requirements', 'public');
                         $requirements[$key] = ['file' => $path];
                     } elseif (is_array($requirement) && isset($requirement['value'])) {
                         $requirements[$key] = ['value' => $requirement['value']];
@@ -266,7 +284,35 @@ class ExpenseSheetController extends Controller
         }
 
         $message = $isDraft ? 'Brouillon enregistré.' : 'Note de frais enregistrée.';
+
+        // API request: return JSON
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'expense_sheet' => $expenseSheet->load(['costs', 'department', 'user']),
+            ], 201);
+        }
+
+        // Web request: redirect
         return redirect()->route('expense-sheet.show', $expenseSheet->id)->with('success', $message);
+
+        } catch (\Exception $e) {
+            \Log::error('ExpenseSheet store error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // API request: return JSON error
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 500);
+            }
+
+            throw $e;
+        }
     }
 
     /**

@@ -54,7 +54,9 @@ export interface FormCostReimbursementRate {
 export interface FormCostRequirement {
   id: number;
   form_cost_id: number;
+  name: string;
   requirement_type: string;
+  type: string; // "text" ou "file"
   required: boolean;
 }
 

@@ -31,6 +31,7 @@ interface CostData {
     reimbursedAmount?: number;
   };
   fixedAmount?: number;
+  reimbursementAmount?: number; // Montant total du remboursement (pour km)
   requirements?: Record<string, any>;
 }
 
@@ -49,7 +50,6 @@ export default function CreateExpenseScreen() {
   const [departments, setDepartments] = useState<Department[]>([]);
 
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null);
-  const [targetUserId, setTargetUserId] = useState<number | null>(null);
   const [selectedCosts, setSelectedCosts] = useState<SelectedCost[]>([]);
   const [costData, setCostData] = useState<CostData[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -64,11 +64,47 @@ export default function CreateExpenseScreen() {
     try {
       setIsLoading(true);
       const response = await api.getFormDetails(Number(formId));
-      setFormData(response);
-      setAvailableCosts(response.form.costs || []);
+
+      // Debug - Vérifier le format des données
+      console.log('RAW API Response first cost:', JSON.stringify(response.form.costs?.[0], null, 2));
+
+      // Transformer les données si elles sont en snake_case
+      const transformedCosts = response.form.costs?.map((cost: any) => {
+        const transformedCost = { ...cost };
+
+        // Transformer reimbursement_rates en camelCase
+        if (cost.reimbursement_rates && !cost.reimbursementRates) {
+          console.log('Transforming reimbursement_rates to camelCase for cost:', cost.name);
+          transformedCost.reimbursementRates = cost.reimbursement_rates;
+        }
+
+        // Transformer requirements (requirement_type en camelCase)
+        if (cost.requirements && Array.isArray(cost.requirements)) {
+          transformedCost.requirements = cost.requirements.map((req: any) => ({
+            ...req,
+            requirement_type: req.requirement_type || req.requirementType,
+          }));
+        }
+
+        return transformedCost;
+      }) || [];
+
+      console.log('Transformed costs:', transformedCosts.map((c: any) => ({
+        name: c.name,
+        hasReimbursementRates: !!c.reimbursementRates,
+        ratesCount: c.reimbursementRates?.length
+      })));
+
+      setFormData({
+        ...response,
+        form: {
+          ...response.form,
+          costs: transformedCosts,
+        },
+      });
+      setAvailableCosts(transformedCosts);
       setDepartments(response.departments);
 
-      // Debug
       console.log('Departments loaded:', response.departments);
       console.log('Number of departments:', response.departments.length);
     } catch (error) {
@@ -124,42 +160,6 @@ export default function CreateExpenseScreen() {
     }
   };
 
-  const showUserPicker = () => {
-    const users = selectedDepartment?.users || [];
-    if (users.length === 0) {
-      Alert.alert('Aucun utilisateur', 'Aucun utilisateur disponible dans ce département');
-      return;
-    }
-
-    if (Platform.OS === 'ios') {
-      const options = ['Annuler', ...users.map(u => u.name)];
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex > 0) {
-            setTargetUserId(users[buttonIndex - 1].id);
-          }
-        }
-      );
-    } else {
-      // Android: Use Alert with buttons
-      Alert.alert(
-        'Sélectionner un agent',
-        '',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          ...users.map(user => ({
-            text: user.name,
-            onPress: () => setTargetUserId(user.id),
-          })),
-        ],
-        { cancelable: true }
-      );
-    }
-  };
 
   const addCost = (cost: FormCost) => {
     if (selectedCosts.length >= 30) {
@@ -252,6 +252,29 @@ export default function CreateExpenseScreen() {
       return;
     }
 
+    // Valider les requirements obligatoires (seulement si ce n'est pas un brouillon)
+    if (!isDraft) {
+      for (let i = 0; i < selectedCosts.length; i++) {
+        const cost = selectedCosts[i];
+        const data = costData[i];
+
+        if (cost.requirements && cost.requirements.length > 0) {
+          for (const requirement of cost.requirements) {
+            if (requirement.required) {
+              const value = data.requirements?.[requirement.id];
+              if (!value) {
+                Alert.alert(
+                  'Prérequis manquants',
+                  `Le coût "${cost.name}" nécessite: ${requirement.requirement_type}.\nVeuillez compléter tous les champs obligatoires avant de soumettre.`
+                );
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -259,10 +282,6 @@ export default function CreateExpenseScreen() {
       const formData = new FormData();
       formData.append('department_id', selectedDepartmentId.toString());
       formData.append('is_draft', isDraft ? '1' : '0');
-
-      if (targetUserId) {
-        formData.append('target_user_id', targetUserId.toString());
-      }
 
       // Add costs
       selectedCosts.forEach((cost, index) => {
@@ -285,10 +304,16 @@ export default function CreateExpenseScreen() {
         // Add requirements
         if (costData[index].requirements) {
           Object.entries(costData[index].requirements).forEach(([reqId, req]) => {
-            if (req instanceof File || req?.uri) {
-              // Handle file uploads
-              formData.append(`costs[${index}][requirements][${reqId}][file]`, req);
+            if (req?.uri) {
+              // Handle file uploads (React Native)
+              const file: any = {
+                uri: req.uri,
+                name: req.name || `file_${reqId}`,
+                type: req.type || 'application/octet-stream',
+              };
+              formData.append(`costs[${index}][requirements][${reqId}][file]`, file);
             } else if (req !== null && req !== undefined && req !== '') {
+              // Handle text values
               formData.append(`costs[${index}][requirements][${reqId}][value]`, req.toString());
             }
           });
@@ -365,20 +390,6 @@ export default function CreateExpenseScreen() {
             )}
           </View>
 
-          {/* Target user selection (if head of department) */}
-          {selectedDepartment && selectedDepartment.heads && selectedDepartment.heads.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionLabel}>Pour quel agent ?</ThemedText>
-              <TouchableOpacity onPress={showUserPicker}>
-                <ThemedView style={[styles.selectButton, isDark && styles.selectButtonDark]}>
-                  <ThemedText style={[styles.selectButtonText, !targetUserId && styles.placeholderText]}>
-                    {selectedDepartment.users?.find(u => u.id === targetUserId)?.name || 'Sélectionner un agent'}
-                  </ThemedText>
-                  <IconSymbol size={20} name="chevron.down" color={isDark ? '#999' : '#666'} />
-                </ThemedView>
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Selected costs */}
           {selectedCosts.length > 0 && (
@@ -399,6 +410,81 @@ export default function CreateExpenseScreen() {
                   getActiveRate={(date) => getActiveRate(cost, date)}
                 />
               ))}
+
+              {/* Summary of KM costs */}
+              {(() => {
+                const kmCosts = selectedCosts
+                  .map((cost, index) => ({ cost, data: costData[index], index }))
+                  .filter(item => item.cost.type === 'km' && item.data.kmData?.totalKm);
+
+                if (kmCosts.length === 0) return null;
+
+                console.log('KM Summary - kmCosts:', kmCosts.map(item => ({
+                  costName: item.cost.name,
+                  date: item.data.date,
+                  km: item.data.kmData?.totalKm,
+                  reimbursement: item.data.reimbursementAmount,
+                  rates: item.cost.reimbursementRates
+                })));
+
+                const totalKm = kmCosts.reduce((sum, item) => sum + (item.data.kmData?.totalKm || 0), 0);
+                const totalAmount = kmCosts.reduce((sum, item) => sum + (item.data.reimbursementAmount || 0), 0);
+
+                // Calculate average rate (weighted by km)
+                const weightedRateSum = kmCosts.reduce((sum, item) => {
+                  const rate = getActiveRate(item.cost, item.data.date || new Date().toISOString().split('T')[0]);
+                  const km = item.data.kmData?.totalKm || 0;
+                  console.log('KM Summary - Rate calculation:', {
+                    costName: item.cost.name,
+                    date: item.data.date,
+                    rate,
+                    km,
+                    weighted: rate * km
+                  });
+                  return sum + (rate * km);
+                }, 0);
+                const averageRate = totalKm > 0 ? weightedRateSum / totalKm : 0;
+
+                console.log('KM Summary - Final:', {
+                  totalKm,
+                  totalAmount,
+                  weightedRateSum,
+                  averageRate
+                });
+
+                return (
+                  <ThemedView style={[styles.kmSummary, isDark && styles.kmSummaryDark]}>
+                    <View style={styles.kmSummaryHeader}>
+                      <IconSymbol size={24} name="car.fill" color={Colors[colorScheme].tint} />
+                      <ThemedText style={styles.kmSummaryTitle}>Récapitulatif kilométrique</ThemedText>
+                    </View>
+
+                    <View style={styles.kmSummaryContent}>
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Nombre de trajets:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{kmCosts.length}</ThemedText>
+                      </View>
+
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Distance totale:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{totalKm.toFixed(2)} km</ThemedText>
+                      </View>
+
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Taux moyen:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{averageRate.toFixed(4)} €/km</ThemedText>
+                      </View>
+
+                      <View style={[styles.kmSummaryRow, styles.kmSummaryTotal]}>
+                        <ThemedText style={styles.kmSummaryTotalLabel}>Remboursement total:</ThemedText>
+                        <ThemedText style={[styles.kmSummaryTotalValue, { color: Colors[colorScheme].tint }]}>
+                          {totalAmount.toFixed(2)} €
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </ThemedView>
+                );
+              })()}
             </View>
           )}
 
@@ -589,5 +675,60 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  kmSummary: {
+    marginTop: 20,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+  },
+  kmSummaryDark: {
+    borderColor: '#333',
+    backgroundColor: '#1C1C1E',
+  },
+  kmSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  kmSummaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  kmSummaryContent: {
+    gap: 12,
+  },
+  kmSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kmSummaryLabel: {
+    fontSize: 15,
+    opacity: 0.8,
+  },
+  kmSummaryValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  kmSummaryTotal: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: '#e0e0e0',
+  },
+  kmSummaryTotalLabel: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  kmSummaryTotalValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
   },
 });

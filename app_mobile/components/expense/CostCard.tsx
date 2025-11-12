@@ -2,6 +2,8 @@ import { StyleSheet, View, TouchableOpacity, TextInput, Alert } from 'react-nati
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DistanceInput } from './DistanceInput';
+import { RequirementsInput } from './RequirementsInput';
 import type { FormCost } from '@/types/api';
 
 interface CostCardProps {
@@ -112,9 +114,64 @@ export function CostCard({
       {/* Cost type specific inputs */}
       {cost.type === 'km' && (
         <View style={styles.kmSection}>
-          <ThemedText style={styles.kmPlaceholder}>
-            Calcul kilométrique à implémenter
-          </ThemedText>
+          {(() => {
+            const currentDate = costData.date || new Date().toISOString().split('T')[0];
+            const currentRate = getActiveRate(currentDate);
+            console.log('CostCard - KM type:', {
+              costName: cost.name,
+              date: currentDate,
+              rate: currentRate,
+              reimbursementRates: cost.reimbursementRates
+            });
+            return (
+              <DistanceInput
+                isDark={isDark}
+                rate={currentRate}
+                onDistanceCalculated={(distance, route) => {
+                  const rate = getActiveRate(costData.date || new Date().toISOString().split('T')[0]);
+                  const totalAmount = distance * rate;
+                  console.log('CostCard - Distance calculated:', { distance, rate, totalAmount, route });
+
+                  // Extract waypoints (all items except first and last)
+                  const waypoints = route.slice(1, -1).map(w => w.address);
+
+                  onUpdateData({
+                    kmData: {
+                      googleKm: distance,
+                      totalKm: distance,
+                      departure: route[0]?.address,
+                      arrival: route[route.length - 1]?.address,
+                      steps: waypoints,
+                      manualKm: 0,
+                    },
+                    reimbursementAmount: totalAmount,
+                  });
+                }}
+              />
+            );
+          })()}
+
+          {/* Display calculated amount */}
+          {costData.kmData?.totalKm && (
+            <View style={styles.kmCalculation}>
+              <View style={styles.kmCalculationRow}>
+                <ThemedText style={styles.kmLabel}>Distance:</ThemedText>
+                <ThemedText style={styles.kmValue}>{costData.kmData.totalKm} km</ThemedText>
+              </View>
+              <View style={styles.kmCalculationRow}>
+                <ThemedText style={styles.kmLabel}>Tarif:</ThemedText>
+                <ThemedText style={styles.kmValue}>
+                  {getActiveRate(costData.date || new Date().toISOString().split('T')[0]).toFixed(2)} €/km
+                </ThemedText>
+              </View>
+              <View style={[styles.kmCalculationRow, styles.kmTotal]}>
+                <ThemedText style={styles.kmTotalLabel}>Remboursement:</ThemedText>
+                <ThemedText style={styles.kmTotalValue}>
+                  {(costData.reimbursementAmount || 0).toFixed(2)} €
+                </ThemedText>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -176,20 +233,20 @@ export function CostCard({
 
       {/* Requirements section */}
       {cost.requirements && cost.requirements.length > 0 && (
-        <View style={styles.requirementsSection}>
-          <ThemedText style={styles.requirementsTitle}>Prérequis</ThemedText>
-          {cost.requirements.map((req) => (
-            <View key={req.id} style={styles.requirementItem}>
-              <ThemedText style={styles.requirementLabel}>
-                {req.requirement_type}
-                {req.required && <ThemedText style={styles.required}> *</ThemedText>}
-              </ThemedText>
-              <ThemedText style={styles.requirementPlaceholder}>
-                À implémenter
-              </ThemedText>
-            </View>
-          ))}
-        </View>
+        <RequirementsInput
+          requirements={cost.requirements}
+          values={costData.requirements || {}}
+          isDark={isDark}
+          submitted={submitted}
+          onUpdate={(requirementId, value) => {
+            onUpdateData({
+              requirements: {
+                ...costData.requirements,
+                [requirementId]: value,
+              },
+            });
+          }}
+        />
       )}
     </ThemedView>
   );
@@ -265,11 +322,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     marginTop: 8,
+    gap: 12,
   },
   kmPlaceholder: {
     fontSize: 14,
     opacity: 0.7,
     textAlign: 'center',
+  },
+  kmCalculation: {
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    gap: 8,
+  },
+  kmCalculationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kmLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  kmValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  kmTotal: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  kmTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  kmTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#34C759',
   },
   percentageSection: {
     gap: 12,
@@ -288,32 +382,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#34C759',
-  },
-  requirementsSection: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  requirementsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  requirementItem: {
-    marginBottom: 8,
-  },
-  requirementLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  requirementPlaceholder: {
-    fontSize: 13,
-    opacity: 0.6,
-    fontStyle: 'italic',
-  },
-  required: {
-    color: '#FF3B30',
   },
 });
