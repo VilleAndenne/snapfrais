@@ -14,7 +14,8 @@
         "NSCameraUsageDescription": "Cette application a besoin d'accéder à votre caméra pour prendre des photos de reçus et documents.",
         "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour sélectionner des reçus et documents.",
         "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour sauvegarder des documents."
-      }
+      },
+      "bundleIdentifier": "com.sebastienmerv.app-mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,8 +30,13 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
         "READ_MEDIA_IMAGES"
-      ]
+      ],
+      "package": "com.sebastienmerv.app_mobile"
     },
     "web": {
       "output": "static",
