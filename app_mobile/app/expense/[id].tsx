@@ -13,8 +13,8 @@ type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
 
 function getStatusFromApproved(approved: boolean | null | undefined, isDraft: boolean): StatusType {
   if (isDraft) return 'draft';
-  if (approved === 1) return 'approved';
-  if (approved === 0) return 'rejected';
+  if (approved == 1) return 'approved';
+  if (approved == 0) return 'rejected';
   return 'pending';
 }
 
@@ -1068,7 +1068,6 @@ const styles = StyleSheet.create({
   rejectionReason: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#1a1a1a',
   },
   rejectionHeader: {
     flexDirection: 'row',
