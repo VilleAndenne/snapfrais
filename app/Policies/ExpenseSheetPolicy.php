@@ -120,11 +120,16 @@ class ExpenseSheetPolicy
             return true;
         }
 
-        // Le propriétaire peut modifier si :
+        // Le propriétaire (bénéficiaire) peut modifier si :
         // - C'est un brouillon OU
         // - Le statut est "rejeté" (approved === 0/false)
-        return $expenseSheet->user_id === $user->id &&
-            ($expenseSheet->is_draft || $expenseSheet->approved === 0);
+        $isOwner = $expenseSheet->user_id === $user->id;
+
+        // Le créateur peut modifier les brouillons qu'il a créés pour d'autres
+        $isCreatorOfDraft = $expenseSheet->created_by === $user->id && $expenseSheet->is_draft;
+
+        return ($isOwner && ($expenseSheet->is_draft || $expenseSheet->approved === 0))
+            || $isCreatorOfDraft;
     }
 
     /**
