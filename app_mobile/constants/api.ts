@@ -2,8 +2,13 @@
  * API Configuration for SnapFrais Mobile App
  */
 
+import Constants from 'expo-constants';
+
 // Base URL for API
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+
+// Project ID from Expo configuration (app.json)
+export const PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId || 'e2ed1a25-93e6-4f34-a0da-f09b883c3ae9';
 
 // API Endpoints
 export const API_ENDPOINTS = {

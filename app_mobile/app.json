@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "app_mobile",
-    "slug": "app_mobile",
+    "name": "snapfrais",
+    "slug": "snapfrais",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -13,7 +13,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Cette application a besoin d'accéder à votre caméra pour prendre des photos de reçus et documents.",
         "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour sélectionner des reçus et documents.",
-        "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour sauvegarder des documents."
+        "NSPhotoLibraryAddUsageDescription": "Cette application a besoin d'accéder à vos photos pour sauvegarder des documents.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.sebastienmerv.app-mobile"
     },
@@ -44,6 +45,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -60,6 +62,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e2ed1a25-93e6-4f34-a0da-f09b883c3ae9"
+      }
+    },
+    "owner": "villeandenne"
   }
 }

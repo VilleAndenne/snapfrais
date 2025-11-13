@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\SendsExpoPushNotifications;
+use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -9,15 +11,14 @@ use Illuminate\Notifications\Notification;
 
 class UserCreated extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SendsExpoPushNotifications;
 
     /**
      * Create a new notification instance.
      */
-
     private string $token;
-    private string $email;
 
+    private string $email;
 
     public function __construct(string $token, string $email)
     {
@@ -32,7 +33,9 @@ class UserCreated extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        $channels = ['mail'];
+
+        return $this->addExpoPushChannel($channels, $notifiable);
     }
 
     /**
@@ -44,10 +47,24 @@ class UserCreated extends Notification implements ShouldQueue
             ->subject('Création de compte sur la plateforme de gestion des notes de frais')
             ->greeting('Bonjour ,')
             ->line('Nous vous informons que votre compte a été créé avec succès.')
-            ->action('Réinitialiser le mot de passe', url('/reset-password/' . $this->token . '?email=' . $this->email))
+            ->action('Réinitialiser le mot de passe', url('/reset-password/'.$this->token.'?email='.$this->email))
             ->line('Cette application vous permet de gérer vos notes de frais de manière plus efficace.')
             ->line('Merci d\'utiliser notre application !')
             ->salutation('Cordialement,');
+    }
+
+    /**
+     * Get the Expo push notification representation of the notification.
+     */
+    public function toExpoPush(object $notifiable): ExpoPushMessage
+    {
+        return new ExpoPushMessage(
+            title: 'Compte créé',
+            body: 'Votre compte a été créé avec succès. Veuillez définir votre mot de passe.',
+            data: [
+                'type' => 'user_created',
+            ]
+        );
     }
 
     /**

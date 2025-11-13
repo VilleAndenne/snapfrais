@@ -3,16 +3,18 @@
 namespace App\Notifications;
 
 use App\Models\User;
+use App\Notifications\Concerns\SendsExpoPushNotifications;
+use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class RemindApprovalExpenseSheetNotification extends Notification
 {
-    use Queueable;
+    use Queueable, SendsExpoPushNotifications;
 
     public int $count;
+
     public User $user;
 
     /**
@@ -32,11 +34,13 @@ class RemindApprovalExpenseSheetNotification extends Notification
     public function via(object $notifiable): array
     {
         // Vérifier si l'utilisateur souhaite recevoir ce type de notification
-        if (!$notifiable->notify_remind_approval) {
+        if (! $notifiable->notify_remind_approval) {
             return [];
         }
 
-        return ['mail'];
+        $channels = ['mail'];
+
+        return $this->addExpoPushChannel($channels, $notifiable);
     }
 
     /**
@@ -47,10 +51,25 @@ class RemindApprovalExpenseSheetNotification extends Notification
         return (new MailMessage)
             ->subject('Rappel : Notes de frais en attente de validation')
             ->greeting('Bonjour,')
-            ->line('Vous avez encore ' . $this->count . ' note(s) de frais à valider.')
+            ->line('Vous avez encore '.$this->count.' note(s) de frais à valider.')
             ->action('Voir les notes de frais', url('/dashboard'))
             ->line('Merci de traiter ces demandes dès que possible.')
             ->salutation('Bien cordialement,');
+    }
+
+    /**
+     * Get the Expo push notification representation of the notification.
+     */
+    public function toExpoPush(object $notifiable): ExpoPushMessage
+    {
+        return new ExpoPushMessage(
+            title: 'Rappel de validation',
+            body: 'Vous avez '.$this->count.' note(s) de frais en attente de validation',
+            data: [
+                'type' => 'remind_approval',
+                'count' => $this->count,
+            ]
+        );
     }
 
     /**
