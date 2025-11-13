@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DistanceInput } from './DistanceInput';
 import { RequirementsInput } from './RequirementsInput';
+import { DatePicker } from '@/components/ui/date-picker';
 import type { FormCost } from '@/types/api';
 
 interface CostCardProps {
@@ -99,20 +100,12 @@ export function CostCard({
       {/* Date field */}
       <View style={styles.field}>
         <ThemedText style={styles.fieldLabel}>Date du coût <ThemedText style={styles.required}>*</ThemedText></ThemedText>
-        <ThemedView style={[
-          styles.input,
-          isDark && styles.inputDark,
-          submitted && !costData.date && styles.inputError
-        ]}>
-          <IconSymbol size={20} name="calendar" color={isDark ? '#999' : '#666'} />
-          <TextInput
-            value={costData.date}
-            onChangeText={handleDateChange}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={isDark ? '#666' : '#999'}
-            style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
-          />
-        </ThemedView>
+        <DatePicker
+          value={costData.date}
+          onChange={handleDateChange}
+          isDark={isDark}
+          hasError={submitted && !costData.date}
+        />
         {submitted && !costData.date && (
           <ThemedText style={styles.errorText}>Ce champ est obligatoire</ThemedText>
         )}

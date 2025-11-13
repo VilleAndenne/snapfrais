@@ -54,6 +54,13 @@ const MAPPING = {
   'info.circle': 'info',
   'arrow.right.square': 'logout',
   'building.2': 'business',
+  'doc.text.fill': 'description',
+  'chevron.down': 'keyboard-arrow-down',
+  'plus.circle.fill': 'add-circle',
+  'doc.on.doc': 'content-copy',
+  'trash': 'delete',
+  'location': 'place',
+  'location.fill': 'place',
 } as IconMapping;
 
 /**
