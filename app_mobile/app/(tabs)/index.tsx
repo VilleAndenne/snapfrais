@@ -1,14 +1,15 @@
 import { useRouter, Link, useFocusEffect } from 'expo-router';
-import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Platform, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, TouchableOpacity, Platform, TextInput, ActivityIndicator, RefreshControl, Alert, Animated } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/services/api';
 import type { Form, ExpenseSheet } from '@/types/api';
+import { SkeletonCard } from '@/components/loading-skeleton';
 
 type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
 
@@ -294,18 +295,6 @@ export default function DashboardScreen() {
     );
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors[colorScheme].tint} />
-          <ThemedText style={styles.loadingText}>Chargement...</ThemedText>
-        </View>
-      </ThemedView>
-    );
-  }
-
   return (
     <ThemedView style={styles.container}>
       <ScrollView
@@ -343,26 +332,34 @@ export default function DashboardScreen() {
             Formulaires disponibles
           </ThemedText>
           <View style={styles.formsGrid}>
-            {forms.map((form) => (
-              <TouchableOpacity
-                key={form.id}
-                onPress={() => {
-                  router.push(`/expense/create/${form.id}`);
-                }}
-              >
-                <ThemedView style={styles.formCard}>
-                  <ThemedText style={styles.formName}>{form.name}</ThemedText>
-                  <ThemedText style={styles.formDescription}>{form.description}</ThemedText>
-                  <View style={[styles.formArrow, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 122, 255, 0.1)' }]}>
-                    <IconSymbol
-                      size={20}
-                      name="chevron.right"
-                      color={Colors[colorScheme].tint}
-                    />
-                  </View>
-                </ThemedView>
-              </TouchableOpacity>
-            ))}
+            {isLoading && !hasInitiallyLoaded ? (
+              <>
+                <SkeletonCard type="form" />
+                <SkeletonCard type="form" />
+                <SkeletonCard type="form" />
+              </>
+            ) : (
+              forms.map((form) => (
+                <TouchableOpacity
+                  key={form.id}
+                  onPress={() => {
+                    router.push(`/expense/create/${form.id}`);
+                  }}
+                >
+                  <ThemedView style={styles.formCard}>
+                    <ThemedText style={styles.formName}>{form.name}</ThemedText>
+                    <ThemedText style={styles.formDescription}>{form.description}</ThemedText>
+                    <View style={[styles.formArrow, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 122, 255, 0.1)' }]}>
+                      <IconSymbol
+                        size={20}
+                        name="chevron.right"
+                        color={Colors[colorScheme].tint}
+                      />
+                    </View>
+                  </ThemedView>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
 
@@ -418,7 +415,13 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {filteredExpenseSheets.length > 0 ? (
+          {isLoading && !hasInitiallyLoaded ? (
+            <View style={styles.expensesContainer}>
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+            </View>
+          ) : filteredExpenseSheets.length > 0 ? (
             <View style={styles.expensesContainer}>
               {filteredExpenseSheets.map((sheet) => {
                 const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
@@ -487,7 +490,12 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {filteredToValidate.length > 0 ? (
+            {isLoading && !hasInitiallyLoaded ? (
+              <View style={styles.expensesContainer}>
+                <SkeletonCard type="expense-to-validate" />
+                <SkeletonCard type="expense-to-validate" />
+              </View>
+            ) : filteredToValidate.length > 0 ? (
               <View style={styles.expensesContainer}>
                 {filteredToValidate.map((sheet) => {
                   const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
@@ -617,16 +625,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    opacity: 0.7,
   },
   section: {
     paddingHorizontal: 20,

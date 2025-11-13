@@ -9,6 +9,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/services/api';
 import type { ExpenseSheet } from '@/types/api';
+import { SkeletonCard } from '@/components/loading-skeleton';
 
 type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
 
@@ -126,17 +127,6 @@ export default function ExpenseListScreen() {
     });
   };
 
-  if (isLoading && !hasInitiallyLoaded) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors[colorScheme].tint} />
-          <ThemedText style={styles.loadingText}>Chargement...</ThemedText>
-        </View>
-      </ThemedView>
-    );
-  }
-
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -201,12 +191,20 @@ export default function ExpenseListScreen() {
           {/* Compteur */}
           <View style={styles.countSection}>
             <ThemedText style={styles.countText}>
-              {filteredExpenseSheets.length} note(s) de frais
+              {isLoading && !hasInitiallyLoaded ? '...' : `${filteredExpenseSheets.length} note(s) de frais`}
             </ThemedText>
           </View>
 
           {/* Liste des notes de frais */}
-          {filteredExpenseSheets.length > 0 ? (
+          {isLoading && !hasInitiallyLoaded ? (
+            <View style={styles.expensesContainer}>
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+              <SkeletonCard type="expense" />
+            </View>
+          ) : filteredExpenseSheets.length > 0 ? (
             <View style={styles.expensesContainer}>
               {filteredExpenseSheets.map((sheet) => {
                 const status = getStatusFromApproved(sheet.approved ?? null, sheet.is_draft);
@@ -286,16 +284,6 @@ export default function ExpenseListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    opacity: 0.7,
   },
   header: {
     paddingHorizontal: 20,
