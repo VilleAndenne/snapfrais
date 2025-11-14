@@ -1,21 +1,40 @@
 {
-  "cli": {
-    "version": ">= 16.20.2",
-    "appVersionSource": "remote"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
+    "cli": {
+        "version": ">= 16.20.2",
+        "appVersionSource": "remote"
     },
-    "preview": {
-      "distribution": "internal"
+    "build": {
+        "development": {
+            "developmentClient": true,
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://staging-snapfrais.andenne.be/api",
+                "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD9bX6Y7bX4U5n1K5Z3F4G5H6I7J8K9L0M"
+            },
+            "environment": "development"
+        },
+        "preview": {
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://staging-snapfrais.andenne.be/api"
+            },
+            "environment": "preview"
+        },
+        "production": {
+            "autoIncrement": true,
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://staging-snapfrais.andenne.be/api"
+            },
+            "environment": "production"
+        }
     },
-    "production": {
-      "autoIncrement": true
+    "submit": {
+        "production": {}
     }
-  },
-  "submit": {
-    "production": {}
-  }
 }

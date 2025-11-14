@@ -23,6 +23,13 @@ class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
         this.projectId = PROJECT_ID;
+
+        // Debug logs pour identifier le problème
+        console.log('=== API Service Initialization ===');
+        console.log('API_BASE_URL from env:', process.env.EXPO_PUBLIC_API_URL);
+        console.log('API_BASE_URL used:', this.baseURL);
+        console.log('PROJECT_ID:', this.projectId);
+        console.log('==================================');
     }
 
     /**
@@ -49,10 +56,12 @@ class ApiService {
         const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
         try {
-            const headers: HeadersInit = {
+            console.log(`[API Request] ${options.method || 'GET'} ${this.baseURL}${endpoint}`);
+
+            const headers: Record<string, string> = {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
-                ...options.headers,
+                ...(options.headers as Record<string, string>),
             };
 
             if (token) {
