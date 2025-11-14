@@ -21,12 +21,13 @@ class MobileDeviceController extends Controller
 
         $user = Auth::user();
 
+        // Rechercher par token uniquement pour permettre le changement de compte
         $device = MobileDevice::updateOrCreate(
             [
-                'user_id' => $user->id,
                 'token' => $validated['push_token'],
             ],
             [
+                'user_id' => $user->id,
                 'platform' => $validated['platform'],
             ]
         );

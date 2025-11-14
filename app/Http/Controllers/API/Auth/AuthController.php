@@ -26,12 +26,13 @@ class AuthController extends Controller
         $token = $user->createToken('api-token')->plainTextToken;
 
         if (isset($credentials['push_token']) && isset($credentials['platform'])) {
+            // Rechercher par token uniquement pour permettre le changement de compte
             MobileDevice::updateOrCreate(
                 [
-                    'user_id' => $user->id,
                     'token' => $credentials['push_token'],
                 ],
                 [
+                    'user_id' => $user->id,
                     'platform' => $credentials['platform'],
                 ]
             );
