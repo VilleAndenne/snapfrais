@@ -127,6 +127,9 @@ export function CostCard({
               <DistanceInput
                 isDark={isDark}
                 rate={currentRate}
+                initialOrigin={costData.kmData?.departure || ''}
+                initialDestination={costData.kmData?.arrival || ''}
+                initialSteps={costData.kmData?.steps || []}
                 onDistanceCalculated={(distance, route) => {
                   const rate = getActiveRate(costData.date || new Date().toISOString().split('T')[0]);
                   const totalAmount = distance * rate;

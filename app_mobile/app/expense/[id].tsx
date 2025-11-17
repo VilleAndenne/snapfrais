@@ -1,11 +1,11 @@
-import { useRouter, Link, useLocalSearchParams } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { StyleSheet, View, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Linking } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/services/api';
 import type { ExpenseSheet } from '@/types/api';
 
@@ -75,13 +75,7 @@ export default function ExpenseDetailScreen() {
     }
   };
 
-  useEffect(() => {
-    if (id) {
-      fetchExpenseSheet();
-    }
-  }, [id]);
-
-  const fetchExpenseSheet = async () => {
+  const fetchExpenseSheet = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.getExpenseSheetDetails(Number(id));
@@ -102,7 +96,16 @@ export default function ExpenseDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, router]);
+
+  // Rafraîchir les données quand l'écran reprend le focus (après édition par ex.)
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        fetchExpenseSheet();
+      }
+    }, [id, fetchExpenseSheet])
+  );
 
   const handleApprove = async () => {
     if (!expenseSheet) return;
@@ -199,7 +202,7 @@ export default function ExpenseDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <IconSymbol size={28} name="xmark.circle.fill" color={isDark ? '#fff' : '#000'} />
         </TouchableOpacity>
-        {canEdit && (
+        {canEdit && (status === 'draft' || status === 'rejected') && (
           <Link href={`/expense/edit/${expenseSheet.id}`} asChild>
             <TouchableOpacity style={styles.editButton}>
               <IconSymbol size={24} name="pencil" color={Colors[colorScheme].tint} />

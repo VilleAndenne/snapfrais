@@ -1,5 +1,5 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, ActionSheetIOS } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -10,6 +10,7 @@ import { api } from '@/services/api';
 import type { FormDetailsResponse, FormCost, Department } from '@/types/api';
 import { CostCard } from '@/components/expense/CostCard';
 import { CostPicker } from '@/components/expense/CostPicker';
+import { SelectPicker } from '@/components/ui/select-picker';
 
 interface SelectedCost extends FormCost {
   _index: number;
@@ -121,45 +122,6 @@ export default function CreateExpenseScreen() {
       setIsLoading(false);
     }
   };
-
-  const selectedDepartment = departments.find(d => d.id === selectedDepartmentId);
-
-  const showDepartmentPicker = () => {
-    if (departments.length === 0) {
-      Alert.alert('Aucun département', 'Aucun département disponible');
-      return;
-    }
-
-    if (Platform.OS === 'ios') {
-      const options = ['Annuler', ...departments.map(d => d.name)];
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex > 0) {
-            setSelectedDepartmentId(departments[buttonIndex - 1].id);
-          }
-        }
-      );
-    } else {
-      // Android: Use Alert with buttons
-      Alert.alert(
-        'Sélectionner un département',
-        '',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          ...departments.map(dept => ({
-            text: dept.name,
-            onPress: () => setSelectedDepartmentId(dept.id),
-          })),
-        ],
-        { cancelable: true }
-      );
-    }
-  };
-
 
   const addCost = (cost: FormCost) => {
     if (selectedCosts.length >= 30) {
@@ -373,18 +335,15 @@ export default function CreateExpenseScreen() {
             <ThemedText style={styles.sectionLabel}>
               Département <ThemedText style={styles.required}>*</ThemedText>
             </ThemedText>
-            <TouchableOpacity onPress={showDepartmentPicker}>
-              <ThemedView style={[
-                styles.selectButton,
-                isDark && styles.selectButtonDark,
-                submitted && !selectedDepartmentId && styles.selectButtonError
-              ]}>
-                <ThemedText style={[styles.selectButtonText, !selectedDepartmentId && styles.placeholderText]}>
-                  {selectedDepartment?.name || 'Sélectionner un département'}
-                </ThemedText>
-                <IconSymbol size={20} name="chevron.down" color={isDark ? '#999' : '#666'} />
-              </ThemedView>
-            </TouchableOpacity>
+            <SelectPicker
+              options={departments}
+              selectedId={selectedDepartmentId}
+              onSelect={(id) => setSelectedDepartmentId(id)}
+              placeholder="Sélectionner un département"
+              isDark={isDark}
+              hasError={submitted && !selectedDepartmentId}
+              title="Sélectionner un département"
+            />
             {submitted && !selectedDepartmentId && (
               <ThemedText style={styles.errorText}>Veuillez sélectionner un département</ThemedText>
             )}

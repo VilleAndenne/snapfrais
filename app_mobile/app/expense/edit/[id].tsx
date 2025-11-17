@@ -1,52 +1,415 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useState, useEffect } from 'react';
+import { api } from '@/services/api';
+import type { FormCost, Department, ExpenseSheet, ExpenseSheetCost } from '@/types/api';
+import { CostCard } from '@/components/expense/CostCard';
+import { CostPicker } from '@/components/expense/CostPicker';
+import { SelectPicker } from '@/components/ui/select-picker';
 
-const CATEGORIES = [
-  { id: 'repas', label: 'Repas', icon: 'fork.knife' },
-  { id: 'transport', label: 'Transport', icon: 'car.fill' },
-  { id: 'hebergement', label: 'Hébergement', icon: 'bed.double.fill' },
-  { id: 'fournitures', label: 'Fournitures', icon: 'cart.fill' },
-  { id: 'autre', label: 'Autre', icon: 'ellipsis.circle.fill' },
-];
+interface SelectedCost extends FormCost {
+  _index: number;
+  _originalCostId?: number; // ID du coût existant dans la base
+}
+
+interface CostData {
+  date: string;
+  kmData?: {
+    departure?: string;
+    arrival?: string;
+    steps?: string[];
+    googleKm?: number;
+    manualKm?: number;
+    totalKm?: number;
+  };
+  percentageData?: {
+    paidAmount?: number;
+    percentage?: number;
+    reimbursedAmount?: number;
+  };
+  fixedAmount?: number;
+  reimbursementAmount?: number;
+  requirements?: Record<string, any>;
+}
 
 export default function EditExpenseScreen() {
-  // const { id } = useLocalSearchParams(); // TODO: Use this to fetch data from API
+  const { id } = useLocalSearchParams();
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
 
-  // En production, charger les données depuis une API
-  const [title, setTitle] = useState('Repas client - Restaurant Le Gourmet');
-  const [amount, setAmount] = useState('85.50');
-  const [date, setDate] = useState('2025-11-05');
-  const [category, setCategory] = useState('repas');
-  const [merchant, setMerchant] = useState('Restaurant Le Gourmet');
-  const [description, setDescription] = useState('Déjeuner d\'affaires avec le client Acme Corp');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraftSubmit, setIsDraftSubmit] = useState(false);
 
-  const handleSave = () => {
-    if (!title || !amount || !category) {
-      Alert.alert('Champs manquants', 'Veuillez remplir tous les champs obligatoires.');
+  const [expenseSheet, setExpenseSheet] = useState<ExpenseSheet | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [availableCosts, setAvailableCosts] = useState<FormCost[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null);
+  const [selectedCosts, setSelectedCosts] = useState<SelectedCost[]>([]);
+  const [costData, setCostData] = useState<CostData[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetchExpenseSheetData();
+    }
+  }, [id]);
+
+  const fetchExpenseSheetData = async () => {
+    try {
+      setIsLoading(true);
+
+      // Charger les détails de la note de frais
+      const response = await api.getExpenseSheetDetails(Number(id));
+
+      if (!response.canEdit) {
+        Alert.alert(
+          'Non autorisé',
+          'Vous n\'avez pas les permissions pour modifier cette note de frais.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+        return;
+      }
+
+      setExpenseSheet(response.expenseSheet);
+      setCanEdit(response.canEdit);
+      setSelectedDepartmentId(response.expenseSheet.department_id || null);
+
+      // Charger les détails du formulaire pour avoir les coûts disponibles
+      if (response.expenseSheet.form_id) {
+        const formResponse = await api.getFormDetails(response.expenseSheet.form_id);
+
+        // Transformer les données si nécessaire
+        const transformedCosts = formResponse.form.costs?.map((cost: any) => {
+          const transformedCost = { ...cost };
+          if (cost.reimbursement_rates && !cost.reimbursementRates) {
+            transformedCost.reimbursementRates = cost.reimbursement_rates;
+          }
+          if (cost.requirements && Array.isArray(cost.requirements)) {
+            transformedCost.requirements = cost.requirements.map((req: any) => ({
+              ...req,
+              requirement_type: req.requirement_type || req.requirementType,
+            }));
+          }
+          return transformedCost;
+        }) || [];
+
+        setAvailableCosts(transformedCosts);
+        setDepartments(formResponse.departments);
+
+        // Pré-remplir les coûts existants
+        if (response.expenseSheet.costs && response.expenseSheet.costs.length > 0) {
+          const existingCosts: SelectedCost[] = [];
+          const existingCostData: CostData[] = [];
+
+          response.expenseSheet.costs.forEach((cost: ExpenseSheetCost, index: number) => {
+            // Trouver le FormCost correspondant
+            const formCost = transformedCosts.find((fc: FormCost) => fc.id === cost.form_cost_id);
+
+            if (formCost) {
+              existingCosts.push({
+                ...formCost,
+                _index: Date.now() + index,
+                _originalCostId: cost.id,
+              });
+
+              // Reconstruire les données du coût
+              const costDataItem: CostData = {
+                date: cost.date ? cost.date.split('T')[0] : new Date().toISOString().split('T')[0],
+                requirements: {},
+              };
+
+              // Gérer les différents types de coûts
+              if (formCost.type === 'km') {
+                const route = (cost.route as any) || {};
+                // Extraire les adresses des étapes (peuvent être des objets {address, order} ou des strings)
+                const stepsArray = route.steps || [];
+                const stepsAddresses = stepsArray.map((step: any) =>
+                  typeof step === 'string' ? step : (step.address || step.name || '')
+                );
+                costDataItem.kmData = {
+                  departure: route.departure || '',
+                  arrival: route.arrival || '',
+                  steps: stepsAddresses,
+                  googleKm: route.google_km || cost.google_distance || 0,
+                  manualKm: route.manual_km || 0,
+                  totalKm: (route.google_km || cost.google_distance || 0) + (route.manual_km || 0),
+                };
+                costDataItem.reimbursementAmount = cost.total || 0;
+              } else if (formCost.type === 'percentage') {
+                const paidAmount = cost.amount || 0;
+                costDataItem.percentageData = {
+                  paidAmount: paidAmount,
+                  paidAmountText: paidAmount > 0 ? paidAmount.toString().replace('.', ',') : '',
+                  percentage: getActiveRate(formCost, costDataItem.date),
+                  reimbursedAmount: cost.total || 0,
+                };
+              } else {
+                costDataItem.fixedAmount = cost.amount || 0;
+              }
+
+              // Charger les requirements existants
+              if (cost.requirements) {
+                try {
+                  const reqData = typeof cost.requirements === 'string'
+                    ? JSON.parse(cost.requirements)
+                    : cost.requirements;
+
+                  // Mapper les requirements par leur ID
+                  if (formCost.requirements) {
+                    formCost.requirements.forEach((req: any) => {
+                      const existingValue = reqData[req.name] || reqData[req.id];
+                      if (existingValue) {
+                        if (existingValue.value) {
+                          costDataItem.requirements![req.id] = existingValue.value;
+                        } else if (existingValue.file) {
+                          // Pour les fichiers, on garde juste l'information qu'il existe
+                          costDataItem.requirements![req.id] = { existing: true, url: existingValue.file };
+                        }
+                      }
+                    });
+                  }
+                } catch (e) {
+                  console.error('Error parsing requirements:', e);
+                }
+              }
+
+              existingCostData.push(costDataItem);
+            }
+          });
+
+          setSelectedCosts(existingCosts);
+          setCostData(existingCostData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching expense sheet:', error);
+      Alert.alert(
+        'Erreur',
+        'Impossible de charger la note de frais',
+        [
+          { text: 'Réessayer', onPress: fetchExpenseSheetData },
+          { text: 'Retour', onPress: () => router.back() },
+        ]
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addCost = (cost: FormCost) => {
+    if (selectedCosts.length >= 30) {
+      Alert.alert('Limite atteinte', 'Vous avez atteint le maximum de 30 coûts.');
       return;
     }
 
-    // Logique pour mettre à jour la note de frais
-    Alert.alert('Note modifiée', 'Votre note de frais a été mise à jour.', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    const today = new Date().toISOString().split('T')[0];
+    const newCost = { ...cost, _index: Date.now() };
+
+    setSelectedCosts([...selectedCosts, newCost]);
+    setCostData([...costData, {
+      date: today,
+      kmData: {},
+      percentageData: {
+        paidAmount: 0,
+        percentage: getActiveRate(cost, today),
+        reimbursedAmount: 0,
+      },
+      fixedAmount: getActiveRate(cost, today),
+      requirements: {},
+    }]);
   };
+
+  const removeCost = (index: number) => {
+    setSelectedCosts(selectedCosts.filter((_, i) => i !== index));
+    setCostData(costData.filter((_, i) => i !== index));
+  };
+
+  const duplicateCost = (index: number, count: number) => {
+    if (selectedCosts.length + count > 30) {
+      Alert.alert('Limite atteinte', `Vous ne pouvez pas ajouter ${count} coûts. Maximum 30 coûts au total.`);
+      return;
+    }
+
+    const originalCost = selectedCosts[index];
+    const originalData = costData[index];
+    const newCosts: SelectedCost[] = [];
+    const newData: CostData[] = [];
+
+    for (let i = 0; i < count; i++) {
+      newCosts.push({ ...originalCost, _index: Date.now() + i, _originalCostId: undefined });
+      newData.push({
+        date: originalData.date,
+        kmData: { ...originalData.kmData },
+        percentageData: { ...originalData.percentageData },
+        fixedAmount: originalData.fixedAmount,
+        requirements: {},
+      });
+    }
+
+    setSelectedCosts([...selectedCosts, ...newCosts]);
+    setCostData([...costData, ...newData]);
+  };
+
+  const updateCostData = (index: number, data: Partial<CostData>) => {
+    const newCostData = [...costData];
+    newCostData[index] = { ...newCostData[index], ...data };
+    setCostData(newCostData);
+  };
+
+  const getActiveRate = (cost: FormCost, date: string): number => {
+    const rates = cost.reimbursementRates || [];
+    const activeRates = rates.filter(r =>
+      r.start_date <= date && (!r.end_date || r.end_date >= date)
+    );
+    activeRates.sort((a, b) => (a.start_date > b.start_date ? -1 : 1));
+    return activeRates[0]?.value ?? 0;
+  };
+
+  const handleSaveDraft = () => {
+    setIsDraftSubmit(true);
+    handleSubmit(true);
+  };
+
+  const handleSubmitForm = () => {
+    setSubmitted(true);
+    setIsDraftSubmit(false);
+    handleSubmit(false);
+  };
+
+  const handleSubmit = async (isDraft: boolean) => {
+    if (!selectedDepartmentId) {
+      Alert.alert('Champ requis', 'Veuillez sélectionner un département.');
+      return;
+    }
+
+    if (selectedCosts.length === 0) {
+      Alert.alert('Aucun coût', 'Veuillez ajouter au moins un coût à votre note de frais.');
+      return;
+    }
+
+    // Valider les requirements obligatoires (seulement si ce n'est pas un brouillon)
+    if (!isDraft) {
+      for (let i = 0; i < selectedCosts.length; i++) {
+        const cost = selectedCosts[i];
+        const data = costData[i];
+
+        if (cost.requirements && cost.requirements.length > 0) {
+          for (const requirement of cost.requirements) {
+            if (requirement.required) {
+              const value = data.requirements?.[requirement.id];
+              // Vérifier si c'est un fichier existant ou une nouvelle valeur
+              const hasValue = value && (
+                typeof value === 'string' ||
+                value.uri ||
+                value.existing
+              );
+              if (!hasValue) {
+                Alert.alert(
+                  'Prérequis manquants',
+                  `Le coût "${cost.name}" nécessite: ${requirement.requirement_type}.\nVeuillez compléter tous les champs obligatoires avant de soumettre.`
+                );
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Prepare FormData
+      const formData = new FormData();
+      formData.append('department_id', selectedDepartmentId.toString());
+      formData.append('is_draft', isDraft ? '1' : '0');
+
+      // Add costs
+      selectedCosts.forEach((cost, index) => {
+        const data = cost.type === 'km'
+          ? costData[index].kmData || {}
+          : cost.type === 'percentage'
+          ? costData[index].percentageData || {}
+          : { amount: costData[index].fixedAmount };
+
+        formData.append(`costs[${index}][cost_id]`, cost.id.toString());
+        formData.append(`costs[${index}][date]`, costData[index].date);
+
+        // Inclure l'ID du coût existant si disponible (pour la mise à jour)
+        if (cost._originalCostId) {
+          formData.append(`costs[${index}][id]`, cost._originalCostId.toString());
+        }
+
+        // Add cost data
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            if (Array.isArray(value)) {
+              value.forEach((item, itemIndex) => {
+                formData.append(`costs[${index}][data][${key}][${itemIndex}]`, item.toString());
+              });
+            } else {
+              formData.append(`costs[${index}][data][${key}]`, value.toString());
+            }
+          }
+        });
+
+        // Add requirements
+        if (costData[index].requirements) {
+          Object.entries(costData[index].requirements).forEach(([reqId, req]) => {
+            if (req?.uri) {
+              // Handle new file uploads
+              const file: any = {
+                uri: req.uri,
+                name: req.name || `file_${reqId}`,
+                type: req.type || 'application/octet-stream',
+              };
+              formData.append(`costs[${index}][requirements][${reqId}][file]`, file);
+            } else if (req?.existing) {
+              // Marquer comme fichier existant à conserver
+              formData.append(`costs[${index}][requirements][${reqId}][keep_existing]`, '1');
+            } else if (req !== null && req !== undefined && req !== '') {
+              // Handle text values
+              formData.append(`costs[${index}][requirements][${reqId}][value]`, req.toString());
+            }
+          });
+        }
+      });
+
+      // Call API pour mettre à jour
+      await api.updateExpenseSheetFull(Number(id), formData);
+
+      Alert.alert(
+        'Succès',
+        isDraft ? 'Brouillon mis à jour avec succès' : 'Note de frais mise à jour et soumise avec succès',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (error) {
+      console.error('Error updating expense sheet:', error);
+      Alert.alert('Erreur', error instanceof Error ? error.message : 'Une erreur est survenue lors de la mise à jour');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading || !expenseSheet) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors[colorScheme].tint} />
+          <ThemedText style={styles.loadingText}>Chargement...</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -55,149 +418,168 @@ export default function EditExpenseScreen() {
           <IconSymbol size={28} name="xmark.circle.fill" color={isDark ? '#fff' : '#000'} />
         </TouchableOpacity>
         <ThemedText type="title" style={styles.headerTitle}>
-          Modifier
+          Modifier la note
         </ThemedText>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-          <ThemedText style={[styles.saveText, { color: Colors[colorScheme].tint }]}>
-            Enregistrer
-          </ThemedText>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          {/* Titre */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>
-              Titre <ThemedText style={styles.required}>*</ThemedText>
-            </ThemedText>
-            <ThemedView style={[styles.input, isDark && styles.inputDark]}>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Ex: Repas client"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
-              />
-            </ThemedView>
+          {/* Form name */}
+          <View style={styles.formHeader}>
+            <IconSymbol size={24} name="doc.text.fill" color={Colors[colorScheme].tint} />
+            <ThemedText style={styles.formName}>{expenseSheet.form?.name}</ThemedText>
           </View>
 
-          {/* Montant */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>
-              Montant <ThemedText style={styles.required}>*</ThemedText>
+          {expenseSheet.form?.description && (
+            <ThemedText style={styles.formDescription}>{expenseSheet.form.description}</ThemedText>
+          )}
+
+          {/* Department selection */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>
+              Département <ThemedText style={styles.required}>*</ThemedText>
             </ThemedText>
-            <ThemedView style={[styles.input, isDark && styles.inputDark]}>
-              <TextInput
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                keyboardType="decimal-pad"
-                style={[styles.textInput, { color: isDark ? '#fff' : '#000' }]}
-              />
-              <ThemedText style={styles.currency}>€</ThemedText>
-            </ThemedView>
+            <SelectPicker
+              options={departments}
+              selectedId={selectedDepartmentId}
+              onSelect={(id) => setSelectedDepartmentId(id)}
+              placeholder="Sélectionner un département"
+              isDark={isDark}
+              hasError={submitted && !selectedDepartmentId}
+              title="Sélectionner un département"
+            />
+            {submitted && !selectedDepartmentId && (
+              <ThemedText style={styles.errorText}>Veuillez sélectionner un département</ThemedText>
+            )}
           </View>
 
-          {/* Date */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>Date</ThemedText>
-            <ThemedView style={[styles.input, isDark && styles.inputDark]}>
-              <IconSymbol size={20} name="calendar" color={isDark ? '#999' : '#666'} />
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                style={[styles.textInput, styles.dateInput, { color: isDark ? '#fff' : '#000' }]}
-              />
-            </ThemedView>
-          </View>
-
-          {/* Catégorie */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>
-              Catégorie <ThemedText style={styles.required}>*</ThemedText>
-            </ThemedText>
-            <View style={styles.categoriesGrid}>
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryButton,
-                    category === cat.id && {
-                      backgroundColor: Colors[colorScheme].tint + '20',
-                      borderColor: Colors[colorScheme].tint,
-                    },
-                  ]}
-                  onPress={() => setCategory(cat.id)}>
-                  <IconSymbol
-                    size={24}
-                    name={cat.icon}
-                    color={
-                      category === cat.id ? Colors[colorScheme].tint : isDark ? '#999' : '#666'
-                    }
-                  />
-                  <ThemedText
-                    style={[
-                      styles.categoryLabel,
-                      category === cat.id && { color: Colors[colorScheme].tint },
-                    ]}>
-                    {cat.label}
-                  </ThemedText>
-                </TouchableOpacity>
+          {/* Selected costs */}
+          {selectedCosts.length > 0 && (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Votre demande</ThemedText>
+              {selectedCosts.map((cost, index) => (
+                <CostCard
+                  key={cost._index}
+                  cost={cost}
+                  costData={costData[index]}
+                  index={index}
+                  isDark={isDark}
+                  colorScheme={colorScheme}
+                  submitted={submitted}
+                  onRemove={() => removeCost(index)}
+                  onDuplicate={(count) => duplicateCost(index, count)}
+                  onUpdateData={(data) => updateCostData(index, data)}
+                  getActiveRate={(date) => getActiveRate(cost, date)}
+                />
               ))}
+
+              {/* Summary of KM costs */}
+              {(() => {
+                const kmCosts = selectedCosts
+                  .map((cost, index) => ({ cost, data: costData[index], index }))
+                  .filter(item => item.cost.type === 'km' && item.data?.kmData?.totalKm && item.data.kmData.totalKm > 0);
+
+                if (kmCosts.length === 0) return null;
+
+                const totalKm = kmCosts.reduce((sum, item) => sum + (Number(item.data.kmData?.totalKm) || 0), 0);
+                const totalAmount = kmCosts.reduce((sum, item) => sum + (Number(item.data.reimbursementAmount) || 0), 0);
+
+                const weightedRateSum = kmCosts.reduce((sum, item) => {
+                  const rate = getActiveRate(item.cost, item.data.date || new Date().toISOString().split('T')[0]);
+                  const km = Number(item.data.kmData?.totalKm) || 0;
+                  return sum + (rate * km);
+                }, 0);
+                const averageRate = totalKm > 0 ? weightedRateSum / totalKm : 0;
+
+                return (
+                  <ThemedView style={[styles.kmSummary, isDark && styles.kmSummaryDark]}>
+                    <View style={styles.kmSummaryHeader}>
+                      <IconSymbol size={24} name="car.fill" color={Colors[colorScheme].tint} />
+                      <ThemedText style={styles.kmSummaryTitle}>Récapitulatif kilométrique</ThemedText>
+                    </View>
+
+                    <View style={styles.kmSummaryContent}>
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Nombre de trajets:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{kmCosts.length}</ThemedText>
+                      </View>
+
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Distance totale:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{totalKm.toFixed(2)} km</ThemedText>
+                      </View>
+
+                      <View style={styles.kmSummaryRow}>
+                        <ThemedText style={styles.kmSummaryLabel}>Taux moyen:</ThemedText>
+                        <ThemedText style={styles.kmSummaryValue}>{averageRate.toFixed(4)} €/km</ThemedText>
+                      </View>
+
+                      <View style={[styles.kmSummaryRow, styles.kmSummaryTotal]}>
+                        <ThemedText style={styles.kmSummaryTotalLabel}>Remboursement total:</ThemedText>
+                        <ThemedText style={[styles.kmSummaryTotalValue, { color: Colors[colorScheme].tint }]}>
+                          {totalAmount.toFixed(2)} €
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </ThemedView>
+                );
+              })()}
             </View>
-          </View>
+          )}
 
-          {/* Commerçant */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>Commerçant</ThemedText>
-            <ThemedView style={[styles.input, isDark && styles.inputDark]}>
-              <IconSymbol size={20} name="storefront" color={isDark ? '#999' : '#666'} />
-              <TextInput
-                value={merchant}
-                onChangeText={setMerchant}
-                placeholder="Nom du commerçant"
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                style={[styles.textInput, styles.merchantInput, { color: isDark ? '#fff' : '#000' }]}
-              />
-            </ThemedView>
-          </View>
-
-          {/* Description */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>Description</ThemedText>
-            <ThemedView style={[styles.input, styles.textArea, isDark && styles.inputDark]}>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Ajoutez des détails sur cette dépense..."
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                multiline
-                numberOfLines={4}
-                style={[styles.textInput, styles.textAreaInput, { color: isDark ? '#fff' : '#000' }]}
-              />
-            </ThemedView>
-          </View>
-
-          {/* Justificatifs */}
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>Justificatifs</ThemedText>
-            <TouchableOpacity style={styles.uploadButton}>
-              <IconSymbol size={32} name="camera.fill" color={Colors[colorScheme].tint} />
-              <ThemedText style={[styles.uploadText, { color: Colors[colorScheme].tint }]}>
-                Prendre une photo
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.uploadButton, styles.uploadButtonSecondary]}>
-              <IconSymbol size={32} name="photo.fill" color={isDark ? '#999' : '#666'} />
-              <ThemedText style={styles.uploadText}>Choisir depuis la galerie</ThemedText>
-            </TouchableOpacity>
+          {/* Available costs */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Types de coûts disponibles</ThemedText>
+            <ThemedText style={styles.costCount}>
+              Coûts ajoutés : {selectedCosts.length}/30
+            </ThemedText>
+            <CostPicker
+              availableCosts={availableCosts}
+              selectedCosts={selectedCosts}
+              onAddCost={addCost}
+              isDark={isDark}
+              colorScheme={colorScheme}
+            />
           </View>
         </View>
       </ScrollView>
+
+      {/* Actions */}
+      <View style={[styles.actions, isDark && styles.actionsDark]}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.draftButton,
+            isDark && styles.draftButtonDark,
+            (isSubmitting || selectedCosts.length === 0) && styles.buttonDisabled,
+          ]}
+          onPress={handleSaveDraft}
+          disabled={isSubmitting || selectedCosts.length === 0}
+        >
+          {isSubmitting && isDraftSubmit ? (
+            <ActivityIndicator size="small" color={isDark ? '#fff' : '#666'} />
+          ) : (
+            <ThemedText style={[styles.draftButtonText, isDark && styles.draftButtonTextDark]}>Enregistrer</ThemedText>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.submitButton,
+            { backgroundColor: '#34C759' },
+            (isSubmitting || selectedCosts.length === 0) && styles.buttonDisabled,
+          ]}
+          onPress={handleSubmitForm}
+          disabled={isSubmitting || selectedCosts.length === 0}
+        >
+          {isSubmitting && !isDraftSubmit ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <ThemedText style={styles.submitButtonText}>Soumettre</ThemedText>
+          )}
+        </TouchableOpacity>
+      </View>
     </ThemedView>
   );
 }
@@ -205,6 +587,16 @@ export default function EditExpenseScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
   },
   header: {
     flexDirection: 'row',
@@ -221,102 +613,181 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  saveButton: {
-    padding: 8,
-  },
-  saveText: {
-    fontSize: 16,
-    fontWeight: '600',
+  headerSpacer: {
+    width: 36,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingTop: 10,
+    paddingBottom: 120,
   },
-  field: {
+  formHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  formName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  formDescription: {
+    fontSize: 14,
+    opacity: 0.7,
     marginBottom: 24,
   },
-  label: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
   required: {
     color: '#FF3B30',
   },
-  input: {
+  selectButton: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    padding: 16,
+    minHeight: 56,
   },
-  inputDark: {
+  selectButtonDark: {
     borderColor: '#333',
   },
-  textInput: {
-    flex: 1,
+  selectButtonError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
+  selectButtonText: {
     fontSize: 16,
-  },
-  dateInput: {
-    marginLeft: 0,
-  },
-  merchantInput: {
-    marginLeft: 0,
-  },
-  currency: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  textArea: {
-    minHeight: 120,
-    alignItems: 'flex-start',
-  },
-  textAreaInput: {
-    textAlignVertical: 'top',
-    paddingTop: 0,
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  categoryButton: {
     flex: 1,
-    minWidth: '30%',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    gap: 8,
   },
-  categoryLabel: {
+  placeholderText: {
+    opacity: 0.5,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#FF3B30',
+    marginTop: 4,
+  },
+  costCount: {
     fontSize: 14,
-    fontWeight: '500',
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
-    gap: 12,
+    opacity: 0.7,
     marginBottom: 12,
   },
-  uploadButtonSecondary: {
-    marginBottom: 0,
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
-  uploadText: {
+  actionsDark: {
+    borderTopColor: '#333',
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  draftButton: {
+    backgroundColor: '#e0e0e0',
+  },
+  draftButtonDark: {
+    backgroundColor: '#2C2C2E',
+  },
+  draftButtonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#666',
+  },
+  draftButtonTextDark: {
+    color: '#fff',
+  },
+  submitButton: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  kmSummary: {
+    marginTop: 20,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+  },
+  kmSummaryDark: {
+    borderColor: '#333',
+    backgroundColor: '#1C1C1E',
+  },
+  kmSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  kmSummaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  kmSummaryContent: {
+    gap: 12,
+  },
+  kmSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kmSummaryLabel: {
+    fontSize: 15,
+    opacity: 0.8,
+  },
+  kmSummaryValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  kmSummaryTotal: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: '#e0e0e0',
+  },
+  kmSummaryTotalLabel: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  kmSummaryTotalValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
   },
 });

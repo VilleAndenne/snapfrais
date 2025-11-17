@@ -290,7 +290,79 @@ class ApiService {
             body: JSON.stringify(data),
         });
     }
+
+    async updateExpenseSheetFull(id: number, data: FormData): Promise<any> {
+        console.log('========== updateExpenseSheetFull START ==========');
+        console.log('updateExpenseSheetFull - id:', id);
+
+        const token = await this.getToken();
+        console.log(
+            'updateExpenseSheetFull - Token retrieved:',
+            token ? `Present (length: ${token.length})` : 'MISSING!!!'
+        );
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+        try {
+            const url = `${this.baseURL}${API_ENDPOINTS.EXPENSE_SHEET_DETAILS(id)}`;
+            console.log('updateExpenseSheetFull - Full URL:', url);
+
+            const headers: HeadersInit = {
+                Accept: 'application/json',
+            };
+
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+                console.log('updateExpenseSheetFull - Authorization header SET successfully');
+            } else {
+                console.error('updateExpenseSheetFull - ERROR: No token found! Cannot authenticate!');
+            }
+
+            // Ajouter _method pour simuler PUT via POST (Laravel)
+            data.append('_method', 'PUT');
+
+            const response = await fetch(url, {
+                method: 'POST', // Utilise POST avec _method=PUT pour supporter FormData
+                headers,
+                body: data,
+                signal: controller.signal,
+            });
+
+            console.log('updateExpenseSheetFull - Request sent, waiting for response...');
+
+            clearTimeout(timeoutId);
+
+            console.log('updateExpenseSheetFull - Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('updateExpenseSheetFull - Error response:', errorText);
+
+                let error: ApiError;
+                try {
+                    error = JSON.parse(errorText);
+                } catch {
+                    error = { message: `HTTP Error ${response.status}: ${errorText}` };
+                }
+                throw new Error(error.message || `HTTP Error ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            console.error('updateExpenseSheetFull - Exception:', error);
+            if (error instanceof Error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
+            }
+            throw new Error('Unknown error occurred');
+        }
+    }
 }
+
 
 // Export singleton instance
 export const api = new ApiService();

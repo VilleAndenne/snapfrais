@@ -98,7 +98,7 @@ export function DatePicker({ value, onChange, isDark, hasError }: DatePickerProp
                 locale="fr-FR"
                 maximumDate={new Date()}
                 themeVariant={isDark ? 'dark' : 'light'}
-                style={styles.iosPicker}
+                style={[styles.iosPicker, isDark && styles.iosPickerDark]}
               />
             </View>
           )}
@@ -180,5 +180,8 @@ const styles = StyleSheet.create({
   },
   iosPicker: {
     backgroundColor: '#fff',
+  },
+  iosPickerDark: {
+    backgroundColor: '#1C1C1E',
   },
 });

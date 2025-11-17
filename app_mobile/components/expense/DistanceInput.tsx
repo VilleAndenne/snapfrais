@@ -20,14 +20,25 @@ interface DistanceInputProps {
   isDark: boolean;
   onDistanceCalculated: (distance: number, route: any[]) => void;
   rate?: number; // Taux de remboursement par km
+  initialOrigin?: string;
+  initialDestination?: string;
+  initialSteps?: string[];
 }
 
-export function DistanceInput({ isDark, onDistanceCalculated, rate = 0 }: DistanceInputProps) {
+export function DistanceInput({ isDark, onDistanceCalculated, rate = 0, initialOrigin = '', initialDestination = '', initialSteps = [] }: DistanceInputProps) {
   console.log('DistanceInput - Component rendered with rate:', rate);
 
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const [origin, setOrigin] = useState(initialOrigin);
+  const [destination, setDestination] = useState(initialDestination);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>(() => {
+    // Initialiser les waypoints avec les étapes existantes
+    return initialSteps.map((step, index) => ({
+      id: `initial-${index}-${Date.now()}`,
+      address: step,
+      suggestions: [],
+      showSuggestions: false,
+    }));
+  });
   const [originSuggestions, setOriginSuggestions] = useState<Address[]>([]);
   const [destinationSuggestions, setDestinationSuggestions] = useState<Address[]>([]);
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
