@@ -21,6 +21,49 @@ class ExpenseSheetPolicy
     }
 
     /**
+     * Vérifie si la note de frais doit apparaître dans la liste "à valider" de l'utilisateur.
+     * Cette méthode est utilisée pour filtrer l'affichage, pas pour les permissions.
+     */
+    public function shouldAppearInValidationList(User $user, ExpenseSheet $expenseSheet): bool
+    {
+        // Ne pas afficher les brouillons
+        if ($expenseSheet->is_draft) {
+            return false;
+        }
+
+        // Ne pas afficher les notes déjà traitées
+        if (!is_null($expenseSheet->approved)) {
+            return false;
+        }
+
+        // Ne jamais afficher ses propres notes dans la liste (même pour admin)
+        if ($expenseSheet->user_id === $user->id) {
+            return false;
+        }
+
+        // Département lié à la note de frais
+        $department = $expenseSheet->department;
+
+        // Vérifie si l'utilisateur est responsable du département ou d'un parent
+        while ($department) {
+            // 1. L'utilisateur est responsable ici ?
+            if ($department->heads->contains($user)) {
+                // 2. L'auteur de la note est aussi responsable ici ?
+                if ($department->heads->contains($expenseSheet->user)) {
+                    return false; // même service, 2 responsables : ne pas afficher
+                }
+
+                // Afficher si l'utilisateur est responsable (admin ou non)
+                return true;
+            }
+
+            $department = $department->parent;
+        }
+
+        return false;
+    }
+
+    /**
      * Vérifie si l'utilisateur peut modérer (valider/rejeter) la note de frais.
      */
     protected function canModerate(User $user, ExpenseSheet $expenseSheet): bool
@@ -30,30 +73,28 @@ class ExpenseSheetPolicy
             return false;
         }
 
-        // Déjà traité
-        if (isset($expenseSheet->approved)) {
+        // Déjà traité - vérifie si approved n'est pas null
+        if (!is_null($expenseSheet->approved)) {
             return false;
         }
 
-        // Administrateur → toujours autorisé (sauf pour sa propre note déjà gérée ci-dessus)
+        // Administrateur → toujours autorisé (même pour ses propres notes)
         if ($user->is_admin) {
             return true;
         }
 
-        // L'utilisateur tente de valider sa propre note
+        // L'utilisateur tente de valider sa propre note (non-admin)
         if ($expenseSheet->user_id === $user->id) {
             return false;
         }
 
-
         // Département lié à la note de frais
         $department = $expenseSheet->department;
 
-        // Vérifie si l'utilisateur est responsable du département ou d’un parent
+        // Vérifie si l'utilisateur est responsable du département ou d'un parent
         while ($department) {
             // 1. L'utilisateur est responsable ici ?
             if ($department->heads->contains($user)) {
-
                 // 2. L'auteur de la note est aussi responsable ici ?
                 if ($department->heads->contains($expenseSheet->user)) {
                     return false; // même service, 2 responsables : rejeté
@@ -79,11 +120,16 @@ class ExpenseSheetPolicy
             return true;
         }
 
-        // Le propriétaire peut modifier si :
+        // Le propriétaire (bénéficiaire) peut modifier si :
         // - C'est un brouillon OU
         // - Le statut est "rejeté" (approved === 0/false)
-        return $expenseSheet->user_id === $user->id &&
-            ($expenseSheet->is_draft || $expenseSheet->approved === 0);
+        $isOwner = $expenseSheet->user_id === $user->id;
+
+        // Le créateur peut modifier les brouillons qu'il a créés pour d'autres
+        $isCreatorOfDraft = $expenseSheet->created_by === $user->id && $expenseSheet->is_draft;
+
+        return ($isOwner && ($expenseSheet->is_draft || $expenseSheet->approved === 0))
+            || $isCreatorOfDraft;
     }
 
     /**

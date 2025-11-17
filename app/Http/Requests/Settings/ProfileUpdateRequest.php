@@ -25,6 +25,8 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'bank_account_number' => ['required', 'string', 'max:34'],
+            'address' => ['required', 'string', 'max:500'],
             'notify_expense_sheet_to_approval' => ['sometimes', 'boolean'],
             'notify_receipt_expense_sheet' => ['sometimes', 'boolean'],
             'notify_remind_approval' => ['sometimes', 'boolean'],

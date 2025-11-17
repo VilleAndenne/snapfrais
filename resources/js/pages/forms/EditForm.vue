@@ -88,6 +88,26 @@
                                     </p>
                                 </div>
 
+                                <!-- Département de traitement -->
+                                <div class="space-y-2">
+                                    <Label :for="`cost-processing-department-${costIndex}`">Traité par</Label>
+                                    <Select v-model="cost.processing_department">
+                                        <SelectTrigger
+                                            :id="`cost-processing-department-${costIndex}`"
+                                            :class="{ 'border-destructive': form.errors?.[`costs.${costIndex}.processing_department`] }"
+                                        >
+                                            <SelectValue placeholder="Sélectionner un département" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="SRH">Service des Ressources Humaines</SelectItem>
+                                            <SelectItem value="DSF">Direction des Services Financiers</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p v-if="form.errors?.[`costs.${costIndex}.processing_department`]" class="text-sm text-destructive">
+                                        {{ form.errors[`costs.${costIndex}.processing_department`] }}
+                                    </p>
+                                </div>
+
                                 <!-- Reimbursement Rates -->
                                 <div class="space-y-4">
                                     <div class="flex justify-between items-center">
@@ -223,6 +243,7 @@ const form = useForm(props.form);
 // 🔧 Normaliser les données entrantes pour garantir rate.transport sur les coûts km
 if (Array.isArray(form.costs)) {
     form.costs.forEach((cost) => {
+        cost.processing_department = cost.processing_department ?? 'SRH';
         cost.reimbursement_rates = cost.reimbursement_rates || [];
         // Si km : s'assurer que chaque taux possède un transport
         if (cost.type === 'km') {
@@ -281,6 +302,7 @@ const addCost = () => {
         name: '',
         description: '',
         type: '',
+        processing_department: 'SRH',
         reimbursement_rates: [],
         requirements: []
     });

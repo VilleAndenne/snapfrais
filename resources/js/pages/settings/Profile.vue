@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 
 import DeleteUser from '@/components/DeleteUser.vue';
@@ -31,11 +32,49 @@ const user = page.props.auth.user as User;
 const form = useForm({
     name: user.name,
     email: user.email,
+    bank_account_number: user.bank_account_number || '',
+    address: user.address || '',
+});
+
+const showBankAccountRequired = ref(false);
+const showAddressRequired = ref(false);
+
+// Vérifier si le numéro de compte ou l'adresse sont manquants au chargement
+onMounted(() => {
+    if (!user.bank_account_number) {
+        showBankAccountRequired.value = true;
+        // Scroll vers le champ après un court délai
+        nextTick(() => {
+            const element = document.getElementById('bank_account_number');
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.focus();
+            }
+        });
+    }
+
+    if (!user.address) {
+        showAddressRequired.value = true;
+        // Si le numéro de compte n'est pas manquant, scroll vers l'adresse
+        if (user.bank_account_number) {
+            nextTick(() => {
+                const element = document.getElementById('address');
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.focus();
+                }
+            });
+        }
+    }
 });
 
 const submit = () => {
     form.patch(route('profile.update'), {
         preserveScroll: true,
+        onSuccess: () => {
+            showBankAccountRequired.value = false;
+            showAddressRequired.value = false;
+        }
     });
 };
 </script>
@@ -67,6 +106,56 @@ const submit = () => {
                             placeholder="Adresse email"
                         />
                         <InputError class="mt-2" :message="form.errors.email" />
+                    </div>
+
+                    <div class="grid gap-2" :class="{ 'p-4 border-2 border-red-500 rounded-lg bg-red-50': showBankAccountRequired }">
+                        <Label for="bank_account_number" :class="{ 'text-red-600 font-semibold': showBankAccountRequired }">
+                            Numéro de compte bancaire
+                            <span v-if="showBankAccountRequired" class="text-red-600">*</span>
+                        </Label>
+                        <Input
+                            id="bank_account_number"
+                            type="text"
+                            :class="[
+                                'mt-1 block w-full',
+                                showBankAccountRequired ? 'border-red-500 focus:border-red-600 focus:ring-red-500' : ''
+                            ]"
+                            v-model="form.bank_account_number"
+                            autocomplete="off"
+                            placeholder="BE00 0000 0000 0000"
+                        />
+                        <p v-if="showBankAccountRequired" class="text-sm font-medium text-red-600">
+                            ⚠️ Ce champ est obligatoire pour le bon fonctionnement des nouvelles fonctionnalités.
+                        </p>
+                        <p v-else class="text-sm text-muted-foreground">
+                            Ce numéro est stocké de manière sécurisée et chiffrée. Il sera utilisé pour le traitement de vos remboursements.
+                        </p>
+                        <InputError class="mt-2" :message="form.errors.bank_account_number" />
+                    </div>
+
+                    <div class="grid gap-2" :class="{ 'p-4 border-2 border-red-500 rounded-lg bg-red-50': showAddressRequired }">
+                        <Label for="address" :class="{ 'text-red-600 font-semibold': showAddressRequired }">
+                            Adresse complète
+                            <span v-if="showAddressRequired" class="text-red-600">*</span>
+                        </Label>
+                        <Input
+                            id="address"
+                            type="text"
+                            :class="[
+                                'mt-1 block w-full',
+                                showAddressRequired ? 'border-red-500 focus:border-red-600 focus:ring-red-500' : ''
+                            ]"
+                            v-model="form.address"
+                            autocomplete="street-address"
+                            placeholder="Rue, numéro, code postal, ville"
+                        />
+                        <p v-if="showAddressRequired" class="text-sm font-medium text-red-600">
+                            ⚠️ Ce champ est obligatoire pour le bon fonctionnement des nouvelles fonctionnalités.
+                        </p>
+                        <p v-else class="text-sm text-muted-foreground">
+                            Cette adresse est stockée de manière sécurisée et chiffrée. Elle sera utilisée pour le traitement de vos remboursements.
+                        </p>
+                        <InputError class="mt-2" :message="form.errors.address" />
                     </div>
 
                     <div v-if="mustVerifyEmail && !user.email_verified_at">

@@ -14,7 +14,8 @@ class DashboardController extends Controller
         $forms = Form::all();
         $user  = auth()->user();
 
-        $baseQuery = ExpenseSheet::with([
+        // Query de base pour MES notes (filtré par mois en cours)
+        $baseQueryMyNotes = ExpenseSheet::with([
             'form',
             'costs',
             'department.heads',
@@ -25,13 +26,23 @@ class DashboardController extends Controller
             ->whereYear('created_at', now()->year)
             ->orderBy('created_at', 'desc');
 
-        // Mes propres notes
-        $myExpenseSheets = (clone $baseQuery)
+        // Mes propres notes du mois en cours
+        $myExpenseSheets = (clone $baseQueryMyNotes)
             ->where('user_id', $user->id)
             ->get();
 
+        // Query de base pour les notes à valider (SANS filtre de mois)
+        $baseQueryToValidate = ExpenseSheet::with([
+            'form',
+            'costs',
+            'department.heads',
+            'department.parent.heads',
+            'user'
+        ])
+            ->orderBy('created_at', 'desc');
+
         // Candidats à la validation : je suis head du département de la note OU du parent (N+1)
-        $candidateToValidate = (clone $baseQuery)
+        $candidateToValidate = (clone $baseQueryToValidate)
             ->where(function ($q) use ($user) {
                 $q->whereHas('department.heads', function ($h) use ($user) {
                     $h->where('users.id', $user->id);
@@ -44,7 +55,7 @@ class DashboardController extends Controller
 
 
         $expenseToValidate = $candidateToValidate->filter(function ($sheet) {
-            return Gate::allows('approve', $sheet);
+            return Gate::allows('shouldAppearInValidationList', $sheet);
         })->values();
 
         $isHead = $user->isHead();

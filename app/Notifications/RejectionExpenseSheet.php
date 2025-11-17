@@ -3,6 +3,8 @@
 namespace App\Notifications;
 
 use App\Models\ExpenseSheet;
+use App\Notifications\Concerns\SendsExpoPushNotifications;
+use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -10,7 +12,7 @@ use Illuminate\Notifications\Notification;
 
 class RejectionExpenseSheet extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SendsExpoPushNotifications;
 
     public ExpenseSheet $expenseSheet;
 
@@ -29,7 +31,9 @@ class RejectionExpenseSheet extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        $channels = ['mail'];
+
+        return $this->addExpoPushChannel($channels, $notifiable);
     }
 
     /**
@@ -38,12 +42,27 @@ class RejectionExpenseSheet extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Votre note de frais #' . $this->expenseSheet->id . ' a été refusée')
+            ->subject('Votre note de frais #'.$this->expenseSheet->id.' a été refusée')
             ->greeting('Bonjour,')
-            ->line($this->expenseSheet->validatedBy->name . ' a refusé votre note de frais #' . $this->expenseSheet->id)
-            ->action('Voir la note de frais', url('/expense-sheets/' . $this->expenseSheet->id))
-            ->line('Si vous pensez qu’il s’agit d’une erreur, vous pouvez contacter votre responsable de service ou justifiez à nouveau votre demande.')
+            ->line($this->expenseSheet->validatedBy->name.' a refusé votre note de frais #'.$this->expenseSheet->id)
+            ->action('Voir la note de frais', url('/expense-sheets/'.$this->expenseSheet->id))
+            ->line('Si vous pensez qu\'il s\'agit d\'une erreur, vous pouvez contacter votre responsable de service ou justifiez à nouveau votre demande.')
             ->salutation('Bien cordialement,');
+    }
+
+    /**
+     * Get the Expo push notification representation of the notification.
+     */
+    public function toExpoPush(object $notifiable): ExpoPushMessage
+    {
+        return new ExpoPushMessage(
+            title: 'Note de frais refusée',
+            body: $this->expenseSheet->validatedBy->name.' a refusé votre note de frais #'.$this->expenseSheet->id,
+            data: [
+                'type' => 'expense_sheet_rejected',
+                'expense_sheet_id' => $this->expenseSheet->id,
+            ]
+        );
     }
 
     /**
