@@ -204,14 +204,6 @@
                     <td class="w-25 muted">Agent</td>
                     <td>{{ $sheet->user->name ?? '-' }} ({{ $sheet->user->email ?? '-' }})</td>
                 </tr>
-                <tr>
-                    <td class="muted">Adresse</td>
-                    <td>{{ $sheet->user->address ?? 'Non renseignée' }}</td>
-                </tr>
-                <tr>
-                    <td class="muted">N° de compte</td>
-                    <td><strong>{{ $sheet->user->bank_account_number ?? 'Non renseigné' }}</strong></td>
-                </tr>
                 @if($sheet->user_id !== $sheet->creator_id && !empty($sheet->created_by))
                 <tr>
                     <td class="w-25 muted">Encodeur</td>
