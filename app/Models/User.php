@@ -5,8 +5,6 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -16,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -31,7 +29,11 @@ class User extends Authenticatable
         'notify_expense_sheet_to_approval',
         'notify_receipt_expense_sheet',
         'notify_remind_approval',
+        'bank_account_number',
+        'address',
     ];
+
+    protected $casts = ['bank_account_number' => 'encrypted', 'address' => 'encrypted'];
 
     protected $appends = ['is_head'];
 
@@ -63,6 +65,7 @@ class User extends Authenticatable
             'notify_expense_sheet_to_approval' => 'boolean',
             'notify_receipt_expense_sheet' => 'boolean',
             'notify_remind_approval' => 'boolean',
+            'bank_account_number' => 'encrypted',
         ];
     }
 
@@ -190,4 +193,11 @@ class User extends Authenticatable
         })->orderBy('created_at', 'desc');
     }
 
+    /**
+     * Get the mobile devices for the user.
+     */
+    public function mobileDevices(): HasMany
+    {
+        return $this->hasMany(MobileDevice::class);
+    }
 }

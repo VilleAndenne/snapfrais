@@ -16,7 +16,7 @@ class RemindApprovalExpenseSheet implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct()
-    {
+{
         Log::info('RemindApprovalExpenseSheet job dispatched.');
     }
 
