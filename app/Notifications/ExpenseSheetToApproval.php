@@ -31,6 +31,11 @@ class ExpenseSheetToApproval extends Notification implements ShouldQueue
         $channels = ['mail'];
 
         return $this->addExpoPushChannel($channels, $notifiable);
+        if (!$notifiable->notify_expense_sheet_to_approval) {
+            return [];
+        }
+
+        return ['mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
