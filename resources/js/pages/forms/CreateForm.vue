@@ -85,24 +85,6 @@
                                             {{ form.errors[`costs.${costIndex}.description`] }}
                                         </p>
                                     </div>
-                                    <div class="space-y-2">
-                                        <Label :for="`cost-processing-department-${costIndex}`">Traité par</Label>
-                                        <Select v-model="cost.processing_department">
-                                            <SelectTrigger
-                                                :id="`cost-processing-department-${costIndex}`"
-                                                :class="{ 'border-destructive': form.errors[`costs.${costIndex}.processing_department`] }"
-                                            >
-                                                <SelectValue placeholder="Sélectionner un département" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="SRH">Service des Ressources Humaines</SelectItem>
-                                                <SelectItem value="DSF">Direction des Services Financiers</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <p v-if="form.errors[`costs.${costIndex}.processing_department`]" class="text-sm text-destructive">
-                                            {{ form.errors[`costs.${costIndex}.processing_department`] }}
-                                        </p>
-                                    </div>
                                 </div>
                                 <!-- Reimbursement Rates -->
                                 <div class="space-y-4">
@@ -259,7 +241,6 @@ const addCost = () => {
         name: '',
         description: '',
         type: '',
-        processing_department: 'SRH',
         reimbursement_rates: [],
         requirements: [],
     });
