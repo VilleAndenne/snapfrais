@@ -693,12 +693,6 @@ class ExpenseSheetController extends Controller
 
         if ($validated['approval']) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
-
-            // Générer et envoyer le PDF pour les coûts DSF
-            $dsfService = new \App\Services\DsfReimbursementService();
-            if ($dsfService->hasDsfCosts($expenseSheet)) {
-                $dsfService->generateAndSendReimbursementPdf($expenseSheet);
-            }
         } else {
             $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
         }
