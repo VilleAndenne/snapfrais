@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class FormCost extends Model
 {
-    protected $fillable = ['name', 'description', 'type', 'processing_department'];
+    protected $fillable = ['name', 'description', 'type'];
 
     protected $casts = [
         'cost' => CostCast::class,

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import PatchNoteModal from '@/components/PatchNoteModal.vue';
-import RequiredFieldsModal from '@/components/RequiredFieldsModal.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 import { watch, ref, computed } from 'vue';
@@ -105,7 +104,4 @@ watch(
 
     <!-- Modal Patch Notes -->
     <PatchNoteModal />
-
-    <!-- Modal Champs obligatoires (numéro de compte bancaire et adresse) -->
-    <RequiredFieldsModal />
 </template>
