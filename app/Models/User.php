@@ -79,6 +79,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Department::class)->withPivot('is_head');
     }
 
+    public function headOfDepartments()
+    {
+        return $this->belongsToMany(Department::class)->wherePivot('is_head', true);
+    }
+
     public function superiors()
     {
         // Tous les autres membres des services de l'utilisateur where is_head = 1
