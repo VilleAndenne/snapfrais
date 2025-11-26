@@ -62,6 +62,7 @@ const props = defineProps<{
         dateStart?: string;
         dateEnd?: string;
     };
+    departments: string[];
 }>();
 
 // 🔁 Mapping approved → statut lisible
@@ -161,12 +162,6 @@ const resetFilters = () => {
     applyFilters();
 };
 
-// 🏢 Options des départements
-const departmentOptions = computed(() => {
-    const unique = new Set(props.expenseSheets.data.map(s => s.department?.name || 'Inconnu'));
-    return [...Array.from(unique)];
-});
-
 // 🔎 Filtres actifs ?
 const hasActiveFilters = computed(() => {
     return searchQuery.value !== '' ||
@@ -234,7 +229,7 @@ const breadcrumbs = [
                         <label for="department-filter" class="text-xs sm:text-sm font-medium">Département</label>
                         <select id="department-filter" v-model="departmentFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les départements</option>
-                            <option v-for="d in departmentOptions" :key="d" :value="d">{{ d }}</option>
+                            <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
                         </select>
                     </div>
 
