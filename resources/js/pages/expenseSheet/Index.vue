@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Link, Head } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Link, Head, router } from '@inertiajs/vue3';
 import { Badge } from '@/components/ui/badge';
 import {
     FileText,
@@ -14,28 +14,54 @@ import {
     ChevronDown
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
+import Pagination from '@/components/Pagination.vue';
+
+interface ExpenseSheet {
+    id: number;
+    type: string;
+    distance: number;
+    route: string;
+    total: number;
+    approved: boolean | null;
+    is_draft: boolean;
+    created_at: string;
+    form: {
+        name: string;
+    };
+    department?: {
+        name: string;
+    };
+    user?: {
+        name: string;
+    };
+}
+
+interface PaginatedData {
+    data: ExpenseSheet[];
+    current_page: number;
+    from: number;
+    last_page: number;
+    links: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
+    path: string;
+    per_page: number;
+    to: number;
+    total: number;
+}
 
 const props = defineProps<{
-    expenseSheets: Array<{
-        id: number;
-        type: string;
-        distance: number;
-        route: string;
-        total: number;
-        approved: boolean | null;
-        is_draft: boolean;
-        created_at: string;
-        form: {
-            name: string;
-        };
-        department?: {
-            name: string;
-        };
-        user?: {
-            name: string;
-        };
-    }>,
+    expenseSheets: PaginatedData;
     canExport: boolean;
+    filters: {
+        search?: string;
+        status?: string;
+        department?: string;
+        dateStart?: string;
+        dateEnd?: string;
+    };
 }>();
 
 // 🔁 Mapping approved → statut lisible
@@ -87,13 +113,43 @@ const formatDate = (dateString: string) => {
     });
 };
 
-// 🎛️ Filtres
-const searchQuery = ref('');
-const statusFilter = ref('all');
-const departmentFilter = ref('all');
-const dateStart = ref('');
-const dateEnd = ref('');
+// 🎛️ Filtres - Initialisation avec les valeurs du serveur
+const searchQuery = ref(props.filters.search || '');
+const statusFilter = ref(props.filters.status || 'all');
+const departmentFilter = ref(props.filters.department || 'all');
+const dateStart = ref(props.filters.dateStart || '');
+const dateEnd = ref(props.filters.dateEnd || '');
 const isFilterOpen = ref(false);
+
+// Debounce pour la recherche
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Fonction pour appliquer les filtres côté serveur
+const applyFilters = () => {
+    router.get(route('expense-sheet.index'), {
+        search: searchQuery.value || undefined,
+        status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
+        department: departmentFilter.value !== 'all' ? departmentFilter.value : undefined,
+        dateStart: dateStart.value || undefined,
+        dateEnd: dateEnd.value || undefined,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['expenseSheets'],
+    });
+};
+
+// Watch pour les changements de filtres (avec debounce pour la recherche)
+watch(searchQuery, () => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        applyFilters();
+    }, 300);
+});
+
+watch([statusFilter, departmentFilter, dateStart, dateEnd], () => {
+    applyFilters();
+});
 
 // ♻️ Reset des filtres
 const resetFilters = () => {
@@ -102,29 +158,13 @@ const resetFilters = () => {
     departmentFilter.value = 'all';
     dateStart.value = '';
     dateEnd.value = '';
+    applyFilters();
 };
 
 // 🏢 Options des départements
 const departmentOptions = computed(() => {
-    const unique = new Set(props.expenseSheets.map(s => s.department?.name || 'Inconnu'));
+    const unique = new Set(props.expenseSheets.data.map(s => s.department?.name || 'Inconnu'));
     return [...Array.from(unique)];
-});
-
-// 📊 Filtrage principal
-const filteredExpenseSheets = computed(() => {
-    return props.expenseSheets.filter(sheet => {
-        const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
-        const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
-        const matchesDepartment = departmentFilter.value === 'all' || sheet.department?.name === departmentFilter.value;
-
-        const createdAt = new Date(sheet.created_at);
-        const start = dateStart.value ? new Date(dateStart.value) : null;
-        const end = dateEnd.value ? new Date(dateEnd.value) : null;
-        const matchesDate = (!start || createdAt >= start) && (!end || createdAt <= end);
-
-        return matchesSearch && matchesStatus && matchesDepartment && matchesDate;
-    });
 });
 
 // 🔎 Filtres actifs ?
@@ -219,14 +259,14 @@ const breadcrumbs = [
 
             <div class="flex items-center justify-between">
                 <Badge variant="outline" class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs">
-                    {{ filteredExpenseSheets.length }} note(s) trouvée(s)
+                    {{ expenseSheets.total }} note(s) trouvée(s)
                 </Badge>
             </div>
 
             <!-- Vue Mobile (cartes) - visible uniquement sur mobile -->
             <div class="md:hidden space-y-3">
                 <Link
-                    v-for="sheet in filteredExpenseSheets"
+                    v-for="sheet in expenseSheets.data"
                     :key="sheet.id"
                     :href="'/expense-sheet/' + sheet.id"
                     class="block"
@@ -274,10 +314,16 @@ const breadcrumbs = [
                     </div>
                 </Link>
 
-                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
+                <div v-if="expenseSheets.data.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
                     <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
                     <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
                 </div>
+
+                <!-- Pagination Mobile -->
+                <Pagination
+                    v-if="expenseSheets.data.length > 0"
+                    :pagination="expenseSheets"
+                />
             </div>
 
             <!-- Vue Desktop (tableau) - visible sur tablette et + -->
@@ -295,7 +341,7 @@ const breadcrumbs = [
                     </tr>
                     </thead>
                     <tbody class="divide-y">
-                    <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
+                    <tr v-for="sheet in expenseSheets.data" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
                         <td class="px-4 lg:px-6 py-4">
                             <div class="flex items-center gap-2">
                                 <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0" />
@@ -327,11 +373,18 @@ const breadcrumbs = [
                     </tbody>
                 </table>
 
-                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground">
+                <div v-if="expenseSheets.data.length === 0" class="text-center p-8 text-muted-foreground">
                     <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
                     <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
                 </div>
             </div>
+
+            <!-- Pagination Desktop -->
+            <Pagination
+                v-if="expenseSheets.data.length > 0"
+                :pagination="expenseSheets"
+                class="hidden md:block"
+            />
         </div>
     </AppLayout>
 </template>

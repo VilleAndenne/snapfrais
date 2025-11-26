@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Casts\CostCast;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 class ExpenseSheet extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'user_id',
         'type',
@@ -24,7 +24,7 @@ class ExpenseSheet extends Model
         'approved',
         'refusal_reason',
         'created_by',
-        'is_draft'
+        'is_draft',
     ];
 
     protected $casts = [
@@ -40,7 +40,6 @@ class ExpenseSheet extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-
 
     public function costs()
     {
@@ -75,5 +74,38 @@ class ExpenseSheet extends Model
     public function expenseSheetCosts()
     {
         return $this->hasMany(ExpenseSheetCost::class);
+    }
+
+    /**
+     * Scope pour filtrer les notes de frais visibles par l'utilisateur.
+     */
+    public function scopeVisibleBy(Builder $query, User $user): Builder
+    {
+        // Admin peut tout voir
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        // Récupérer tous les départements où l'utilisateur est responsable
+        $headDepartmentIds = $user->headOfDepartments()->pluck('departments.id')->toArray();
+
+        return $query->where(function ($q) use ($user, $headDepartmentIds) {
+            // L'utilisateur peut voir ses propres notes
+            $q->where('expense_sheets.user_id', $user->id);
+
+            // Ou les notes des départements où il est responsable
+            if (! empty($headDepartmentIds)) {
+                $q->orWhere(function ($subQ) use ($headDepartmentIds) {
+                    $subQ->whereIn('expense_sheets.department_id', $headDepartmentIds)
+                        // Mais pas celles où l'auteur est aussi responsable du même département
+                        ->whereNotExists(function ($existsQ) use ($headDepartmentIds) {
+                            $existsQ->select(\DB::raw(1))
+                                ->from('department_head')
+                                ->whereColumn('department_head.user_id', 'expense_sheets.user_id')
+                                ->whereIn('department_head.department_id', $headDepartmentIds);
+                        });
+                });
+            }
+        });
     }
 }
