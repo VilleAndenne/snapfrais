@@ -64,10 +64,14 @@ class ExpenseSheetController extends Controller
 
         $expenseSheets = $query->paginate(5)->withQueryString();
 
+        // Récupérer tous les départements uniques pour le filtre
+        $departments = \App\Models\Department::orderBy('name')->pluck('name')->unique()->values();
+
         return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,
             'canExport' => auth()->user()->can('export', ExpenseSheet::class),
             'filters' => $request->only(['search', 'status', 'department', 'dateStart', 'dateEnd']),
+            'departments' => $departments,
         ]);
     }
 
