@@ -100,9 +100,10 @@ class ExpenseSheet extends Model
                         // Mais pas celles où l'auteur est aussi responsable du même département
                         ->whereNotExists(function ($existsQ) use ($headDepartmentIds) {
                             $existsQ->select(\DB::raw(1))
-                                ->from('department_head')
-                                ->whereColumn('department_head.user_id', 'expense_sheets.user_id')
-                                ->whereIn('department_head.department_id', $headDepartmentIds);
+                                ->from('department_user')
+                                ->whereColumn('department_user.user_id', 'expense_sheets.user_id')
+                                ->whereIn('department_user.department_id', $headDepartmentIds)
+                                ->where('department_user.is_head', 1);
                         });
                 });
             }
