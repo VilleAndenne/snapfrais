@@ -2,21 +2,17 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Form;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
-class FormController extends Controller
+class FormController extends BaseController
 {
     /**
      * Display a listing of the resource.
      */
     public function index(): JsonResponse
     {
-        return response()->json([
-            'forms' => Form::all(),
-        ]);
+        return $this->handleResponse(Form::all());
     }
 
     /**
@@ -26,10 +22,9 @@ class FormController extends Controller
     {
         $form = Form::with('costs.reimbursementRates', 'costs.requirements')->findOrFail($id);
 
-        return response()->json([
+        return $this->handleResponse([
             'form' => $form,
             'departments' => auth()->user()->departments()->with('heads')->get(),
         ]);
     }
-
 }
