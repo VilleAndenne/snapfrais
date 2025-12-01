@@ -2,17 +2,18 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\MobileDevice;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 
-class MobileDeviceController extends Controller
+class MobileDeviceController extends BaseController
 {
     /**
      * Register or update a mobile device push token.
      */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'push_token' => 'required|string',
@@ -32,16 +33,13 @@ class MobileDeviceController extends Controller
             ]
         );
 
-        return response()->json([
-            'message' => 'Device registered successfully',
-            'device' => $device,
-        ]);
+        return $this->handleResponse($device, 'Device registered successfully');
     }
 
     /**
      * Unregister a mobile device push token.
      */
-    public function unregister(Request $request)
+    public function unregister(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'push_token' => 'required|string',
@@ -54,27 +52,21 @@ class MobileDeviceController extends Controller
             ->delete();
 
         if ($deleted) {
-            return response()->json([
-                'message' => 'Device unregistered successfully',
-            ]);
+            return $this->handleResponse(null, 'Device unregistered successfully');
         }
 
-        return response()->json([
-            'message' => 'Device not found',
-        ], 404);
+        return $this->handleError('Device not found', Response::HTTP_NOT_FOUND);
     }
 
     /**
      * Get all registered devices for the authenticated user.
      */
-    public function index()
+    public function index(): JsonResponse
     {
         $user = Auth::user();
 
         $devices = $user->mobileDevices;
 
-        return response()->json([
-            'devices' => $devices,
-        ]);
+        return $this->handleResponse($devices);
     }
 }

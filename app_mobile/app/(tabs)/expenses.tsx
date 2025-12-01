@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/services/api';
-import type { ExpenseSheet } from '@/types/api';
+import type { ExpenseSheet, PaginationInfo } from '@/types/api';
 import { SkeletonCard } from '@/components/loading-skeleton';
 
 type StatusType = 'draft' | 'pending' | 'approved' | 'rejected';
@@ -59,23 +59,27 @@ export default function ExpenseListScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | StatusType>('all');
   const [expenseSheets, setExpenseSheets] = useState<ExpenseSheet[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (page: number = 1) => {
     try {
       setIsLoading(true);
       // Charger toutes les notes de frais auxquelles l'utilisateur a accès
-      const response = await api.getAllExpenseSheets();
+      const response = await api.getAllExpenseSheets(page, 5);
       console.log('Expenses - Loaded', response.expenseSheets.length, 'expense sheets');
       setExpenseSheets(response.expenseSheets);
+      setPagination(response.pagination || null);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching expense sheets:', error);
       Alert.alert(
         'Erreur',
         'Impossible de charger les notes de frais',
-        [{ text: 'Réessayer', onPress: fetchData }]
+        [{ text: 'Réessayer', onPress: () => fetchData(page) }]
       );
     } finally {
       setIsLoading(false);
@@ -85,9 +89,9 @@ export default function ExpenseListScreen() {
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await fetchData();
+    await fetchData(currentPage);
     setIsRefreshing(false);
-  }, []);
+  }, [currentPage]);
 
   // Refresh when screen comes into focus
   useFocusEffect(
@@ -125,6 +129,18 @@ export default function ExpenseListScreen() {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+
+  const goToNextPage = () => {
+    if (pagination && currentPage < pagination.last_page) {
+      fetchData(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      fetchData(currentPage - 1);
+    }
   };
 
   return (
@@ -191,7 +207,7 @@ export default function ExpenseListScreen() {
           {/* Compteur */}
           <View style={styles.countSection}>
             <ThemedText style={styles.countText}>
-              {isLoading && !hasInitiallyLoaded ? '...' : `${filteredExpenseSheets.length} note(s) de frais`}
+              {isLoading && !hasInitiallyLoaded ? '...' : pagination ? `${pagination.total} note(s) de frais` : `${filteredExpenseSheets.length} note(s) de frais`}
             </ThemedText>
           </View>
 
@@ -274,6 +290,50 @@ export default function ExpenseListScreen() {
                 Aucune note de frais ne correspond à vos critères de recherche.
               </ThemedText>
             </ThemedView>
+          )}
+
+          {/* Pagination */}
+          {pagination && pagination.last_page > 1 && (
+            <View style={styles.paginationContainer}>
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+                onPress={goToPreviousPage}
+                disabled={currentPage === 1}
+              >
+                <IconSymbol
+                  size={20}
+                  name="chevron.left"
+                  color={currentPage === 1 ? (isDark ? '#4A4A4A' : '#D1D1D6') : (isDark ? '#FFFFFF' : '#000000')}
+                />
+                <ThemedText style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+                  Précédent
+                </ThemedText>
+              </TouchableOpacity>
+
+              <View style={styles.paginationInfo}>
+                <ThemedText style={styles.paginationText}>
+                  Page {pagination.current_page} / {pagination.last_page}
+                </ThemedText>
+                <ThemedText style={styles.paginationSubtext}>
+                  {pagination.from}-{pagination.to} sur {pagination.total}
+                </ThemedText>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage === pagination.last_page && styles.paginationButtonDisabled]}
+                onPress={goToNextPage}
+                disabled={currentPage === pagination.last_page}
+              >
+                <ThemedText style={[styles.paginationButtonText, currentPage === pagination.last_page && styles.paginationButtonTextDisabled]}>
+                  Suivant
+                </ThemedText>
+                <IconSymbol
+                  size={20}
+                  name="chevron.right"
+                  color={currentPage === pagination.last_page ? (isDark ? '#4A4A4A' : '#D1D1D6') : (isDark ? '#FFFFFF' : '#000000')}
+                />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -446,5 +506,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
     textAlign: 'center',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginTop: 12,
+  },
+  paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  paginationButtonDisabled: {
+    opacity: 0.4,
+  },
+  paginationButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  paginationButtonTextDisabled: {
+    opacity: 0.5,
+  },
+  paginationInfo: {
+    alignItems: 'center',
+  },
+  paginationText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  paginationSubtext: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 2,
   },
 });
