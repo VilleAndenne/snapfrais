@@ -45,7 +45,7 @@ class RejectionExpenseSheet extends Notification implements ShouldQueue
             ->subject('Votre note de frais #'.$this->expenseSheet->id.' a été refusée')
             ->greeting('Bonjour,')
             ->line($this->expenseSheet->validatedBy->name.' a refusé votre note de frais #'.$this->expenseSheet->id)
-            ->action('Voir la note de frais', url('/expense-sheets/'.$this->expenseSheet->id))
+            ->action('Voir la note de frais', url('/expense-sheet/'.$this->expenseSheet->id))
             ->line('Si vous pensez qu\'il s\'agit d\'une erreur, vous pouvez contacter votre responsable de service ou justifiez à nouveau votre demande.')
             ->salutation('Bien cordialement,');
     }
