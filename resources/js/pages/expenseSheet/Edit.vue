@@ -78,13 +78,41 @@
                             type="date"
                             v-model="costData[index].date"
                             class="w-full rounded border border-border bg-background p-1.5 sm:p-2 text-sm sm:text-base text-foreground"
+                            @change="updateRate(index, cost)"
                             required
                         />
                     </div>
 
                     <!-- Champs dynamiques selon le type de coût -->
                     <div v-if="cost.type === 'km'">
-                        <KmCostInput v-model="costData[index].kmData" />
+                        <KmCostInput
+                            v-model="costData[index].kmData"
+                            :travel_mode="getActiveTransport(cost, costData[index].date) === 'bike' ? 'BICYCLING' : 'DRIVING'"
+                        />
+                        <!-- Résumé remboursement km -->
+                        <div class="mt-3 rounded border border-border bg-muted/40 p-2 sm:p-3">
+                            <div class="flex flex-col gap-x-4 gap-y-1.5 sm:gap-y-2 text-xs sm:text-sm">
+                                <span class="font-medium">Estimation</span>
+                                <span>
+                                    • Mode :
+                                    {{
+                                        getActiveTransport(cost, costData[index].date) === 'bike'
+                                            ? 'Vélo'
+                                            : getActiveTransport(cost, costData[index].date) === 'car'
+                                              ? 'Voiture'
+                                              : 'Autre'
+                                    }}
+                                </span>
+                                <span>• Taux : {{ formatRate(getActiveRate(cost, costData[index].date)) }} / km</span>
+                                <span>• Distance : {{ roundKm(costData[index]?.kmData?.totalKm) }} km</span>
+                                <span>
+                                    • Remboursé :
+                                    <span class="font-semibold">
+                                        {{ formatCurrency(kmReimbursed(index, cost)) }}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div v-else-if="cost.type === 'fixed'">
                         <FixedCostDisplay v-model="costData[index].fixedAmount" />
@@ -200,13 +228,22 @@ watch(
     }
 );
 
-const getActiveRate = (cost) => {
-    const today = new Date().toISOString().split("T")[0];
-    const activeRate = (cost.reimbursement_rates || []).find(
-        (rate) => rate.start_date <= today && (!rate.end_date || rate.end_date >= today)
-    );
-    return activeRate?.value ?? 0;
+const getActiveRateRecord = (cost, date) => {
+    const rates = cost.reimbursement_rates || [];
+    const actives = rates.filter((r) => r.start_date <= date && (!r.end_date || r.end_date >= date));
+    actives.sort((a, b) => (a.start_date > b.start_date ? -1 : 1));
+    return actives[0] || null;
 };
+
+const getActiveRate = (cost, date) => {
+    if (!date) {
+        const today = new Date().toISOString().split("T")[0];
+        return getActiveRateRecord(cost, today)?.value ?? 0;
+    }
+    return getActiveRateRecord(cost, date)?.value ?? 0;
+};
+
+const getActiveTransport = (cost, date) => getActiveRateRecord(cost, date)?.transport ?? 'car';
 
 onMounted(() => {
     // Initialiser les départements
@@ -237,6 +274,7 @@ onMounted(() => {
                 steps: item.data.steps || [],
                 manualKm: item.data.manualKm || 0,
                 justification: item.data.justification || '',
+                totalKm: item.data.totalKm || item.data.manualKm || 0,
             };
         } else if (item.type === 'percentage') {
             data = {
@@ -285,6 +323,21 @@ const addToRequest = (cost) => {
 const removeCost = (index) => {
     selectedCosts.value.splice(index, 1);
     costData.value.splice(index, 1);
+};
+
+const updateRate = (index, cost) => {
+    const date = costData.value[index].date;
+    const rate = getActiveRate(cost, date);
+
+    if (cost.type === 'percentage') {
+        costData.value[index].percentageData.percentage = rate;
+        const paidAmount = costData.value[index].percentageData.paidAmount;
+        if (paidAmount !== null && typeof paidAmount !== 'undefined') {
+            costData.value[index].percentageData.reimbursedAmount = (paidAmount * rate) / 100;
+        }
+    } else if (cost.type === 'fixed') {
+        costData.value[index].fixedAmount = rate;
+    }
 };
 
 const submit = () => {
@@ -371,5 +424,22 @@ const submit = () => {
             return formData;
         }
     });
+};
+
+// Helpers
+const roundKm = (v) => {
+    const n = Number(v) || 0;
+    return Math.round(n * 10) / 10;
+};
+
+const formatCurrency = (v) => (Number(v) || 0).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' });
+
+const formatRate = (v) => `${v} €`;
+
+// Montant remboursé pour un coût "km"
+const kmReimbursed = (index, cost) => {
+    const km = Number(costData.value[index]?.kmData?.totalKm) || 0;
+    const rate = getActiveRate(cost, costData.value[index].date);
+    return Number((km * rate).toFixed(2));
 };
 </script>
