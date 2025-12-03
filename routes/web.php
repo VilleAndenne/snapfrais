@@ -25,7 +25,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/patch-notes/{id}/mark-as-read', [\App\Http\Controllers\PatchNoteController::class, 'markAsRead'])->name('patch-notes.mark-as-read');
 });
 
-require __DIR__ . '/settings.php';
-require __DIR__ . '/auth.php';
-require __DIR__ . '/forms.php';
-require __DIR__ . '/expenseSheet.php';
+// Impersonation routes
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/impersonate/{user}', [\App\Http\Controllers\ImpersonationController::class, 'start'])->name('impersonate.start');
+    Route::post('/impersonate/stop', [\App\Http\Controllers\ImpersonationController::class, 'stop'])->name('impersonate.stop');
+});
+
+require __DIR__.'/settings.php';
+require __DIR__.'/auth.php';
+require __DIR__.'/forms.php';
+require __DIR__.'/expenseSheet.php';
