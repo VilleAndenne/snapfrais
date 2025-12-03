@@ -4,11 +4,12 @@ import PatchNoteModal from '@/components/PatchNoteModal.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 import { watch, ref, computed } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { usePage, router } from '@inertiajs/vue3';
 import { useFlashStore } from '@/stores/flash';
 
 // Icônes Lucide
-import { CheckCircle, AlertTriangle, X as LucideX } from 'lucide-vue-next';
+import { CheckCircle, AlertTriangle, X as LucideX, LogOut } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     breadcrumbs?: BreadcrumbItemType[];
@@ -24,6 +25,14 @@ const flash = useFlashStore();
 const show = ref(false);
 const flashMessage = computed(() => flash.success || flash.error);
 const isSuccess = computed(() => !!flash.success);
+
+// Impersonation
+const isImpersonating = computed(() => page.props.impersonating ?? false);
+const impersonatedUser = computed(() => page.props.impersonatedUser ?? null);
+
+const stopImpersonation = () => {
+    router.post(route('impersonate.stop'));
+};
 
 // Surveille les props flash transmises par Laravel (via Inertia)
 watch(
@@ -51,10 +60,32 @@ watch(
 </script>
 
 <template>
-    <!-- Layout principal -->
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <slot />
-    </AppLayout>
+    <!-- Bannière d'impersonation -->
+    <div
+        v-if="isImpersonating"
+        class="fixed top-0 left-0 right-0 z-50 bg-orange-500 text-white px-4 py-2 flex items-center justify-between shadow-lg"
+    >
+        <div class="flex items-center gap-2">
+            <span class="font-semibold">Mode Impersonation:</span>
+            <span>Vous naviguez en tant que {{ impersonatedUser?.name }}</span>
+        </div>
+        <Button
+            @click="stopImpersonation"
+            variant="secondary"
+            size="sm"
+            class="flex items-center gap-2"
+        >
+            <LogOut class="h-4 w-4" />
+            Quitter
+        </Button>
+    </div>
+
+    <!-- Layout principal avec padding-top si impersonation active -->
+    <div :class="{ 'pt-[44px]': isImpersonating }">
+        <AppLayout :breadcrumbs="breadcrumbs">
+            <slot />
+        </AppLayout>
+    </div>
 
     <!-- Notification Toast (Lucide) -->
     <div aria-live="assertive" class="pointer-events-none fixed inset-0 flex items-end px-4 py-6 sm:items-start sm:p-6 z-50">

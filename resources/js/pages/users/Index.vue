@@ -45,6 +45,16 @@
                                 <TableCell class="hidden sm:table-cell text-xs sm:text-sm">{{ user.email }}</TableCell>
                                 <TableCell class="text-right">
                                 <div class="flex justify-end gap-1 sm:gap-2">
+                                    <Button
+                                        v-if="canImpersonate && !user.super_admin"
+                                        variant="ghost"
+                                        size="icon"
+                                        @click="impersonateUser(user.id)"
+                                        class="h-8 w-8 sm:h-10 sm:w-10"
+                                        title="Impersonner cet utilisateur"
+                                    >
+                                        <UserIcon class="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                                    </Button>
                                     <Button variant="ghost" size="icon" @click="editUser(user.id)" class="h-8 w-8 sm:h-10 sm:w-10">
                                         <PencilIcon class="h-3 w-3 sm:h-4 sm:w-4" />
                                     </Button>
@@ -125,7 +135,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
-import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon } from 'lucide-vue-next'
+import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon, UserIcon } from 'lucide-vue-next'
 
 // shadcn/ui
 import { Button } from '@/components/ui/button'
@@ -156,6 +166,7 @@ const page = usePage()
 // Props via Inertia (pagination-friendly)
 const users = computed(() => page.props.users)
 const initialSearch = page.props.filters?.search ?? ''
+const canImpersonate = computed(() => page.props.canImpersonate)
 
 // UI State
 const filters = ref({ search: initialSearch })
@@ -207,5 +218,9 @@ const deleteUser = () => {
             isDeleting.value = false
         }
     })
+}
+
+const impersonateUser = (userId) => {
+    router.post(route('impersonate.start', userId))
 }
 </script>
