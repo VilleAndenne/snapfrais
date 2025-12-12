@@ -32,6 +32,10 @@
                             <TrashIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                             Supprimer
                         </Button>
+                        <Button v-if="canReturnBySRH" variant="outline" size="sm" @click="openReturnBySRHModal" class="text-xs sm:text-sm border-orange-400 text-orange-600 hover:bg-orange-600 hover:text-white">
+                            <RotateCcwIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                            Renvoyer (SRH)
+                        </Button>
                     </div>
                     <Badge :variant="getStatusLabel(expenseSheet).variant">
                         {{ getStatusLabel(expenseSheet).label }}
@@ -62,9 +66,40 @@
                 </div>
             </div>
 
-            <!-- Bannière de refus -->
+            <!-- Bannière de renvoi SRH -->
             <div
-                v-if="expenseSheet.approved == false"
+                v-if="expenseSheet.approved == false && expenseSheet.status === 'Renvoyé par le SRH'"
+                class="flex flex-col sm:flex-row items-start gap-3 rounded-lg border-l-4 border-orange-400 bg-gradient-to-r from-orange-100 to-orange-50 px-3 sm:px-5 py-3 sm:py-4 shadow-sm transition-all duration-200 hover:shadow-md dark:from-orange-950/50 dark:to-orange-950/25"
+            >
+                <div class="flex-shrink-0 rounded-full bg-orange-100 p-1.5 sm:p-2 dark:bg-orange-900">
+                    <RotateCcwIcon class="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div class="flex-1 space-y-1.5">
+                    <h3 class="flex items-center gap-2 font-medium text-orange-700 dark:text-orange-300 text-sm sm:text-base">
+                        Note de frais renvoyée par le SRH
+                        <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-orange-600/70 dark:bg-orange-400/70"></span>
+                    </h3>
+                    <div class="space-y-1 text-xs sm:text-sm text-orange-600/90 dark:text-orange-400/90">
+                        <p class="flex items-baseline gap-1.5">
+                            <span class="font-semibold">Renvoyée par :</span>
+                            <span>{{ expenseSheet.validated_by.name }}</span>
+                        </p>
+                        <p class="flex items-baseline gap-1.5">
+                            <span class="font-semibold">Motif du renvoi :</span>
+                            <span>{{ expenseSheet.refusal_reason }}</span>
+                        </p>
+                    </div>
+                </div>
+                <div v-if="canEdit" class="flex-shrink-0 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" @click="editExpenseSheet" class="w-full sm:w-auto border-orange-400 text-orange-600 hover:bg-orange-600 hover:text-white text-xs sm:text-sm">
+                        Modifier et resoumettre
+                    </Button>
+                </div>
+            </div>
+
+            <!-- Bannière de refus (classique) -->
+            <div
+                v-if="expenseSheet.approved == false && expenseSheet.status !== 'Renvoyé par le SRH'"
                 class="flex flex-col sm:flex-row items-start gap-3 rounded-lg border-l-4 border-destructive bg-gradient-to-r from-destructive/10 to-destructive/5 px-3 sm:px-5 py-3 sm:py-4 shadow-sm transition-all duration-200 hover:shadow-md"
             >
                 <div class="flex-shrink-0 rounded-full bg-destructive/10 p-1.5 sm:p-2">
@@ -324,6 +359,36 @@
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <!-- Modal renvoi SRH -->
+        <Dialog :open="isReturnBySRHModalOpen" @update:open="isReturnBySRHModalOpen = $event">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="text-base sm:text-lg">Renvoyer la note de frais (SRH)</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">
+                        Cette action renverra la note de frais à l'agent et son responsable sera notifié.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="space-y-3 sm:space-y-4 py-3 sm:py-4">
+                    <div class="space-y-2">
+                        <Label for="return-srh-reason" class="text-xs sm:text-sm">Motif du renvoi</Label>
+                        <Textarea
+                            id="return-srh-reason"
+                            v-model="returnBySRHReason"
+                            placeholder="Veuillez expliquer pourquoi cette note de frais est renvoyée..."
+                            class="min-h-[80px] sm:min-h-[100px] text-sm"
+                        />
+                    </div>
+                </div>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="closeReturnBySRHModal" class="w-full xs:w-auto">Annuler</Button>
+                    <Button variant="default" @click="confirmReturnBySRH" :disabled="!returnBySRHReason.trim()" class="w-full xs:w-auto bg-orange-600 hover:bg-orange-700">
+                        <RotateCcwIcon class="mr-2 h-4 w-4" />
+                        Confirmer le renvoi
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 
     <ExpenseSheetPdf ref="pdfContent" :expenseSheet="expenseSheet" class="hidden" />
@@ -354,6 +419,7 @@ import {
     FootprintsIcon,
     MoreVerticalIcon,
     PrinterIcon,
+    RotateCcwIcon,
     TrashIcon,
     XIcon,
 } from 'lucide-vue-next';
@@ -365,6 +431,7 @@ const props = defineProps({
     canReject: { type: Boolean, default: false },
     canEdit: { type: Boolean, default: false },
     canDestroy: { type: Boolean, default: false },
+    canReturnBySRH: { type: Boolean, default: false },
 });
 
 const breadcrumbs = [
@@ -375,6 +442,10 @@ const breadcrumbs = [
 // Modal refus
 const isRejectModalOpen = ref(false);
 const rejectionReason = ref('');
+
+// Modal renvoi SRH
+const isReturnBySRHModalOpen = ref(false);
+const returnBySRHReason = ref('');
 
 // Modal de delete
 const isDeleteModalOpen = ref(false);
@@ -423,6 +494,22 @@ const confirmReject = () => {
 };
 const approveExpenseSheet = () => {
     useForm({ approval: true }).post('/expense-sheet/' + props.expenseSheet.id + '/approve');
+};
+
+// Renvoi SRH
+const openReturnBySRHModal = () => {
+    returnBySRHReason.value = '';
+    isReturnBySRHModalOpen.value = true;
+};
+const closeReturnBySRHModal = () => {
+    isReturnBySRHModalOpen.value = false;
+};
+const confirmReturnBySRH = () => {
+    if (!returnBySRHReason.value.trim()) return;
+    useForm({
+        reason: returnBySRHReason.value,
+    }).post('/expense-sheet/' + props.expenseSheet.id + '/return-by-srh');
+    closeReturnBySRHModal();
 };
 const submitDraft = () => {
     useForm({}).post('/expense-sheet/' + props.expenseSheet.id + '/submit-draft');

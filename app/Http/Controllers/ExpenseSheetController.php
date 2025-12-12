@@ -380,6 +380,7 @@ class ExpenseSheetController extends Controller
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
         $canDestroy = auth()->user()->can('destroy', $expenseSheet);
+        $canReturnBySRH = auth()->user()->can('returnBySRH', $expenseSheet);
 
         return Inertia::render('expenseSheet/Show', [
             'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy', 'creator']),
@@ -387,6 +388,7 @@ class ExpenseSheetController extends Controller
             'canReject' => $canReject,
             'canEdit' => $canEdit,
             'canDestroy' => $canDestroy,
+            'canReturnBySRH' => $canReturnBySRH,
         ]);
     }
 
@@ -794,6 +796,45 @@ class ExpenseSheetController extends Controller
             'expenseSheet' => $expenseSheet,
         ])->setPaper('a4', 'landscape')
             ->stream('note_de_frais_'.$id.'.pdf'); // inline
+    }
+
+    /**
+     * Return expense sheet by SRH (admin) after final validation.
+     */
+    public function returnBySRH(Request $request, $id)
+    {
+        $expenseSheet = ExpenseSheet::with(['department.heads', 'user'])->findOrFail($id);
+
+        if (! auth()->user()->can('returnBySRH', $expenseSheet)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|string|min:3',
+        ]);
+
+        // Remettre la note en statut "à corriger"
+        $expenseSheet->update([
+            'approved' => false,
+            'status' => 'Renvoyé par le SRH',
+            'refusal_reason' => $validated['reason'],
+            'validated_by' => auth()->id(),
+            'validated_at' => now(),
+        ]);
+
+        // Notifier l'agent (bénéficiaire de la note)
+        $expenseSheet->user->notify(new \App\Notifications\SRHReturnExpenseSheet($expenseSheet));
+
+        // Notifier le(s) responsable(s) du département
+        $department = $expenseSheet->department;
+        $heads = $department->heads;
+
+        $heads->each(function ($head) use ($expenseSheet) {
+            $head->notify(new \App\Notifications\SRHReturnExpenseSheet($expenseSheet));
+        });
+
+        return redirect()->route('expense-sheet.show', $expenseSheet->id)
+            ->with('success', 'La note de frais a été renvoyée. L\'agent et son responsable ont été notifiés.');
     }
 
     public function duplicate($id)
