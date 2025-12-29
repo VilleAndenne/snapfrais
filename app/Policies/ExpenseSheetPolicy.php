@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\ExpenseSheet;
+use App\Models\User;
 
 class ExpenseSheetPolicy
 {
@@ -32,7 +32,7 @@ class ExpenseSheetPolicy
         }
 
         // Ne pas afficher les notes déjà traitées
-        if (!is_null($expenseSheet->approved)) {
+        if (! is_null($expenseSheet->approved)) {
             return false;
         }
 
@@ -74,7 +74,7 @@ class ExpenseSheetPolicy
         }
 
         // Déjà traité - vérifie si approved n'est pas null
-        if (!is_null($expenseSheet->approved)) {
+        if (! is_null($expenseSheet->approved)) {
             return false;
         }
 
@@ -108,7 +108,6 @@ class ExpenseSheetPolicy
 
         return false;
     }
-
 
     /**
      * Vérifie si l'utilisateur peut modifier une note de frais spécifique.
@@ -151,6 +150,7 @@ class ExpenseSheetPolicy
                 if ($department->heads->contains($expenseSheet->user)) {
                     return false;
                 }
+
                 return true;
             }
             $department = $department->parent;
@@ -170,6 +170,21 @@ class ExpenseSheetPolicy
         if ($expenseSheet->approved == true) {
             return false;
         }
+
         return $user->is_admin == true || ($expenseSheet->user_id === $user->id && $expenseSheet->is_draft);
+    }
+
+    /**
+     * Vérifie si l'utilisateur (SRH/admin) peut renvoyer une note de frais déjà approuvée.
+     */
+    public function returnBySRH(User $user, ExpenseSheet $expenseSheet): bool
+    {
+        // Seuls les admins peuvent renvoyer une note
+        if (! $user->is_admin) {
+            return false;
+        }
+
+        // La note doit être approuvée pour pouvoir être renvoyée
+        return $expenseSheet->approved == true;
     }
 }

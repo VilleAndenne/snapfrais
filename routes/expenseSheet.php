@@ -12,6 +12,7 @@ Route::post('/expense-sheet/{id}', [ExpenseSheetController::class, 'store'])->na
 Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])->name('expense-sheet.edit')->middleware('auth');
 Route::post('/expense-sheet/{id}/approve', [ExpenseSheetController::class, 'approve'])->name('expense-sheet.approve')->middleware('auth');
 Route::post('/expense-sheet/{id}/submit-draft', [ExpenseSheetController::class, 'submitDraft'])->name('expense-sheet.submit-draft')->middleware('auth');
+Route::post('/expense-sheet/{id}/return-by-srh', [ExpenseSheetController::class, 'returnBySRH'])->name('expense-sheet.return-by-srh')->middleware('auth');
 Route::get('/expense-sheet/{id}/edit', [ExpenseSheetController::class, 'edit'])->name('expense-sheet.edit')->middleware('auth');
 Route::put('/expense-sheet/{id}', [ExpenseSheetController::class, 'update'])->name('expense-sheet.update')->middleware('auth');
 Route::delete('/expense-sheet/{id}', [ExpenseSheetController::class, 'destroy'])->name('expense-sheet.destroy')->middleware('auth');
