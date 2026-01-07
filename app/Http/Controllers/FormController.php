@@ -183,8 +183,15 @@ class FormController extends Controller
         ]);
 
         // ✅ Supprimer les coûts qui ne sont plus présents
+        // D'abord supprimer les relations enfants (reimbursement_rates et requirements) pour éviter les violations de clé étrangère
         $incomingCostIds = collect($validated['costs'])->pluck('id')->filter()->toArray();
-        $form->costs()->whereNotIn('id', $incomingCostIds)->delete();
+        $costsToDelete = $form->costs()->whereNotIn('id', $incomingCostIds)->get();
+
+        foreach ($costsToDelete as $costToDelete) {
+            $costToDelete->reimbursementRates()->delete();
+            $costToDelete->requirements()->delete();
+            $costToDelete->delete();
+        }
 
         // ✅ Traiter chaque coût
         foreach ($validated['costs'] as $costData) {
