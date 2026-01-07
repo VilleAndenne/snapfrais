@@ -78,6 +78,11 @@ class ExpenseSheet extends Model
 
     /**
      * Scope pour filtrer les notes de frais visibles par l'utilisateur.
+     *
+     * Un responsable peut voir :
+     * - Ses propres notes
+     * - Les notes de son département ET de tous les sous-départements (hiérarchie complète)
+     * - Sauf celles où l'auteur est co-responsable du même département que lui
      */
     public function scopeVisibleBy(Builder $query, User $user): Builder
     {
@@ -89,15 +94,18 @@ class ExpenseSheet extends Model
         // Récupérer tous les départements où l'utilisateur est responsable
         $headDepartmentIds = $user->headOfDepartments()->pluck('departments.id')->toArray();
 
-        return $query->where(function ($q) use ($user, $headDepartmentIds) {
+        // Récupérer également tous les sous-départements (récursif)
+        $allVisibleDepartmentIds = $this->getAllDescendantDepartmentIds($headDepartmentIds);
+
+        return $query->where(function ($q) use ($user, $headDepartmentIds, $allVisibleDepartmentIds) {
             // L'utilisateur peut voir ses propres notes
             $q->where('expense_sheets.user_id', $user->id);
 
-            // Ou les notes des départements où il est responsable
-            if (! empty($headDepartmentIds)) {
-                $q->orWhere(function ($subQ) use ($headDepartmentIds) {
-                    $subQ->whereIn('expense_sheets.department_id', $headDepartmentIds)
-                        // Mais pas celles où l'auteur est aussi responsable du même département
+            // Ou les notes des départements où il est responsable + tous les sous-départements
+            if (! empty($allVisibleDepartmentIds)) {
+                $q->orWhere(function ($subQ) use ($headDepartmentIds, $allVisibleDepartmentIds) {
+                    $subQ->whereIn('expense_sheets.department_id', $allVisibleDepartmentIds)
+                        // Mais pas celles où l'auteur est co-responsable du même département que l'utilisateur
                         ->whereNotExists(function ($existsQ) use ($headDepartmentIds) {
                             $existsQ->select(\DB::raw(1))
                                 ->from('department_user')
@@ -108,5 +116,37 @@ class ExpenseSheet extends Model
                 });
             }
         });
+    }
+
+    /**
+     * Récupère récursivement tous les IDs des départements descendants.
+     *
+     * @param  array  $parentIds  IDs des départements parents
+     * @return array IDs de tous les départements (parents + descendants)
+     */
+    private function getAllDescendantDepartmentIds(array $parentIds): array
+    {
+        if (empty($parentIds)) {
+            return [];
+        }
+
+        $allIds = $parentIds;
+        $currentLevelIds = $parentIds;
+
+        // Parcourir la hiérarchie niveau par niveau
+        while (! empty($currentLevelIds)) {
+            $childIds = Department::whereIn('parent_id', $currentLevelIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (empty($childIds)) {
+                break;
+            }
+
+            $allIds = array_merge($allIds, $childIds);
+            $currentLevelIds = $childIds;
+        }
+
+        return array_unique($allIds);
     }
 }
