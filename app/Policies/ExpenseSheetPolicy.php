@@ -23,6 +23,10 @@ class ExpenseSheetPolicy
     /**
      * Vérifie si la note de frais doit apparaître dans la liste "à valider" de l'utilisateur.
      * Cette méthode est utilisée pour filtrer l'affichage, pas pour les permissions.
+     *
+     * Règles métier :
+     * - Un responsable direct valide les notes des agents non-responsables de son service
+     * - Le N+1 (responsable du parent) valide les notes des responsables de sous-services
      */
     public function shouldAppearInValidationList(User $user, ExpenseSheet $expenseSheet): bool
     {
@@ -41,23 +45,39 @@ class ExpenseSheetPolicy
             return false;
         }
 
-        // Département lié à la note de frais
-        $department = $expenseSheet->department;
+        // Département de la note de frais
+        $noteDepartment = $expenseSheet->department;
 
-        // Vérifie si l'utilisateur est responsable du département ou d'un parent
-        while ($department) {
-            // 1. L'utilisateur est responsable ici ?
-            if ($department->heads->contains($user)) {
-                // 2. L'auteur de la note est aussi responsable ici ?
-                if ($department->heads->contains($expenseSheet->user)) {
-                    return false; // même service, 2 responsables : ne pas afficher
-                }
+        if (! $noteDepartment) {
+            return false;
+        }
 
-                // Afficher si l'utilisateur est responsable (admin ou non)
+        // L'auteur de la note est-il responsable de son département ?
+        $authorIsHeadOfNoteDepartment = $noteDepartment->heads->contains($expenseSheet->user);
+
+        // Cas 1 : L'utilisateur est responsable DIRECT du département de la note
+        if ($noteDepartment->heads->contains($user)) {
+            // Si l'auteur est aussi responsable du même département, ne pas afficher
+            // (les co-responsables ne se valident pas entre eux)
+            if ($authorIsHeadOfNoteDepartment) {
+                return false;
+            }
+
+            // L'utilisateur est responsable direct, l'auteur est un agent → afficher
+            return true;
+        }
+
+        // Cas 2 : L'utilisateur est responsable du PARENT (N+1)
+        // Il ne voit que les notes des responsables de sous-services
+        $parentDepartment = $noteDepartment->parent;
+        if ($parentDepartment && $parentDepartment->heads->contains($user)) {
+            // L'auteur doit être responsable de son département pour que le N+1 le valide
+            if ($authorIsHeadOfNoteDepartment) {
                 return true;
             }
 
-            $department = $department->parent;
+            // L'auteur n'est pas responsable → c'est au responsable direct de valider, pas au N+1
+            return false;
         }
 
         return false;
