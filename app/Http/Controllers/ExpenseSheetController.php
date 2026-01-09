@@ -887,15 +887,35 @@ class ExpenseSheetController extends Controller
     /**
      * Get statistics for the authenticated user's expense sheets.
      */
-    public function statistics()
+    public function statistics(Request $request)
     {
         $user = auth()->user();
+        $year = $request->input('year', now()->year);
 
-        // Récupérer les notes de frais approuvées de l'utilisateur
+        // Récupérer les notes de frais approuvées de l'utilisateur pour l'année sélectionnée
         $approvedExpenseSheets = ExpenseSheet::where('user_id', $user->id)
             ->where('approved', true)
+            ->whereYear('created_at', $year)
             ->with('costs.formCost')
             ->get();
+
+        // Récupérer les années disponibles pour l'utilisateur
+        $availableYears = ExpenseSheet::where('user_id', $user->id)
+            ->where('approved', true)
+            ->get()
+            ->map(fn ($sheet) => $sheet->created_at->year)
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->toArray();
+
+        // Ajouter l'année courante si elle n'est pas présente
+        if (! in_array(now()->year, $availableYears)) {
+            array_unshift($availableYears, now()->year);
+        }
+
+        // S'assurer que les années sont triées en ordre décroissant
+        rsort($availableYears);
 
         // Calculer les euros remboursés par catégorie
         $eurosByCategory = [];
@@ -940,6 +960,8 @@ class ExpenseSheetController extends Controller
             'kmByCategory' => $kmByCategory,
             'totalEuros' => $totalEuros,
             'totalKm' => $totalKm,
+            'selectedYear' => (int) $year,
+            'availableYears' => $availableYears,
         ]);
     }
 }
