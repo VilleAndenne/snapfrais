@@ -883,4 +883,63 @@ class ExpenseSheetController extends Controller
         return redirect()->route('expense-sheet.show', $newExpenseSheet->id)
             ->with('success', 'Note de frais dupliquée avec succès.');
     }
+
+    /**
+     * Get statistics for the authenticated user's expense sheets.
+     */
+    public function statistics()
+    {
+        $user = auth()->user();
+
+        // Récupérer les notes de frais approuvées de l'utilisateur
+        $approvedExpenseSheets = ExpenseSheet::where('user_id', $user->id)
+            ->where('approved', true)
+            ->with('costs.formCost')
+            ->get();
+
+        // Calculer les euros remboursés par catégorie
+        $eurosByCategory = [];
+        // Calculer les KM par catégorie
+        $kmByCategory = [];
+
+        foreach ($approvedExpenseSheets as $expenseSheet) {
+            foreach ($expenseSheet->costs as $cost) {
+                $categoryName = $cost->formCost->name ?? 'Inconnu';
+
+                // Euros remboursés
+                if (! isset($eurosByCategory[$categoryName])) {
+                    $eurosByCategory[$categoryName] = 0;
+                }
+                $eurosByCategory[$categoryName] += $cost->total;
+
+                // KM (uniquement pour les types km)
+                if ($cost->type === 'km' && $cost->distance) {
+                    if (! isset($kmByCategory[$categoryName])) {
+                        $kmByCategory[$categoryName] = 0;
+                    }
+                    $kmByCategory[$categoryName] += $cost->distance;
+                }
+            }
+        }
+
+        // Arrondir les montants
+        foreach ($eurosByCategory as $category => $amount) {
+            $eurosByCategory[$category] = round($amount, 2);
+        }
+
+        foreach ($kmByCategory as $category => $km) {
+            $kmByCategory[$category] = round($km, 2);
+        }
+
+        // Calculer les totaux
+        $totalEuros = round(array_sum($eurosByCategory), 2);
+        $totalKm = round(array_sum($kmByCategory), 2);
+
+        return response()->json([
+            'eurosByCategory' => $eurosByCategory,
+            'kmByCategory' => $kmByCategory,
+            'totalEuros' => $totalEuros,
+            'totalKm' => $totalKm,
+        ]);
+    }
 }
