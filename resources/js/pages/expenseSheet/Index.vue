@@ -11,7 +11,10 @@ import {
     Search,
     Filter,
     X,
-    ChevronDown
+    ChevronDown,
+    BarChart3,
+    Euro,
+    MapPin
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import Pagination from '@/components/Pagination.vue';
@@ -171,6 +174,41 @@ const hasActiveFilters = computed(() => {
         dateEnd.value !== '';
 });
 
+// 📊 Statistiques
+interface Statistics {
+    eurosByCategory: Record<string, number>;
+    kmByCategory: Record<string, number>;
+    totalEuros: number;
+    totalKm: number;
+}
+
+const showStatisticsModal = ref(false);
+const statisticsLoading = ref(false);
+const statistics = ref<Statistics | null>(null);
+
+const fetchStatistics = async () => {
+    statisticsLoading.value = true;
+    try {
+        const response = await fetch(route('expense-sheet.statistics'));
+        if (response.ok) {
+            statistics.value = await response.json();
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des statistiques:', error);
+    } finally {
+        statisticsLoading.value = false;
+    }
+};
+
+const openStatisticsModal = () => {
+    showStatisticsModal.value = true;
+    fetchStatistics();
+};
+
+const closeStatisticsModal = () => {
+    showStatisticsModal.value = false;
+};
+
 const breadcrumbs = [
     {
         title: 'Feuilles de frais',
@@ -188,6 +226,11 @@ const breadcrumbs = [
                 <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Notes de frais</h2>
 
                 <div class="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+                    <button @click="openStatisticsModal" class="px-3 sm:px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md flex items-center justify-center gap-2 text-sm">
+                        <BarChart3 class="h-4 w-4" />
+                        Statistiques
+                    </button>
+
                     <Link v-if="canExport" :href="route('export')" class="px-3 sm:px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center justify-center gap-2 text-sm">
                         <FileText class="h-4 w-4" />
                         Exporter
@@ -381,6 +424,100 @@ const breadcrumbs = [
                 class="hidden md:block"
             />
         </div>
+
+        <!-- Modal Statistiques -->
+        <Teleport to="body">
+            <div v-if="showStatisticsModal" class="fixed inset-0 z-50 flex items-center justify-center">
+                <!-- Overlay -->
+                <div class="fixed inset-0 bg-black/50" @click="closeStatisticsModal"></div>
+
+                <!-- Modal Content -->
+                <div class="relative bg-background rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <div class="flex items-center gap-2">
+                            <BarChart3 class="h-5 w-5 text-primary" />
+                            <h3 class="text-lg font-semibold">Mes statistiques</h3>
+                        </div>
+                        <button @click="closeStatisticsModal" class="p-1 hover:bg-muted rounded-md transition-colors">
+                            <X class="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+                        <!-- Loading state -->
+                        <div v-if="statisticsLoading" class="flex items-center justify-center py-12">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+
+                        <!-- Statistics content -->
+                        <div v-else-if="statistics" class="space-y-6">
+                            <!-- Euros remboursés par catégorie -->
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <Euro class="h-5 w-5 text-green-600" />
+                                    <h4 class="font-semibold text-base">Euros remboursés par catégorie</h4>
+                                </div>
+                                <p class="text-sm text-muted-foreground">Montants des notes de frais approuvées</p>
+
+                                <div v-if="Object.keys(statistics.eurosByCategory).length > 0" class="space-y-2">
+                                    <div v-for="(amount, category) in statistics.eurosByCategory" :key="'euro-' + category" class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                        <span class="text-sm font-medium">{{ category }}</span>
+                                        <span class="text-sm font-semibold text-green-600">{{ amount.toFixed(2) }} €</span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800">
+                                        <span class="text-sm font-semibold">Total</span>
+                                        <span class="text-base font-bold text-green-700 dark:text-green-400">{{ statistics.totalEuros.toFixed(2) }} €</span>
+                                    </div>
+                                </div>
+                                <div v-else class="text-center py-4 text-muted-foreground text-sm">
+                                    Aucun remboursement enregistré
+                                </div>
+                            </div>
+
+                            <!-- Séparateur -->
+                            <hr class="border-border" />
+
+                            <!-- KM par catégorie -->
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <MapPin class="h-5 w-5 text-blue-600" />
+                                    <h4 class="font-semibold text-base">Kilomètres par catégorie</h4>
+                                </div>
+                                <p class="text-sm text-muted-foreground">Distances parcourues (notes approuvées)</p>
+
+                                <div v-if="Object.keys(statistics.kmByCategory).length > 0" class="space-y-2">
+                                    <div v-for="(km, category) in statistics.kmByCategory" :key="'km-' + category" class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                        <span class="text-sm font-medium">{{ category }}</span>
+                                        <span class="text-sm font-semibold text-blue-600">{{ km.toFixed(2) }} km</span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <span class="text-sm font-semibold">Total</span>
+                                        <span class="text-base font-bold text-blue-700 dark:text-blue-400">{{ statistics.totalKm.toFixed(2) }} km</span>
+                                    </div>
+                                </div>
+                                <div v-else class="text-center py-4 text-muted-foreground text-sm">
+                                    Aucun trajet enregistré
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error state -->
+                        <div v-else class="text-center py-12 text-muted-foreground">
+                            <p>Impossible de charger les statistiques.</p>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="flex justify-end p-4 border-t">
+                        <button @click="closeStatisticsModal" class="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors">
+                            Fermer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
 
