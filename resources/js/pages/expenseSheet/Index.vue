@@ -12,6 +12,8 @@ import {
     Filter,
     X,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     BarChart3,
     Euro,
     MapPin
@@ -180,18 +182,23 @@ interface Statistics {
     kmByCategory: Record<string, number>;
     totalEuros: number;
     totalKm: number;
+    selectedYear: number;
+    availableYears: number[];
 }
 
 const showStatisticsModal = ref(false);
 const statisticsLoading = ref(false);
 const statistics = ref<Statistics | null>(null);
+const selectedYear = ref(new Date().getFullYear());
 
-const fetchStatistics = async () => {
+const fetchStatistics = async (year?: number) => {
     statisticsLoading.value = true;
     try {
-        const response = await fetch(route('expense-sheet.statistics'));
+        const yearParam = year ?? selectedYear.value;
+        const response = await fetch(route('expense-sheet.statistics') + `?year=${yearParam}`);
         if (response.ok) {
             statistics.value = await response.json();
+            selectedYear.value = statistics.value?.selectedYear ?? new Date().getFullYear();
         }
     } catch (error) {
         console.error('Erreur lors du chargement des statistiques:', error);
@@ -202,12 +209,27 @@ const fetchStatistics = async () => {
 
 const openStatisticsModal = () => {
     showStatisticsModal.value = true;
+    selectedYear.value = new Date().getFullYear();
     fetchStatistics();
 };
 
 const closeStatisticsModal = () => {
     showStatisticsModal.value = false;
 };
+
+const goToPreviousYear = () => {
+    selectedYear.value--;
+    fetchStatistics(selectedYear.value);
+};
+
+const goToNextYear = () => {
+    if (selectedYear.value < new Date().getFullYear()) {
+        selectedYear.value++;
+        fetchStatistics(selectedYear.value);
+    }
+};
+
+const canGoToNextYear = computed(() => selectedYear.value < new Date().getFullYear());
 
 const breadcrumbs = [
     {
@@ -439,9 +461,21 @@ const breadcrumbs = [
                             <BarChart3 class="h-5 w-5 text-primary" />
                             <h3 class="text-lg font-semibold">Mes statistiques</h3>
                         </div>
-                        <button @click="closeStatisticsModal" class="p-1 hover:bg-muted rounded-md transition-colors">
-                            <X class="h-5 w-5" />
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <!-- Sélecteur d'année -->
+                            <div class="flex items-center gap-1 bg-muted rounded-md">
+                                <button @click="goToPreviousYear" class="p-2 hover:bg-muted-foreground/10 rounded-l-md transition-colors" :disabled="statisticsLoading">
+                                    <ChevronLeft class="h-4 w-4" />
+                                </button>
+                                <span class="px-3 py-1 font-medium text-sm min-w-[60px] text-center">{{ selectedYear }}</span>
+                                <button @click="goToNextYear" class="p-2 hover:bg-muted-foreground/10 rounded-r-md transition-colors" :disabled="!canGoToNextYear || statisticsLoading" :class="{ 'opacity-50 cursor-not-allowed': !canGoToNextYear }">
+                                    <ChevronRight class="h-4 w-4" />
+                                </button>
+                            </div>
+                            <button @click="closeStatisticsModal" class="p-1 hover:bg-muted rounded-md transition-colors">
+                                <X class="h-5 w-5" />
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Body -->

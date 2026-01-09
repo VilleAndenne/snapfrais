@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Casts\CostCast;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class FormCost extends Model
 {
+    use HasFactory;
     protected $fillable = ['name', 'description', 'type'];
 
     protected $casts = [
