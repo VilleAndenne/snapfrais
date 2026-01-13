@@ -75,7 +75,7 @@
                         Note de frais refusée
                         <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-destructive/70"></span>
                     </h3>
-                    <div class="space-y-1 text-xs sm:text-sm text-destructive/90">
+                    <div class="space-y-1 text-xs sm:text-sm text-destructive/90 dark:text-red-200">
                         <p class="flex items-baseline gap-1.5">
                             <span class="font-semibold">Refusée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
@@ -182,7 +182,20 @@
                 </CardHeader>
                 <CardContent>
                     <div class="space-y-4 sm:space-y-6">
-                        <div v-for="(cost, index) in expenseSheet.costs" :key="index" class="space-y-3 sm:space-y-4 rounded border bg-background p-3 sm:p-4">
+                        <div v-for="(cost, index) in expenseSheet.costs" :key="index" class="relative space-y-3 sm:space-y-4 rounded border bg-background p-3 sm:p-4">
+                            <!-- Indicateur DSF -->
+                            <TooltipProvider v-if="cost.form_cost.processing_department === 'DSF'">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div class="absolute top-0 right-0 w-0 h-0 border-l-[40px] border-l-transparent border-t-[40px] border-t-amber-500 cursor-help">
+                                            <AlertTriangleIcon class="absolute -top-[34px] right-[2px] h-4 w-4 text-white" />
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" class="max-w-xs">
+                                        <p>Ce coût est géré par la Direction des Services Financiers (DSF). Le remboursement sera effectué par virement séparé et non sur votre fiche de paie.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <h3 class="text-lg sm:text-xl font-bold text-foreground">{{ cost.form_cost.name }}</h3>
                                 <div class="flex flex-wrap items-center gap-2">
@@ -338,12 +351,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ExpenseSheetPdf from '@/pages/expenseSheet/Pdf.vue';
 import { formatCurrency, formatDate, getActiveRate, getStatusLabel } from '@/utils/formatters';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertCircleIcon,
+    AlertTriangleIcon,
     PencilIcon,
     ArrowUp,
     BikeIcon,
