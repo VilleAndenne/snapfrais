@@ -46,10 +46,17 @@ class ExpenseSheetController extends Controller
         }
 
         // Filtre par département
+        $selectedDepartmentName = null;
         if ($request->filled('department') && $request->input('department') !== 'all') {
-            $query->whereHas('department', function ($q) use ($request) {
-                $q->where('name', $request->input('department'));
+            $selectedDepartmentName = $request->input('department');
+            $query->whereHas('department', function ($q) use ($selectedDepartmentName) {
+                $q->where('name', $selectedDepartmentName);
             });
+        }
+
+        // Filtre par utilisateur
+        if ($request->filled('user') && $request->input('user') !== 'all') {
+            $query->where('user_id', $request->input('user'));
         }
 
         // Filtre par date de début
@@ -67,11 +74,31 @@ class ExpenseSheetController extends Controller
         // Récupérer tous les départements uniques pour le filtre
         $departments = \App\Models\Department::orderBy('name')->pluck('name')->unique()->values();
 
+        // Récupérer les utilisateurs ayant des notes de frais dans le département sélectionné
+        $usersInDepartment = [];
+        if ($selectedDepartmentName) {
+            $department = \App\Models\Department::where('name', $selectedDepartmentName)->first();
+            if ($department) {
+                $usersInDepartment = ExpenseSheet::where('department_id', $department->id)
+                    ->visibleBy(auth()->user())
+                    ->with('user:id,name')
+                    ->get()
+                    ->pluck('user')
+                    ->filter()
+                    ->unique('id')
+                    ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+                    ->sortBy('name')
+                    ->values()
+                    ->toArray();
+            }
+        }
+
         return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,
             'canExport' => auth()->user()->can('export', ExpenseSheet::class),
-            'filters' => $request->only(['search', 'status', 'department', 'dateStart', 'dateEnd']),
+            'filters' => $request->only(['search', 'status', 'department', 'user', 'dateStart', 'dateEnd']),
             'departments' => $departments,
+            'usersInDepartment' => $usersInDepartment,
         ]);
     }
 

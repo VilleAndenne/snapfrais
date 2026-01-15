@@ -41,6 +41,11 @@ interface ExpenseSheet {
     };
 }
 
+interface UserInDepartment {
+    id: number;
+    name: string;
+}
+
 interface PaginatedData {
     data: ExpenseSheet[];
     current_page: number;
@@ -64,10 +69,12 @@ const props = defineProps<{
         search?: string;
         status?: string;
         department?: string;
+        user?: string;
         dateStart?: string;
         dateEnd?: string;
     };
     departments: string[];
+    usersInDepartment: UserInDepartment[];
 }>();
 
 // 🔁 Mapping approved → statut lisible
@@ -123,6 +130,7 @@ const formatDate = (dateString: string) => {
 const searchQuery = ref(props.filters.search || '');
 const statusFilter = ref(props.filters.status || 'all');
 const departmentFilter = ref(props.filters.department || 'all');
+const userFilter = ref(props.filters.user || 'all');
 const dateStart = ref(props.filters.dateStart || '');
 const dateEnd = ref(props.filters.dateEnd || '');
 const isFilterOpen = ref(false);
@@ -136,12 +144,13 @@ const applyFilters = () => {
         search: searchQuery.value || undefined,
         status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
         department: departmentFilter.value !== 'all' ? departmentFilter.value : undefined,
+        user: userFilter.value !== 'all' ? userFilter.value : undefined,
         dateStart: dateStart.value || undefined,
         dateEnd: dateEnd.value || undefined,
     }, {
         preserveState: true,
         preserveScroll: true,
-        only: ['expenseSheets'],
+        only: ['expenseSheets', 'usersInDepartment'],
     });
 };
 
@@ -153,7 +162,13 @@ watch(searchQuery, () => {
     }, 300);
 });
 
-watch([statusFilter, departmentFilter, dateStart, dateEnd], () => {
+watch([statusFilter, userFilter, dateStart, dateEnd], () => {
+    applyFilters();
+});
+
+// Quand le département change, réinitialiser le filtre utilisateur et appliquer les filtres
+watch(departmentFilter, () => {
+    userFilter.value = 'all';
     applyFilters();
 });
 
@@ -162,6 +177,7 @@ const resetFilters = () => {
     searchQuery.value = '';
     statusFilter.value = 'all';
     departmentFilter.value = 'all';
+    userFilter.value = 'all';
     dateStart.value = '';
     dateEnd.value = '';
     applyFilters();
@@ -172,6 +188,7 @@ const hasActiveFilters = computed(() => {
     return searchQuery.value !== '' ||
         statusFilter.value !== 'all' ||
         departmentFilter.value !== 'all' ||
+        userFilter.value !== 'all' ||
         dateStart.value !== '' ||
         dateEnd.value !== '';
 });
@@ -295,6 +312,14 @@ const breadcrumbs = [
                         <select id="department-filter" v-model="departmentFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les départements</option>
                             <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+                        </select>
+                    </div>
+
+                    <div v-if="departmentFilter !== 'all' && usersInDepartment.length > 0" class="space-y-1 sm:space-y-2">
+                        <label for="user-filter" class="text-xs sm:text-sm font-medium">Demandeur</label>
+                        <select id="user-filter" v-model="userFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
+                            <option value="all">Tous les demandeurs</option>
+                            <option v-for="u in usersInDepartment" :key="u.id" :value="u.id">{{ u.name }}</option>
                         </select>
                     </div>
 
