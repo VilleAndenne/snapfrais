@@ -12,6 +12,7 @@ class ExpenseSheetExport extends Model
         'end_date',
         'file_path',
         'status',
+        'created_by_id',
     ];
 
     protected $casts = [
@@ -19,7 +20,7 @@ class ExpenseSheetExport extends Model
         'end_date'   => DateCast::class,
     ];
 
-    protected $appends = ['file_url', 'records_count'];
+    protected $appends = ['file_url', 'records_count', 'created_by_name'];
 
     public function getFileUrlAttribute()
     {
@@ -34,7 +35,18 @@ class ExpenseSheetExport extends Model
             'expense_sheet_export_expense_sheets' // pivot
         )->withTimestamps();
     }
-    protected function getRecordsCountAttribute() {
+    protected function getRecordsCountAttribute(): int
+    {
         return $this->expenseSheets()->count();
+    }
+
+    public function createdBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
+    }
+
+    protected function getCreatedByNameAttribute(): string
+    {
+        return $this->createdBy?->name ?? '-';
     }
 }
