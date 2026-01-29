@@ -304,6 +304,7 @@ const breadcrumbs = [
                             <option value="pending">En attente</option>
                             <option value="approved">Approuvée</option>
                             <option value="rejected">Rejetée</option>
+                            <option value="draft">Brouillon</option>
                         </select>
                     </div>
 

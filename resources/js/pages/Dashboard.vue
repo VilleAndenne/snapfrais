@@ -194,6 +194,7 @@ const approveExpenseSheet = (id: number) => {
                         <option value="pending">En attente</option>
                         <option value="approved">Approuvée</option>
                         <option value="rejected">Rejeté</option>
+                        <option value="draft">Brouillon</option>
                     </select>
                 </div>
             </div>
