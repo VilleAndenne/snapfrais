@@ -55,12 +55,20 @@ class ExpenseSheetExportController extends Controller
         $users = User::inCurrentOrganization()
             ->whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
                 $q->where('approved', true)
-                    ->whereBetween('validated_at', [$startDate, $endDate]);
+                    ->whereBetween('validated_at', [$startDate, $endDate])
+                    ->whereHas('expenseSheetCosts.formCost', function ($costQuery) {
+                        $costQuery->where('processing_department', 'SRH');
+                    });
             })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
                     $q->where('approved', true)
                         ->whereBetween('validated_at', [$startDate, $endDate]);
+                },
+                'expenseSheets.expenseSheetCosts' => function ($q) {
+                    $q->whereHas('formCost', function ($costQuery) {
+                        $costQuery->where('processing_department', 'SRH');
+                    });
                 },
                 'expenseSheets.expenseSheetCosts.formCost.form',
             ])->get();
@@ -73,7 +81,7 @@ class ExpenseSheetExportController extends Controller
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if (empty($cost->date)) {
+                    if (empty($cost->date) || $cost->formCost->processing_department !== 'SRH') {
                         continue;
                     }
 
@@ -121,7 +129,7 @@ class ExpenseSheetExportController extends Controller
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    if (empty($cost->date)) {
+                    if (empty($cost->date) || $cost->formCost->processing_department !== 'SRH') {
                         continue;
                     }
 
@@ -214,9 +222,13 @@ class ExpenseSheetExportController extends Controller
         ]);
 
         // 🆕 2) Récupérer les IDs des notes de frais comprises dans la période et approuvées
+        //        et qui contiennent au moins un coût SRH
         $expenseSheetIds = ExpenseSheet::query()
             ->where('approved', true)
             ->whereBetween('validated_at', [$startDate, $endDate])
+            ->whereHas('expenseSheetCosts.formCost', function ($q) {
+                $q->where('processing_department', 'SRH');
+            })
             ->pluck('id')
             ->all();
 

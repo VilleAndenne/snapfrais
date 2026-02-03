@@ -40,6 +40,7 @@ class FormController extends Controller
             'costs.*.name' => 'required|string|max:255',
             'costs.*.description' => 'required|string|max:255',
             'costs.*.type' => 'required|string|in:km,fixed,percentage',
+            'costs.*.processing_department' => 'required|string|in:SRH,DSF',
 
             'costs.*.reimbursement_rates' => 'nullable|array',
             'costs.*.reimbursement_rates.*.start_date' => 'required_with:costs.*.reimbursement_rates|date',
@@ -66,6 +67,7 @@ class FormController extends Controller
                 'name' => $costData['name'],
                 'description' => $costData['description'],
                 'type' => $costData['type'],
+                'processing_department' => $costData['processing_department'] ?? 'SRH',
             ]);
 
             // Créer les taux de remboursement
@@ -154,6 +156,7 @@ class FormController extends Controller
             'costs.*.name' => 'required|string|max:255',
             'costs.*.description' => 'required|string|max:255',
             'costs.*.type' => 'required|string|in:km,fixed,percentage',
+            'costs.*.processing_department' => 'required|string|in:SRH,DSF',
 
             'costs.*.reimbursement_rates' => 'nullable|array',
             // ⚠️ Si ton nom de table est mal orthographié, corrige-le ici.
@@ -202,6 +205,7 @@ class FormController extends Controller
                     'name'        => $costData['name'],
                     'description' => $costData['description'], // 🔧 on met aussi à jour la description
                     'type'        => $costData['type'],
+                    'processing_department' => $costData['processing_department'] ?? 'SRH',
                 ]);
             } else {
                 // Création
@@ -209,6 +213,7 @@ class FormController extends Controller
                     'name'        => $costData['name'],
                     'description' => $costData['description'],
                     'type'        => $costData['type'],
+                    'processing_department' => $costData['processing_department'] ?? 'SRH',
                 ]);
             }
 

@@ -131,6 +131,18 @@
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div class="space-y-2">
+                            <Label for="cost-processing-department">Traité par</Label>
+                            <Select v-model="costDraft.processing_department">
+                                <SelectTrigger id="cost-processing-department">
+                                    <SelectValue placeholder="Sélectionner un service" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="SRH">Service des Ressources Humaines</SelectItem>
+                                    <SelectItem value="DSF">Direction des Services Financiers</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div class="space-y-2 sm:col-span-2">
                             <Label for="cost-description">Description</Label>
                             <Input id="cost-description" v-model="costDraft.description" placeholder="Description du coût" />
@@ -281,6 +293,7 @@ const normalizeCost = (cost) => ({
     name: cost.name ?? '',
     description: cost.description ?? '',
     type: cost.type ?? '',
+    processing_department: cost.processing_department ?? 'SRH',
     reimbursement_rates: (cost.reimbursement_rates ?? []).map((rate) => ({
         id: rate.id ?? null,
         start_date: rate.start_date ?? '',
@@ -322,6 +335,7 @@ const blankCost = () => ({
     name: '',
     description: '',
     type: '',
+    processing_department: 'SRH',
     reimbursement_rates: [],
     requirements: [],
 });
@@ -392,7 +406,7 @@ const removeRequirement = (reqIndex) => {
 
 const costDraftValid = computed(() => {
     const c = costDraft.value;
-    if (!c.name.trim() || !c.type || !c.description.trim()) {
+    if (!c.name.trim() || !c.type || !c.description.trim() || !c.processing_department) {
         return false;
     }
     const ratesOk = c.reimbursement_rates.every(

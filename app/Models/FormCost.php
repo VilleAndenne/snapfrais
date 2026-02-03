@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 class FormCost extends Model
 {
     use HasFactory;
-    protected $fillable = ['name', 'description', 'type'];
+
+    protected $fillable = ['name', 'description', 'type', 'processing_department'];
 
     protected $casts = [
         'cost' => CostCast::class,
