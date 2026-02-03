@@ -151,7 +151,6 @@ const breadcrumbs = [
                                 <TableRow>
                                     <TableHead>Période</TableHead>
                                     <TableHead>Date d'export</TableHead>
-                                    <TableHead>Créé par</TableHead>
                                     <TableHead>Statut</TableHead>
                                     <TableHead>Taille</TableHead>
                                     <TableHead class="text-right">Actions</TableHead>
@@ -164,9 +163,6 @@ const breadcrumbs = [
                                     </TableCell>
                                     <TableCell>
                                         {{ formatDate(history.created_at) }}
-                                    </TableCell>
-                                    <TableCell>
-                                        {{ history.created_by_name }}
                                     </TableCell>
                                     <TableCell>
                                         <Badge :variant="getStatusBadge(history.status).variant" class="flex items-center gap-1 w-fit">

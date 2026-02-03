@@ -73,11 +73,6 @@ if (props.modelValue) {
 onMounted(async () => {
     const google = await loadGoogleMaps();
     directionsService = new google.maps.DirectionsService();
-
-    // Calculer la distance si les adresses sont déjà remplies (mode édition)
-    if (departure.value && arrival.value) {
-        await calculateDistance();
-    }
 });
 
 // Empêche le champ manuelKm d'être vidé

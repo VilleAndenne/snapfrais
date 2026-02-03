@@ -10,12 +10,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Mirror\Concerns\Impersonatable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Impersonatable, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -62,7 +61,6 @@ class User extends Authenticatable
             'notify_expense_sheet_to_approval' => 'boolean',
             'notify_receipt_expense_sheet' => 'boolean',
             'notify_remind_approval' => 'boolean',
-            'super_admin' => 'boolean',
         ];
     }
 
@@ -79,11 +77,6 @@ class User extends Authenticatable
     public function departments()
     {
         return $this->belongsToMany(Department::class)->withPivot('is_head');
-    }
-
-    public function headOfDepartments()
-    {
-        return $this->belongsToMany(Department::class)->wherePivot('is_head', true);
     }
 
     public function superiors()
@@ -201,21 +194,5 @@ class User extends Authenticatable
     public function mobileDevices(): HasMany
     {
         return $this->hasMany(MobileDevice::class);
-    }
-
-    /**
-     * Determine if the user can impersonate other users.
-     */
-    public function canImpersonate(): bool
-    {
-        return $this->super_admin;
-    }
-
-    /**
-     * Determine if the user can be impersonated.
-     */
-    public function canBeImpersonated(): bool
-    {
-        return ! $this->super_admin;
     }
 }

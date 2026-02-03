@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Http\Controllers\Controller;
 use App\Models\ExpenseSheet;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-class ExpenseSheetController extends BaseController
+class ExpenseSheetController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -17,40 +17,28 @@ class ExpenseSheetController extends BaseController
     public function index(): JsonResponse
     {
         // Retourne uniquement les notes de frais de l'utilisateur connecté
-        $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
-            ->where('user_id', auth()->id())
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return $this->handleResponse($expenseSheets);
+        return response()->json([
+            'expenseSheets' => ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+                ->where('user_id', auth()->id())
+                ->orderBy('created_at', 'desc')
+                ->get(),
+        ]);
     }
 
     /**
      * Display all resource which user have access to.
      */
-    public function all(): JsonResponse
+    public function all()
     {
-        $perPage = request()->input('per_page', 10);
-
         $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
             ->orderBy('created_at', 'desc')
             ->get()
             ->filter(fn ($expenseSheet) => auth()->user()->can('view', $expenseSheet))
-            ->values();
+            ->values()
+            ->all();
 
-        // Paginer manuellement les résultats filtrés
-        $page = request()->input('page', 1);
-        $total = $expenseSheets->count();
-        $items = $expenseSheets->forPage($page, $perPage)->values();
-
-        return $this->handleResponse([
-            'data' => $items,
-            'current_page' => (int) $page,
-            'per_page' => (int) $perPage,
-            'total' => $total,
-            'last_page' => (int) ceil($total / $perPage),
-            'from' => ($page - 1) * $perPage + 1,
-            'to' => min($page * $perPage, $total),
+        return response()->json([
+            'expenseSheets' => $expenseSheets,
         ]);
     }
 
@@ -59,16 +47,16 @@ class ExpenseSheetController extends BaseController
      */
     public function validateIndex(): JsonResponse
     {
-        $expenseSheets = ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
-            ->where('is_draft', false)
-            ->whereNull('approved')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->filter(fn ($expenseSheet) => auth()->user()->can('shouldAppearInValidationList', $expenseSheet))
-            ->values()
-            ->all();
-
-        return $this->handleResponse($expenseSheets);
+        return response()->json([
+            'expenseSheets' => ExpenseSheet::with('form', 'costs', 'department.heads', 'user')
+                ->where('is_draft', false)
+                ->whereNull('approved')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->filter(fn ($expenseSheet) => auth()->user()->can('shouldAppearInValidationList', $expenseSheet))
+                ->values()
+                ->all(),
+        ]);
     }
 
     /**
@@ -106,11 +94,17 @@ class ExpenseSheetController extends BaseController
             if ($targetUserId && (int) $targetUserId !== (int) $currentUserId) {
                 $isHead = $department->heads->contains('id', $currentUserId);
                 if (! $isHead) {
-                    return $this->handleError("Vous devez être responsable du service pour encoder au nom d'un agent.", Response::HTTP_FORBIDDEN);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Vous devez être responsable du service pour encoder au nom d'un agent.",
+                    ], 403);
                 }
                 $belongsToDept = $department->users->contains('id', (int) $targetUserId);
                 if (! $belongsToDept) {
-                    return $this->handleError("L'agent sélectionné n'appartient pas à ce service.", Response::HTTP_UNPROCESSABLE_ENTITY);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "L'agent sélectionné n'appartient pas à ce service.",
+                    ], 422);
                 }
             }
 
@@ -150,7 +144,10 @@ class ExpenseSheetController extends BaseController
                 if ($rates->count() > 1) {
                     $expenseSheet->delete();
 
-                    return $this->handleError("Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.", Response::HTTP_UNPROCESSABLE_ENTITY);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.",
+                    ], 422);
                 }
 
                 $rate = $rates->first();
@@ -267,7 +264,10 @@ class ExpenseSheetController extends BaseController
                     'costs_count' => count($validated['costs']),
                 ]);
 
-                return $this->handleError('Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.',
+                ], 422);
             }
 
             // Ne pas envoyer de notifications pour les brouillons
@@ -293,23 +293,30 @@ class ExpenseSheetController extends BaseController
 
             $message = $isDraft ? 'Brouillon enregistré.' : 'Note de frais enregistrée.';
 
-            return $this->handleResponse(
-                $expenseSheet->load(['costs', 'department', 'user']),
-                $message,
-                Response::HTTP_CREATED
-            );
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'expense_sheet' => $expenseSheet->load(['costs', 'department', 'user']),
+            ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('API ExpenseSheet validation failed', ['errors' => $e->errors()]);
 
-            return $this->handleError('Erreur de validation', Response::HTTP_UNPROCESSABLE_ENTITY, $e->errors());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('API ExpenseSheet store error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->handleError($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -327,7 +334,7 @@ class ExpenseSheetController extends BaseController
         $canReject = auth()->user()->can('reject', $expenseSheet);
         $canEdit = auth()->user()->can('edit', $expenseSheet);
 
-        return $this->handleResponse([
+        return response()->json([
             'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'costs.formCost.reimbursementRates', 'validatedBy']),
             'canApprove' => $canApprove,
             'canReject' => $canReject,
@@ -338,13 +345,16 @@ class ExpenseSheetController extends BaseController
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id)
     {
         $expenseSheet = ExpenseSheet::findOrFail($id);
 
         // Vérifier les permissions
         if (! auth()->user()->can('edit', $expenseSheet)) {
-            return $this->handleError('Vous n\'avez pas les droits pour modifier cette note de frais.', Response::HTTP_FORBIDDEN);
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous n\'avez pas les droits pour modifier cette note de frais.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -378,18 +388,20 @@ class ExpenseSheetController extends BaseController
 
             $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
 
-            return $this->handleResponse(
-                $expenseSheet->load(['costs.formCost', 'user', 'department']),
-                'Note de frais soumise avec succès.'
-            );
+            return response()->json([
+                'success' => true,
+                'message' => 'Note de frais soumise avec succès.',
+                'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department']),
+            ]);
         }
 
         $expenseSheet->save();
 
-        return $this->handleResponse(
-            $expenseSheet->load(['costs.formCost', 'user', 'department']),
-            'Note de frais mise à jour.'
-        );
+        return response()->json([
+            'success' => true,
+            'message' => 'Note de frais mise à jour.',
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department']),
+        ]);
     }
 
     /**
@@ -403,14 +415,17 @@ class ExpenseSheetController extends BaseController
     /**
      * Full update of the expense sheet including costs.
      */
-    public function updateFull(Request $request, string $id): JsonResponse
+    public function updateFull(Request $request, string $id)
     {
         try {
             $expenseSheet = ExpenseSheet::findOrFail($id);
 
             // Vérifier les permissions
             if (! auth()->user()->can('edit', $expenseSheet)) {
-                return $this->handleError('Vous n\'avez pas les droits pour modifier cette note de frais.', Response::HTTP_FORBIDDEN);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'avez pas les droits pour modifier cette note de frais.',
+                ], 403);
             }
 
             \Log::info('API ExpenseSheet updateFull called', [
@@ -475,7 +490,10 @@ class ExpenseSheetController extends BaseController
                 if ($rates->count() > 1) {
                     DB::rollBack();
 
-                    return $this->handleError("Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.", Response::HTTP_UNPROCESSABLE_ENTITY);
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Configuration invalide : plusieurs taux actifs le $date pour le coût \"{$formCost->name}\". Veuillez corriger.",
+                    ], 422);
                 }
 
                 $rate = $rates->first();
@@ -607,7 +625,10 @@ class ExpenseSheetController extends BaseController
                     'costs_count' => count($validated['costs']),
                 ]);
 
-                return $this->handleError('Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le total de la note de frais ne peut pas être nul ou négatif. Cela peut arriver si aucun taux de remboursement n\'est configuré pour les dates sélectionnées. Veuillez vérifier les coûts saisis et leurs dates.',
+                ], 422);
             }
 
             DB::commit();
@@ -635,16 +656,21 @@ class ExpenseSheetController extends BaseController
 
             $message = $isDraft ? 'Brouillon mis à jour.' : 'Note de frais mise à jour et soumise.';
 
-            return $this->handleResponse(
-                $expenseSheet->load(['costs.formCost', 'user', 'department']),
-                $message
-            );
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'expense_sheet' => $expenseSheet->load(['costs.formCost', 'user', 'department']),
+            ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();
             \Log::error('API ExpenseSheet updateFull validation failed', ['errors' => $e->errors()]);
 
-            return $this->handleError('Erreur de validation', Response::HTTP_UNPROCESSABLE_ENTITY, $e->errors());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('API ExpenseSheet updateFull error', [
@@ -652,7 +678,10 @@ class ExpenseSheetController extends BaseController
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->handleError($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -669,9 +698,15 @@ class ExpenseSheetController extends BaseController
         ]);
 
         if (! auth()->user()->can('approve', $expenseSheet) && $validated['approval'] === true) {
-            return $this->handleError('Vous n\'avez pas les droits pour approuver cette note de frais.', Response::HTTP_FORBIDDEN);
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous n\'avez pas les droits pour approuver cette note de frais.',
+            ], 403);
         } elseif (! auth()->user()->can('reject', $expenseSheet) && $validated['approval'] === false) {
-            return $this->handleError('Vous n\'avez pas les droits pour rejeter cette note de frais.', Response::HTTP_FORBIDDEN);
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous n\'avez pas les droits pour rejeter cette note de frais.',
+            ], 403);
         }
 
         $expenseSheet->approved = $validated['approval'];
@@ -692,11 +727,10 @@ class ExpenseSheetController extends BaseController
             $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
         }
 
-        $message = $validated['approval'] ? 'Note de frais approuvée.' : 'Note de frais rejetée.';
-
-        return $this->handleResponse(
-            $expenseSheet->load(['costs.formCost', 'user', 'department', 'validatedBy']),
-            $message
-        );
+        return response()->json([
+            'success' => true,
+            'message' => $validated['approval'] ? 'Note de frais approuvée.' : 'Note de frais rejetée.',
+            'expenseSheet' => $expenseSheet->load(['costs.formCost', 'user', 'department', 'validatedBy']),
+        ]);
     }
 }

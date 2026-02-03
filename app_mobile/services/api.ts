@@ -175,50 +175,32 @@ class ApiService {
      * Forms API
      */
     async getForms(): Promise<FormsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(API_ENDPOINTS.FORMS);
-        return { forms: response.data };
+        return this.request<FormsResponse>(API_ENDPOINTS.FORMS);
     }
 
     async getFormDetails(id: number): Promise<FormDetailsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(API_ENDPOINTS.FORM_DETAILS(id));
-        return response.data;
+        return this.request<FormDetailsResponse>(API_ENDPOINTS.FORM_DETAILS(id));
     }
 
     /**
      * Expense Sheets API
      */
     async getExpenseSheets(): Promise<ExpenseSheetsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(API_ENDPOINTS.EXPENSE_SHEETS);
-        return { expenseSheets: response.data };
+        return this.request<ExpenseSheetsResponse>(API_ENDPOINTS.EXPENSE_SHEETS);
     }
 
-    async getAllExpenseSheets(page: number = 1, perPage: number = 10): Promise<ExpenseSheetsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(
-            `${API_ENDPOINTS.EXPENSE_SHEETS_ALL}?page=${page}&per_page=${perPage}`
-        );
-        return {
-            expenseSheets: response.data.data,
-            pagination: {
-                current_page: response.data.current_page,
-                per_page: response.data.per_page,
-                total: response.data.total,
-                last_page: response.data.last_page,
-                from: response.data.from,
-                to: response.data.to,
-            }
-        };
+    async getAllExpenseSheets(): Promise<ExpenseSheetsResponse> {
+        return this.request<ExpenseSheetsResponse>(API_ENDPOINTS.EXPENSE_SHEETS_ALL);
     }
 
     async getExpenseSheetsToValidate(): Promise<ExpenseSheetsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(API_ENDPOINTS.EXPENSE_SHEETS_VALIDATE);
-        return { expenseSheets: response.data };
+        return this.request<ExpenseSheetsResponse>(API_ENDPOINTS.EXPENSE_SHEETS_VALIDATE);
     }
 
     async getExpenseSheetDetails(id: number): Promise<ExpenseSheetDetailsResponse> {
-        const response = await this.request<{ success: boolean; message: string | null; data: any }>(
+        return this.request<ExpenseSheetDetailsResponse>(
             API_ENDPOINTS.EXPENSE_SHEET_DETAILS(id)
         );
-        return response.data;
     }
 
     async createExpenseSheet(formId: number, data: FormData): Promise<any> {

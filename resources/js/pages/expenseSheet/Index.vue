@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { Link, Head, router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { Link, Head } from '@inertiajs/vue3';
 import { Badge } from '@/components/ui/badge';
 import {
     FileText,
@@ -11,70 +11,31 @@ import {
     Search,
     Filter,
     X,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    BarChart3,
-    Euro,
-    MapPin
+    ChevronDown
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
-import Pagination from '@/components/Pagination.vue';
-
-interface ExpenseSheet {
-    id: number;
-    type: string;
-    distance: number;
-    route: string;
-    total: number;
-    approved: boolean | null;
-    is_draft: boolean;
-    created_at: string;
-    form: {
-        name: string;
-    };
-    department?: {
-        name: string;
-    };
-    user?: {
-        name: string;
-    };
-}
-
-interface UserInDepartment {
-    id: number;
-    name: string;
-}
-
-interface PaginatedData {
-    data: ExpenseSheet[];
-    current_page: number;
-    from: number;
-    last_page: number;
-    links: Array<{
-        url: string | null;
-        label: string;
-        active: boolean;
-    }>;
-    path: string;
-    per_page: number;
-    to: number;
-    total: number;
-}
 
 const props = defineProps<{
-    expenseSheets: PaginatedData;
+    expenseSheets: Array<{
+        id: number;
+        type: string;
+        distance: number;
+        route: string;
+        total: number;
+        approved: boolean | null;
+        is_draft: boolean;
+        created_at: string;
+        form: {
+            name: string;
+        };
+        department?: {
+            name: string;
+        };
+        user?: {
+            name: string;
+        };
+    }>,
     canExport: boolean;
-    filters: {
-        search?: string;
-        status?: string;
-        department?: string;
-        user?: string;
-        dateStart?: string;
-        dateEnd?: string;
-    };
-    departments: string[];
-    usersInDepartment: UserInDepartment[];
 }>();
 
 // 🔁 Mapping approved → statut lisible
@@ -126,127 +87,54 @@ const formatDate = (dateString: string) => {
     });
 };
 
-// 🎛️ Filtres - Initialisation avec les valeurs du serveur
-const searchQuery = ref(props.filters.search || '');
-const statusFilter = ref(props.filters.status || 'all');
-const departmentFilter = ref(props.filters.department || 'all');
-const userFilter = ref(props.filters.user || 'all');
-const dateStart = ref(props.filters.dateStart || '');
-const dateEnd = ref(props.filters.dateEnd || '');
+// 🎛️ Filtres
+const searchQuery = ref('');
+const statusFilter = ref('all');
+const departmentFilter = ref('all');
+const dateStart = ref('');
+const dateEnd = ref('');
 const isFilterOpen = ref(false);
-
-// Debounce pour la recherche
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-// Fonction pour appliquer les filtres côté serveur
-const applyFilters = () => {
-    router.get(route('expense-sheet.index'), {
-        search: searchQuery.value || undefined,
-        status: statusFilter.value !== 'all' ? statusFilter.value : undefined,
-        department: departmentFilter.value !== 'all' ? departmentFilter.value : undefined,
-        user: userFilter.value !== 'all' ? userFilter.value : undefined,
-        dateStart: dateStart.value || undefined,
-        dateEnd: dateEnd.value || undefined,
-    }, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['expenseSheets', 'usersInDepartment'],
-    });
-};
-
-// Watch pour les changements de filtres (avec debounce pour la recherche)
-watch(searchQuery, () => {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        applyFilters();
-    }, 300);
-});
-
-watch([statusFilter, userFilter, dateStart, dateEnd], () => {
-    applyFilters();
-});
-
-// Quand le département change, réinitialiser le filtre utilisateur et appliquer les filtres
-watch(departmentFilter, () => {
-    userFilter.value = 'all';
-    applyFilters();
-});
 
 // ♻️ Reset des filtres
 const resetFilters = () => {
     searchQuery.value = '';
     statusFilter.value = 'all';
     departmentFilter.value = 'all';
-    userFilter.value = 'all';
     dateStart.value = '';
     dateEnd.value = '';
-    applyFilters();
 };
+
+// 🏢 Options des départements
+const departmentOptions = computed(() => {
+    const unique = new Set(props.expenseSheets.map(s => s.department?.name || 'Inconnu'));
+    return [...Array.from(unique)];
+});
+
+// 📊 Filtrage principal
+const filteredExpenseSheets = computed(() => {
+    return props.expenseSheets.filter(sheet => {
+        const status = getStatusFromApproved(sheet.approved, sheet.is_draft);
+        const matchesSearch = sheet.form.name.toLowerCase().includes(searchQuery.value.toLowerCase());
+        const matchesStatus = statusFilter.value === 'all' || status === statusFilter.value;
+        const matchesDepartment = departmentFilter.value === 'all' || sheet.department?.name === departmentFilter.value;
+
+        const createdAt = new Date(sheet.created_at);
+        const start = dateStart.value ? new Date(dateStart.value) : null;
+        const end = dateEnd.value ? new Date(dateEnd.value) : null;
+        const matchesDate = (!start || createdAt >= start) && (!end || createdAt <= end);
+
+        return matchesSearch && matchesStatus && matchesDepartment && matchesDate;
+    });
+});
 
 // 🔎 Filtres actifs ?
 const hasActiveFilters = computed(() => {
     return searchQuery.value !== '' ||
         statusFilter.value !== 'all' ||
         departmentFilter.value !== 'all' ||
-        userFilter.value !== 'all' ||
         dateStart.value !== '' ||
         dateEnd.value !== '';
 });
-
-// 📊 Statistiques
-interface Statistics {
-    eurosByCategory: Record<string, number>;
-    kmByCategory: Record<string, number>;
-    totalEuros: number;
-    totalKm: number;
-    selectedYear: number;
-    availableYears: number[];
-}
-
-const showStatisticsModal = ref(false);
-const statisticsLoading = ref(false);
-const statistics = ref<Statistics | null>(null);
-const selectedYear = ref(new Date().getFullYear());
-
-const fetchStatistics = async (year?: number) => {
-    statisticsLoading.value = true;
-    try {
-        const yearParam = year ?? selectedYear.value;
-        const response = await fetch(route('expense-sheet.statistics') + `?year=${yearParam}`);
-        if (response.ok) {
-            statistics.value = await response.json();
-            selectedYear.value = statistics.value?.selectedYear ?? new Date().getFullYear();
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement des statistiques:', error);
-    } finally {
-        statisticsLoading.value = false;
-    }
-};
-
-const openStatisticsModal = () => {
-    showStatisticsModal.value = true;
-    selectedYear.value = new Date().getFullYear();
-    fetchStatistics();
-};
-
-const closeStatisticsModal = () => {
-    showStatisticsModal.value = false;
-};
-
-const goToPreviousYear = () => {
-    selectedYear.value--;
-    fetchStatistics(selectedYear.value);
-};
-
-const goToNextYear = () => {
-    if (selectedYear.value < new Date().getFullYear()) {
-        selectedYear.value++;
-        fetchStatistics(selectedYear.value);
-    }
-};
-
-const canGoToNextYear = computed(() => selectedYear.value < new Date().getFullYear());
 
 const breadcrumbs = [
     {
@@ -265,11 +153,6 @@ const breadcrumbs = [
                 <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Notes de frais</h2>
 
                 <div class="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-                    <button @click="openStatisticsModal" class="px-3 sm:px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md flex items-center justify-center gap-2 text-sm">
-                        <BarChart3 class="h-4 w-4" />
-                        Statistiques
-                    </button>
-
                     <Link v-if="canExport" :href="route('export')" class="px-3 sm:px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center justify-center gap-2 text-sm">
                         <FileText class="h-4 w-4" />
                         Exporter
@@ -304,7 +187,6 @@ const breadcrumbs = [
                             <option value="pending">En attente</option>
                             <option value="approved">Approuvée</option>
                             <option value="rejected">Rejetée</option>
-                            <option value="draft">Brouillon</option>
                         </select>
                     </div>
 
@@ -312,15 +194,7 @@ const breadcrumbs = [
                         <label for="department-filter" class="text-xs sm:text-sm font-medium">Département</label>
                         <select id="department-filter" v-model="departmentFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les départements</option>
-                            <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
-                        </select>
-                    </div>
-
-                    <div v-if="departmentFilter !== 'all' && usersInDepartment.length > 0" class="space-y-1 sm:space-y-2">
-                        <label for="user-filter" class="text-xs sm:text-sm font-medium">Demandeur</label>
-                        <select id="user-filter" v-model="userFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
-                            <option value="all">Tous les demandeurs</option>
-                            <option v-for="u in usersInDepartment" :key="u.id" :value="u.id">{{ u.name }}</option>
+                            <option v-for="d in departmentOptions" :key="d" :value="d">{{ d }}</option>
                         </select>
                     </div>
 
@@ -345,14 +219,14 @@ const breadcrumbs = [
 
             <div class="flex items-center justify-between">
                 <Badge variant="outline" class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs">
-                    {{ expenseSheets.total }} note(s) trouvée(s)
+                    {{ filteredExpenseSheets.length }} note(s) trouvée(s)
                 </Badge>
             </div>
 
             <!-- Vue Mobile (cartes) - visible uniquement sur mobile -->
             <div class="md:hidden space-y-3">
                 <Link
-                    v-for="sheet in expenseSheets.data"
+                    v-for="sheet in filteredExpenseSheets"
                     :key="sheet.id"
                     :href="'/expense-sheet/' + sheet.id"
                     class="block"
@@ -400,16 +274,10 @@ const breadcrumbs = [
                     </div>
                 </Link>
 
-                <div v-if="expenseSheets.data.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
+                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
                     <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
                     <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
                 </div>
-
-                <!-- Pagination Mobile -->
-                <Pagination
-                    v-if="expenseSheets.data.length > 0"
-                    :pagination="expenseSheets"
-                />
             </div>
 
             <!-- Vue Desktop (tableau) - visible sur tablette et + -->
@@ -427,7 +295,7 @@ const breadcrumbs = [
                     </tr>
                     </thead>
                     <tbody class="divide-y">
-                    <tr v-for="sheet in expenseSheets.data" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
+                    <tr v-for="sheet in filteredExpenseSheets" :key="sheet.id" class="hover:bg-muted/50 transition-colors">
                         <td class="px-4 lg:px-6 py-4">
                             <div class="flex items-center gap-2">
                                 <component :is="getStatusIcon(sheet.approved, sheet.is_draft)" class="h-5 w-5 flex-shrink-0" />
@@ -459,125 +327,12 @@ const breadcrumbs = [
                     </tbody>
                 </table>
 
-                <div v-if="expenseSheets.data.length === 0" class="text-center p-8 text-muted-foreground">
+                <div v-if="filteredExpenseSheets.length === 0" class="text-center p-8 text-muted-foreground">
                     <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
                     <p class="text-sm">Aucune note de frais trouvée selon vos critères.</p>
                 </div>
             </div>
-
-            <!-- Pagination Desktop -->
-            <Pagination
-                v-if="expenseSheets.data.length > 0"
-                :pagination="expenseSheets"
-                class="hidden md:block"
-            />
         </div>
-
-        <!-- Modal Statistiques -->
-        <Teleport to="body">
-            <div v-if="showStatisticsModal" class="fixed inset-0 z-50 flex items-center justify-center">
-                <!-- Overlay -->
-                <div class="fixed inset-0 bg-black/50" @click="closeStatisticsModal"></div>
-
-                <!-- Modal Content -->
-                <div class="relative bg-background rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b">
-                        <div class="flex items-center gap-2">
-                            <BarChart3 class="h-5 w-5 text-primary" />
-                            <h3 class="text-lg font-semibold">Mes statistiques</h3>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <!-- Sélecteur d'année -->
-                            <div class="flex items-center gap-1 bg-muted rounded-md">
-                                <button @click="goToPreviousYear" class="p-2 hover:bg-muted-foreground/10 rounded-l-md transition-colors" :disabled="statisticsLoading">
-                                    <ChevronLeft class="h-4 w-4" />
-                                </button>
-                                <span class="px-3 py-1 font-medium text-sm min-w-[60px] text-center">{{ selectedYear }}</span>
-                                <button @click="goToNextYear" class="p-2 hover:bg-muted-foreground/10 rounded-r-md transition-colors" :disabled="!canGoToNextYear || statisticsLoading" :class="{ 'opacity-50 cursor-not-allowed': !canGoToNextYear }">
-                                    <ChevronRight class="h-4 w-4" />
-                                </button>
-                            </div>
-                            <button @click="closeStatisticsModal" class="p-1 hover:bg-muted rounded-md transition-colors">
-                                <X class="h-5 w-5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Body -->
-                    <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
-                        <!-- Loading state -->
-                        <div v-if="statisticsLoading" class="flex items-center justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        </div>
-
-                        <!-- Statistics content -->
-                        <div v-else-if="statistics" class="space-y-6">
-                            <!-- Euros remboursés par catégorie -->
-                            <div class="space-y-3">
-                                <div class="flex items-center gap-2">
-                                    <Euro class="h-5 w-5 text-green-600" />
-                                    <h4 class="font-semibold text-base">Euros remboursés par catégorie</h4>
-                                </div>
-                                <p class="text-sm text-muted-foreground">Montants des notes de frais approuvées</p>
-
-                                <div v-if="Object.keys(statistics.eurosByCategory).length > 0" class="space-y-2">
-                                    <div v-for="(amount, category) in statistics.eurosByCategory" :key="'euro-' + category" class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                        <span class="text-sm font-medium">{{ category }}</span>
-                                        <span class="text-sm font-semibold text-green-600">{{ amount.toFixed(2) }} €</span>
-                                    </div>
-                                    <div class="flex items-center justify-between p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800">
-                                        <span class="text-sm font-semibold">Total</span>
-                                        <span class="text-base font-bold text-green-700 dark:text-green-400">{{ statistics.totalEuros.toFixed(2) }} €</span>
-                                    </div>
-                                </div>
-                                <div v-else class="text-center py-4 text-muted-foreground text-sm">
-                                    Aucun remboursement enregistré
-                                </div>
-                            </div>
-
-                            <!-- Séparateur -->
-                            <hr class="border-border" />
-
-                            <!-- KM par catégorie -->
-                            <div class="space-y-3">
-                                <div class="flex items-center gap-2">
-                                    <MapPin class="h-5 w-5 text-blue-600" />
-                                    <h4 class="font-semibold text-base">Kilomètres par catégorie</h4>
-                                </div>
-                                <p class="text-sm text-muted-foreground">Distances parcourues (notes approuvées)</p>
-
-                                <div v-if="Object.keys(statistics.kmByCategory).length > 0" class="space-y-2">
-                                    <div v-for="(km, category) in statistics.kmByCategory" :key="'km-' + category" class="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                        <span class="text-sm font-medium">{{ category }}</span>
-                                        <span class="text-sm font-semibold text-blue-600">{{ km.toFixed(2) }} km</span>
-                                    </div>
-                                    <div class="flex items-center justify-between p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <span class="text-sm font-semibold">Total</span>
-                                        <span class="text-base font-bold text-blue-700 dark:text-blue-400">{{ statistics.totalKm.toFixed(2) }} km</span>
-                                    </div>
-                                </div>
-                                <div v-else class="text-center py-4 text-muted-foreground text-sm">
-                                    Aucun trajet enregistré
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Error state -->
-                        <div v-else class="text-center py-12 text-muted-foreground">
-                            <p>Impossible de charger les statistiques.</p>
-                        </div>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="flex justify-end p-4 border-t">
-                        <button @click="closeStatisticsModal" class="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors">
-                            Fermer
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
     </AppLayout>
 </template>
 

@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\ExpenseSheet;
 use App\Models\User;
+use App\Models\ExpenseSheet;
 
 class ExpenseSheetPolicy
 {
@@ -23,10 +23,6 @@ class ExpenseSheetPolicy
     /**
      * Vérifie si la note de frais doit apparaître dans la liste "à valider" de l'utilisateur.
      * Cette méthode est utilisée pour filtrer l'affichage, pas pour les permissions.
-     *
-     * Règles métier :
-     * - Un responsable direct valide les notes des agents non-responsables de son service
-     * - Le N+1 (responsable du parent) valide les notes des responsables de sous-services
      */
     public function shouldAppearInValidationList(User $user, ExpenseSheet $expenseSheet): bool
     {
@@ -36,7 +32,7 @@ class ExpenseSheetPolicy
         }
 
         // Ne pas afficher les notes déjà traitées
-        if (! is_null($expenseSheet->approved)) {
+        if (!is_null($expenseSheet->approved)) {
             return false;
         }
 
@@ -45,39 +41,23 @@ class ExpenseSheetPolicy
             return false;
         }
 
-        // Département de la note de frais
-        $noteDepartment = $expenseSheet->department;
+        // Département lié à la note de frais
+        $department = $expenseSheet->department;
 
-        if (! $noteDepartment) {
-            return false;
-        }
+        // Vérifie si l'utilisateur est responsable du département ou d'un parent
+        while ($department) {
+            // 1. L'utilisateur est responsable ici ?
+            if ($department->heads->contains($user)) {
+                // 2. L'auteur de la note est aussi responsable ici ?
+                if ($department->heads->contains($expenseSheet->user)) {
+                    return false; // même service, 2 responsables : ne pas afficher
+                }
 
-        // L'auteur de la note est-il responsable de son département ?
-        $authorIsHeadOfNoteDepartment = $noteDepartment->heads->contains($expenseSheet->user);
-
-        // Cas 1 : L'utilisateur est responsable DIRECT du département de la note
-        if ($noteDepartment->heads->contains($user)) {
-            // Si l'auteur est aussi responsable du même département, ne pas afficher
-            // (les co-responsables ne se valident pas entre eux)
-            if ($authorIsHeadOfNoteDepartment) {
-                return false;
-            }
-
-            // L'utilisateur est responsable direct, l'auteur est un agent → afficher
-            return true;
-        }
-
-        // Cas 2 : L'utilisateur est responsable du PARENT (N+1)
-        // Il ne voit que les notes des responsables de sous-services
-        $parentDepartment = $noteDepartment->parent;
-        if ($parentDepartment && $parentDepartment->heads->contains($user)) {
-            // L'auteur doit être responsable de son département pour que le N+1 le valide
-            if ($authorIsHeadOfNoteDepartment) {
+                // Afficher si l'utilisateur est responsable (admin ou non)
                 return true;
             }
 
-            // L'auteur n'est pas responsable → c'est au responsable direct de valider, pas au N+1
-            return false;
+            $department = $department->parent;
         }
 
         return false;
@@ -94,7 +74,7 @@ class ExpenseSheetPolicy
         }
 
         // Déjà traité - vérifie si approved n'est pas null
-        if (! is_null($expenseSheet->approved)) {
+        if (!is_null($expenseSheet->approved)) {
             return false;
         }
 
@@ -128,6 +108,7 @@ class ExpenseSheetPolicy
 
         return false;
     }
+
 
     /**
      * Vérifie si l'utilisateur peut modifier une note de frais spécifique.
@@ -170,7 +151,6 @@ class ExpenseSheetPolicy
                 if ($department->heads->contains($expenseSheet->user)) {
                     return false;
                 }
-
                 return true;
             }
             $department = $department->parent;
@@ -190,21 +170,6 @@ class ExpenseSheetPolicy
         if ($expenseSheet->approved == true) {
             return false;
         }
-
         return $user->is_admin == true || ($expenseSheet->user_id === $user->id && $expenseSheet->is_draft);
-    }
-
-    /**
-     * Vérifie si l'utilisateur (SRH/admin) peut renvoyer une note de frais déjà approuvée.
-     */
-    public function returnBySRH(User $user, ExpenseSheet $expenseSheet): bool
-    {
-        // Seuls les admins peuvent renvoyer une note
-        if (! $user->is_admin) {
-            return false;
-        }
-
-        // La note doit être approuvée pour pouvoir être renvoyée
-        return $expenseSheet->approved == true;
     }
 }

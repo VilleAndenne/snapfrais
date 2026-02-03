@@ -163,11 +163,10 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         // 🆕 1) Créer l'export en "pending" (sans file_path au départ)
         $export = ExpenseSheetExport::create([
-            'start_date'    => $startDate,
-            'end_date'      => $endDate,
-            'status'        => 'completed',
-            'file_path'     => null,
-            'created_by_id' => auth()->id(),
+            'start_date' => $startDate,
+            'end_date'   => $endDate,
+            'status'     => 'completed',
+            'file_path'  => null,
         ]);
 
         // 🆕 2) Récupérer les IDs des notes de frais comprises dans la période et approuvées
