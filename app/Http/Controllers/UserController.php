@@ -3,18 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Imports\UsersImport;
-use App\Models\Department;
 use App\Models\User;
 use App\Notifications\UserCreated;
-use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -23,7 +19,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        if (!auth()->user()->can('viewAny', User::class)) {
+        if (! auth()->user()->can('viewAny', User::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $users = User::query()
@@ -39,6 +35,7 @@ class UserController extends Controller
         return Inertia::render('users/Index', [
             'users' => $users,
             'filters' => request()->only(['search']),
+            'canImpersonate' => auth()->user()->canImpersonate(),
         ]);
     }
 
@@ -47,9 +44,10 @@ class UserController extends Controller
      */
     public function create()
     {
-        if (!auth()->user()->can('create', User::class)) {
+        if (! auth()->user()->can('create', User::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
+
         return Inertia::render('users/Create');
     }
 
@@ -58,7 +56,7 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        if (!auth()->user()->can('create', User::class)) {
+        if (! auth()->user()->can('create', User::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
@@ -82,7 +80,7 @@ class UserController extends Controller
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
 
-        if (!$request->has('password')) {
+        if (! $request->has('password')) {
             // generate a reset password token
             $token = Password::broker()->createToken($user);
         }
@@ -106,7 +104,7 @@ class UserController extends Controller
      */
     public function edit(string $id)
     {
-        if (!auth()->user()->can('update', User::findOrFail($id))) {
+        if (! auth()->user()->can('update', User::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $user = User::findOrFail($id);
@@ -121,12 +119,12 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        if (!auth()->user()->can('update', User::findOrFail($id))) {
+        if (! auth()->user()->can('update', User::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $id,
+            'email' => 'required|string|email|max:255|unique:users,email,'.$id,
             'password' => 'nullable|string|min:8|confirmed',
             'is_admin' => 'boolean',
         ]);
@@ -148,7 +146,7 @@ class UserController extends Controller
      */
     public function destroy(string $id)
     {
-        if (!auth()->user()->can('delete', User::findOrFail($id))) {
+        if (! auth()->user()->can('delete', User::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $user = User::findOrFail($id);
@@ -159,9 +157,10 @@ class UserController extends Controller
 
     public function import()
     {
-        if (!auth()->user()->can('create', User::class)) {
+        if (! auth()->user()->can('create', User::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
+
         return Inertia::render('users/Import');
     }
 
@@ -188,5 +187,4 @@ class UserController extends Controller
             ->route('users.index')
             ->with('success', 'Import démarré. Vous recevrez une notification à la fin.');
     }
-
 }

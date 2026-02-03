@@ -218,4 +218,104 @@ class ExpenseSheetPolicyTest extends TestCase
             'Le bénéficiaire devrait pouvoir modifier un brouillon créé pour lui'
         );
     }
+
+    public function test_admin_can_return_approved_expense_sheet(): void
+    {
+        // Créer un département
+        $department = Department::factory()->create();
+
+        // Créer un admin et un utilisateur normal
+        $admin = User::factory()->create(['is_admin' => true]);
+        $user = User::factory()->create(['is_admin' => false]);
+        $department->users()->attach([$admin->id, $user->id]);
+
+        // Créer un formulaire
+        $form = Form::factory()->create();
+
+        // Créer une note de frais approuvée
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'is_draft' => false,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'status' => 'Approuvée',
+            'approved' => true,
+        ]);
+
+        $policy = new ExpenseSheetPolicy();
+
+        // L'admin (SRH) doit pouvoir renvoyer une note approuvée
+        $this->assertTrue(
+            $policy->returnBySRH($admin, $expenseSheet),
+            'Un admin devrait pouvoir renvoyer une note de frais approuvée'
+        );
+    }
+
+    public function test_admin_cannot_return_non_approved_expense_sheet(): void
+    {
+        // Créer un département
+        $department = Department::factory()->create();
+
+        // Créer un admin et un utilisateur normal
+        $admin = User::factory()->create(['is_admin' => true]);
+        $user = User::factory()->create(['is_admin' => false]);
+        $department->users()->attach([$admin->id, $user->id]);
+
+        // Créer un formulaire
+        $form = Form::factory()->create();
+
+        // Créer une note de frais en attente (non approuvée)
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'is_draft' => false,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy();
+
+        // L'admin ne doit PAS pouvoir renvoyer une note non approuvée
+        $this->assertFalse(
+            $policy->returnBySRH($admin, $expenseSheet),
+            'Un admin ne devrait pas pouvoir renvoyer une note de frais non approuvée'
+        );
+    }
+
+    public function test_non_admin_cannot_return_expense_sheet(): void
+    {
+        // Créer un département
+        $department = Department::factory()->create();
+
+        // Créer deux utilisateurs non admin
+        $head = User::factory()->create(['is_admin' => false]);
+        $user = User::factory()->create(['is_admin' => false]);
+        $department->users()->attach($user->id);
+        $department->users()->attach($head->id, ['is_head' => true]);
+
+        // Créer un formulaire
+        $form = Form::factory()->create();
+
+        // Créer une note de frais approuvée
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'is_draft' => false,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'status' => 'Approuvée',
+            'approved' => true,
+        ]);
+
+        $policy = new ExpenseSheetPolicy();
+
+        // Un non-admin (même responsable) ne doit PAS pouvoir renvoyer une note approuvée
+        $this->assertFalse(
+            $policy->returnBySRH($head, $expenseSheet),
+            'Un non-admin ne devrait pas pouvoir renvoyer une note de frais'
+        );
+    }
 }

@@ -50,6 +50,13 @@ export const getStatusLabel = (expenseSheet) => {
         };
     }
     if (expenseSheet.approved == false) {
+        // Vérifier si c'est un renvoi SRH
+        if (expenseSheet.status === 'Renvoyé par le SRH') {
+            return {
+                label: 'Renvoyé par le SRH',
+                variant: 'warning'
+            };
+        }
         return {
             label: 'Rejetée',
             variant: 'destructive'
