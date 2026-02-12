@@ -345,6 +345,7 @@ const formatLogName = (logName) => {
         'expense_sheet_cost': 'Coût',
         'form': 'Formulaire',
         'department': 'Département',
+        'authentication': 'Authentification',
     };
     return names[logName] || logName;
 };
@@ -354,6 +355,10 @@ const formatEvent = (event) => {
         'created': 'Créé',
         'updated': 'Modifié',
         'deleted': 'Supprimé',
+        'login': 'Connexion',
+        'logout': 'Déconnexion',
+        'failed_login': 'Échec connexion',
+        'password_reset': 'Reset mot de passe',
     };
     return events[event] || event;
 };
@@ -363,6 +368,10 @@ const getEventVariant = (event) => {
         'created': 'default',
         'updated': 'secondary',
         'deleted': 'destructive',
+        'login': 'default',
+        'logout': 'secondary',
+        'failed_login': 'destructive',
+        'password_reset': 'default',
     };
     return variants[event] || 'default';
 };

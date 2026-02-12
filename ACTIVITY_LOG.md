@@ -95,6 +95,57 @@ Un système de logging d'activité a été implémenté sur les modèles sensibl
 - Modification : "Département modifié"
 - Suppression : "Département supprimé"
 
+## Événements d'authentification loggés
+
+En plus des modifications sur les modèles, tous les événements d'authentification sont automatiquement loggés pour des raisons de sécurité et d'audit.
+
+### Connexion réussie (Login)
+- **Event :** `login`
+- **Log name :** `authentication`
+- **Description :** "Connexion réussie"
+- **Causer :** L'utilisateur connecté
+- **Propriétés loggées :**
+  - `ip_address` - Adresse IP de connexion
+  - `user_agent` - User agent du navigateur
+  - `guard` - Guard utilisé (web, api, etc.)
+
+### Tentative de connexion échouée (Failed Login)
+- **Event :** `failed_login`
+- **Log name :** `authentication`
+- **Description :** "Tentative de connexion échouée"
+- **Causer :** Anonyme
+- **Propriétés loggées :**
+  - `email` - Email utilisé pour la tentative
+  - `ip_address` - Adresse IP de la tentative
+  - `user_agent` - User agent du navigateur
+  - `guard` - Guard utilisé
+
+### Déconnexion (Logout)
+- **Event :** `logout`
+- **Log name :** `authentication`
+- **Description :** "Déconnexion"
+- **Causer :** L'utilisateur déconnecté
+- **Propriétés loggées :**
+  - `ip_address` - Adresse IP de déconnexion
+  - `user_agent` - User agent du navigateur
+  - `guard` - Guard utilisé
+
+### Réinitialisation de mot de passe (Password Reset)
+- **Event :** `password_reset`
+- **Log name :** `authentication`
+- **Description :** "Mot de passe réinitialisé"
+- **Causer :** L'utilisateur concerné
+- **Propriétés loggées :**
+  - `ip_address` - Adresse IP
+  - `user_agent` - User agent du navigateur
+
+**⚠️ Important pour la sécurité :**
+Les logs d'authentification sont essentiels pour :
+- Détecter les tentatives d'intrusion
+- Tracer les accès non autorisés
+- Auditer les connexions suspectes
+- Identifier les patterns d'attaques (brute force, etc.)
+
 ## Fonctionnalités du logging
 
 ### 1. Logging automatique
