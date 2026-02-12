@@ -194,13 +194,18 @@
 
             <!-- Dialog des détails -->
             <AlertDialog v-model:open="showDetailsDialog">
-                <AlertDialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <AlertDialogContent class="max-w-3xl max-h-[80vh] overflow-y-auto">
                     <AlertDialogHeader>
                         <AlertDialogTitle>Détails du log</AlertDialogTitle>
+                        <div v-if="selectedActivity" class="text-sm text-muted-foreground mt-2">
+                            <Badge variant="outline" class="text-base">
+                                {{ formatSubjectType(selectedActivity.subject_type) }} #{{ selectedActivity.subject_id }}
+                            </Badge>
+                        </div>
                     </AlertDialogHeader>
                     <div v-if="selectedActivity" class="space-y-4 text-sm">
                         <!-- Informations générales -->
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <span class="font-medium">Date :</span>
                                 <p class="text-muted-foreground">{{ formatDate(selectedActivity.created_at) }}</p>
@@ -224,16 +229,60 @@
                             <p class="text-muted-foreground">{{ selectedActivity.description }}</p>
                         </div>
 
+                        <!-- Attributs actuels du modèle -->
+                        <div v-if="selectedActivity.subject" class="rounded-lg border border-border bg-muted/50 p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <InfoIcon class="h-4 w-4 text-primary" />
+                                <span class="font-medium">Attributs actuels du modèle</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div v-for="(value, key) in getRelevantAttributes(selectedActivity.subject)" :key="key" class="flex flex-col">
+                                    <span class="font-medium text-muted-foreground">{{ key }} :</span>
+                                    <span class="text-foreground">{{ formatAttributeValue(value) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                            Le modèle n'existe plus ou n'a pas été chargé
+                        </div>
+
                         <!-- Anciennes valeurs -->
-                        <div v-if="selectedActivity.properties?.old">
+                        <div v-if="selectedActivity.properties?.old && Object.keys(selectedActivity.properties.old).length > 0">
                             <span class="font-medium">Anciennes valeurs :</span>
-                            <pre class="mt-1 p-2 bg-muted rounded text-xs overflow-x-auto">{{ JSON.stringify(selectedActivity.properties.old, null, 2) }}</pre>
+                            <div class="mt-1 p-3 bg-muted rounded-lg">
+                                <div class="grid gap-2 text-xs">
+                                    <div v-for="(value, key) in selectedActivity.properties.old" :key="key" class="flex justify-between border-b border-border pb-1 last:border-0">
+                                        <span class="font-medium">{{ key }} :</span>
+                                        <span class="text-muted-foreground">{{ formatAttributeValue(value) }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Nouvelles valeurs -->
-                        <div v-if="selectedActivity.properties?.attributes">
+                        <div v-if="selectedActivity.properties?.attributes && Object.keys(selectedActivity.properties.attributes).length > 0">
                             <span class="font-medium">Nouvelles valeurs :</span>
-                            <pre class="mt-1 p-2 bg-muted rounded text-xs overflow-x-auto">{{ JSON.stringify(selectedActivity.properties.attributes, null, 2) }}</pre>
+                            <div class="mt-1 p-3 bg-muted rounded-lg">
+                                <div class="grid gap-2 text-xs">
+                                    <div v-for="(value, key) in selectedActivity.properties.attributes" :key="key" class="flex justify-between border-b border-border pb-1 last:border-0">
+                                        <span class="font-medium">{{ key }} :</span>
+                                        <span class="text-foreground font-medium">{{ formatAttributeValue(value) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Propriétés supplémentaires (pour les événements d'authentification) -->
+                        <div v-if="selectedActivity.properties && !selectedActivity.properties.old && !selectedActivity.properties.attributes">
+                            <span class="font-medium">Propriétés :</span>
+                            <div class="mt-1 p-3 bg-muted rounded-lg">
+                                <div class="grid gap-2 text-xs">
+                                    <div v-for="(value, key) in selectedActivity.properties" :key="key" class="flex justify-between border-b border-border pb-1 last:border-0">
+                                        <span class="font-medium">{{ key }} :</span>
+                                        <span class="text-muted-foreground">{{ formatAttributeValue(value) }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <AlertDialogFooter>
@@ -248,7 +297,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { SearchIcon, EyeIcon, XIcon } from 'lucide-vue-next';
+import { SearchIcon, EyeIcon, XIcon, InfoIcon } from 'lucide-vue-next';
 
 // shadcn/ui
 import { Button } from '@/components/ui/button';
@@ -374,6 +423,46 @@ const getEventVariant = (event) => {
         'password_reset': 'default',
     };
     return variants[event] || 'default';
+};
+
+const formatSubjectType = (subjectType) => {
+    if (!subjectType) return 'N/A';
+    const parts = subjectType.split('\\');
+    return parts[parts.length - 1];
+};
+
+const formatAttributeValue = (value) => {
+    if (value === null) return 'null';
+    if (value === '') return '(vide)';
+    if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+    if (typeof value === 'object') return JSON.stringify(value);
+    if (typeof value === 'string' && value.length > 100) {
+        return value.substring(0, 100) + '...';
+    }
+    return value;
+};
+
+const getRelevantAttributes = (subject) => {
+    if (!subject) return {};
+
+    // Liste des attributs à ne pas afficher
+    const excludedAttributes = [
+        'password',
+        'remember_token',
+        'email_verified_at',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+    ];
+
+    const filtered = {};
+    for (const [key, value] of Object.entries(subject)) {
+        if (!excludedAttributes.includes(key)) {
+            filtered[key] = value;
+        }
+    }
+
+    return filtered;
 };
 
 const showDetails = (activity) => {
