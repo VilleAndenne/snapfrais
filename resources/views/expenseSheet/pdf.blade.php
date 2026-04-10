@@ -185,7 +185,7 @@
 <!-- Header -->
 <div class="header">
     <div class="brand">
-        Ville d'Andenne<br>
+        {{ $organizationName }}<br>
         <span class="muted small">Récapitulatif de note de frais</span>
     </div>
     <div class="right">

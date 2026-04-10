@@ -25,6 +25,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/patch-notes/{id}/mark-as-read', [\App\Http\Controllers\PatchNoteController::class, 'markAsRead'])->name('patch-notes.mark-as-read');
 });
 
+// Activity Log routes (admin only)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/admin/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity-logs.index');
+    Route::get('/admin/activity-logs/{activity}', [\App\Http\Controllers\ActivityLogController::class, 'show'])->name('activity-logs.show');
+});
+
 // Impersonation routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/impersonate/stop', [\App\Http\Controllers\ImpersonationController::class, 'stop'])->name('impersonate.stop');

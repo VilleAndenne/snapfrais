@@ -5,14 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class ExpenseSheet extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'user_id',
-        'type',
         'distance',
         'route',
         'total',
@@ -119,6 +122,37 @@ class ExpenseSheet extends Model
     }
 
     /**
+     * Détermine les utilisateurs qui doivent être notifiés pour valider cette note de frais.
+     *
+     * Règles :
+     * - Si l'auteur est responsable de son département et que celui-ci a un parent
+     *   → notifier les responsables du parent (escalade N+1).
+     * - Si l'auteur est responsable d'un département racine (sans parent_id)
+     *   → auto-validation : notifier uniquement l'auteur lui-même.
+     * - Sinon → notifier les responsables du département de la note.
+     */
+    public function resolveApprovers(User $author): Collection
+    {
+        $department = $this->department;
+
+        if (! $department) {
+            return collect();
+        }
+
+        $heads = $department->heads;
+
+        if ($heads->contains($author)) {
+            if ($department->parent) {
+                return $department->parent->heads;
+            }
+
+            return collect([$author]);
+        }
+
+        return $heads;
+    }
+
+    /**
      * Récupère récursivement tous les IDs des départements descendants.
      *
      * @param  array  $parentIds  IDs des départements parents
@@ -148,5 +182,38 @@ class ExpenseSheet extends Model
         }
 
         return array_unique($allIds);
+    }
+
+    /**
+     * Configure activity logging options.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'user_id',
+                'distance',
+                'route',
+                'total',
+                'status',
+                'form_id',
+                'department_id',
+                'validated_by',
+                'validated_at',
+                'approved',
+                'refusal_reason',
+                'created_by',
+                'is_draft',
+                'deleted_at',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('expense_sheet')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => 'Feuille de frais créée',
+                'updated' => 'Feuille de frais modifiée',
+                'deleted' => 'Feuille de frais supprimée',
+                default => "Feuille de frais {$eventName}",
+            });
     }
 }

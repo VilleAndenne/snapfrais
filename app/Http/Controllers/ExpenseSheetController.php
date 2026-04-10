@@ -74,24 +74,25 @@ class ExpenseSheetController extends Controller
         // Récupérer tous les départements uniques pour le filtre
         $departments = \App\Models\Department::orderBy('name')->pluck('name')->unique()->values();
 
-        // Récupérer les utilisateurs ayant des notes de frais dans le département sélectionné
-        $usersInDepartment = [];
+        // Récupérer les utilisateurs ayant des notes de frais visibles (filtrés par département si sélectionné)
+        $usersQuery = ExpenseSheet::visibleBy(auth()->user())
+            ->with('user:id,name');
+
         if ($selectedDepartmentName) {
             $department = \App\Models\Department::where('name', $selectedDepartmentName)->first();
             if ($department) {
-                $usersInDepartment = ExpenseSheet::where('department_id', $department->id)
-                    ->visibleBy(auth()->user())
-                    ->with('user:id,name')
-                    ->get()
-                    ->pluck('user')
-                    ->filter()
-                    ->unique('id')
-                    ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
-                    ->sortBy('name')
-                    ->values()
-                    ->toArray();
+                $usersQuery->where('department_id', $department->id);
             }
         }
+
+        $usersInDepartment = $usersQuery->get()
+            ->pluck('user')
+            ->filter()
+            ->unique('id')
+            ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+            ->sortBy('name')
+            ->values()
+            ->toArray();
 
         return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,
@@ -342,13 +343,7 @@ class ExpenseSheetController extends Controller
 
             // Ne pas envoyer de notifications pour les brouillons
             if (! $isDraft) {
-                $user = auth()->user();
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains($user) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -699,12 +694,7 @@ class ExpenseSheetController extends Controller
 
             // Notifier les responsables de la resoumission (sauf pour les brouillons)
             if (! $expenseSheet->is_draft) {
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains(auth()->user()) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -788,12 +778,7 @@ class ExpenseSheetController extends Controller
         ]);
 
         // Envoyer les notifications
-        $department = $expenseSheet->department;
-        $heads = $department->heads;
-
-        if ($heads->contains(auth()->user()) && $department->parent) {
-            $heads = $department->parent->heads;
-        }
+        $heads = $expenseSheet->resolveApprovers(auth()->user());
 
         $heads->each(function ($head) use ($expenseSheet) {
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -821,6 +806,7 @@ class ExpenseSheetController extends Controller
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('expenseSheet.pdf', [
             'expenseSheet' => $expenseSheet,
+            'organizationName' => config('app.organization_name'),
         ])->setPaper('a4', 'landscape')
             ->stream('note_de_frais_'.$id.'.pdf'); // inline
     }

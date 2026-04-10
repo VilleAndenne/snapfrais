@@ -272,13 +272,7 @@ class ExpenseSheetController extends BaseController
 
             // Ne pas envoyer de notifications pour les brouillons
             if (! $isDraft) {
-                $user = auth()->user();
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains($user) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -360,13 +354,7 @@ class ExpenseSheetController extends BaseController
             $expenseSheet->save();
 
             // Envoyer les notifications
-            $user = $expenseSheet->user;
-            $department = $expenseSheet->department;
-            $heads = $department->heads;
-
-            if ($heads->contains($user) && $department->parent) {
-                $heads = $department->parent->heads;
-            }
+            $heads = $expenseSheet->resolveApprovers($expenseSheet->user);
 
             $heads->each(function ($head) use ($expenseSheet) {
                 $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -614,13 +602,7 @@ class ExpenseSheetController extends BaseController
 
             // Envoyer les notifications si passage de brouillon à soumis
             if ($wasDraft && ! $isDraft) {
-                $user = $expenseSheet->user;
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains($user) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers($expenseSheet->user);
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
