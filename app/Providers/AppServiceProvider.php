@@ -2,13 +2,22 @@
 
 namespace App\Providers;
 
+use App\Listeners\LogFailedLogin;
+use App\Listeners\LogLogout;
+use App\Listeners\LogPasswordReset;
+use App\Listeners\LogSuccessfulLogin;
 use App\Models\Department;
 use App\Models\ExpenseSheet;
 use App\Models\User;
 use App\Policies\DepartmentPolicy;
 use App\Policies\ExpenseSheetPolicy;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,17 +39,23 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ExpenseSheet::class, ExpenseSheetPolicy::class);
         Gate::policy(Department::class, DepartmentPolicy::class);
 
+        // Enregistrer les listeners pour les événements d'authentification
+        Event::listen(Login::class, LogSuccessfulLogin::class);
+        Event::listen(Failed::class, LogFailedLogin::class);
+        Event::listen(Logout::class, LogLogout::class);
+        Event::listen(PasswordReset::class, LogPasswordReset::class);
+
         if (class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
             $this->app->register(TelescopeServiceProvider::class);
         }
 
         Gate::define('viewPulse', function (User $user) {
-            return (bool)$user->is_admin;
+            return (bool) $user->is_admin;
         });
 
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
-            return (new MailMessage())
+            return (new MailMessage)
                 ->subject('Vérifiez votre adresse email')
                 ->greeting('Bonjour,')
                 ->line('Veuillez cliquer sur le bouton ci-dessous pour vérifier votre adresse email.')

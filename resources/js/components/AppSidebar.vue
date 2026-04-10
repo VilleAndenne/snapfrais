@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Building2, FileText, Folder, LayoutGrid, Library, Users } from 'lucide-vue-next';
+import { BookOpen, Building2, FileText, Folder, LayoutGrid, Library, ScrollText, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 import { usePage } from '@inertiajs/vue3';
@@ -25,6 +25,8 @@ const can = page.props.auth.can as {
     forms: boolean;
     // Ajoute d'autres sections ici si tu veux gérer plus de droits
 };
+
+const isAdmin = page.props.auth.user?.is_admin || false;
 
 
 const mainNavItems: NavItem[] = [
@@ -52,6 +54,11 @@ const mainNavItems: NavItem[] = [
         title: 'Départements',
         href: '/departments',
         icon: Building2
+    }] : []),
+    ...(isAdmin ? [{
+        title: 'Logs d\'activité',
+        href: '/admin/activity-logs',
+        icon: ScrollText
     }] : [])
 ];
 

@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Department extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = ['name', 'parent_id'];
 
@@ -31,5 +32,23 @@ class Department extends Model
     public function expenseSheets()
     {
         return $this->hasMany(ExpenseSheet::class);
+    }
+
+    /**
+     * Configure activity logging options.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'parent_id', 'deleted_at'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('department')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => 'Département créé',
+                'updated' => 'Département modifié',
+                'deleted' => 'Département supprimé',
+                default => "Département {$eventName}",
+            });
     }
 }

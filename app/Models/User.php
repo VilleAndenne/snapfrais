@@ -11,11 +11,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Mirror\Concerns\Impersonatable;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Impersonatable, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Impersonatable, LogsActivity, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -217,5 +219,32 @@ class User extends Authenticatable
     public function canBeImpersonated(): bool
     {
         return ! $this->super_admin;
+    }
+
+    /**
+     * Configure activity logging options.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'name',
+                'email',
+                'is_admin',
+                'super_admin',
+                'notify_expense_sheet_to_approval',
+                'notify_receipt_expense_sheet',
+                'notify_remind_approval',
+                'deleted_at',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('user')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => 'Utilisateur créé',
+                'updated' => 'Utilisateur modifié',
+                'deleted' => 'Utilisateur supprimé',
+                default => "Utilisateur {$eventName}",
+            });
     }
 }

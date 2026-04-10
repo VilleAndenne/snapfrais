@@ -41,7 +41,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'status' => 'Brouillon',
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Le créateur doit pouvoir modifier le brouillon qu'il a créé pour quelqu'un d'autre
         $this->assertTrue(
@@ -78,7 +78,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => null,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Le créateur ne doit PAS pouvoir modifier une note soumise (non brouillon) créée pour quelqu'un d'autre
         $this->assertFalse(
@@ -109,7 +109,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'status' => 'Brouillon',
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Le propriétaire doit pouvoir modifier son propre brouillon
         $this->assertTrue(
@@ -141,7 +141,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => 0,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Le propriétaire doit pouvoir modifier sa note rejetée
         $this->assertTrue(
@@ -174,7 +174,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => null,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // L'admin doit toujours pouvoir modifier
         $this->assertTrue(
@@ -210,7 +210,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'status' => 'Brouillon',
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Le bénéficiaire doit également pouvoir modifier le brouillon créé pour lui
         $this->assertTrue(
@@ -243,7 +243,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => true,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // L'admin (SRH) doit pouvoir renvoyer une note approuvée
         $this->assertTrue(
@@ -276,13 +276,140 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => null,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // L'admin ne doit PAS pouvoir renvoyer une note non approuvée
         $this->assertFalse(
             $policy->returnBySRH($admin, $expenseSheet),
             'Un admin ne devrait pas pouvoir renvoyer une note de frais non approuvée'
         );
+    }
+
+    public function test_head_of_root_department_can_self_validate_own_note(): void
+    {
+        // Département racine (parent_id = null par défaut via la factory)
+        $rootDepartment = Department::factory()->create();
+
+        // Utilisateur responsable du département racine
+        $head = User::factory()->create(['is_admin' => false]);
+        $rootDepartment->users()->attach($head->id, ['is_head' => true]);
+
+        $form = Form::factory()->create();
+
+        // Note de frais soumise par le responsable lui-même
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $head->id,
+            'created_by' => $head->id,
+            'is_draft' => false,
+            'department_id' => $rootDepartment->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy;
+
+        $this->assertTrue(
+            $policy->approve($head, $expenseSheet),
+            'Le responsable d\'un département racine doit pouvoir auto-valider sa propre note'
+        );
+        $this->assertTrue(
+            $policy->shouldAppearInValidationList($head, $expenseSheet),
+            'L\'auto-validation doit faire apparaître la note dans la liste à valider'
+        );
+    }
+
+    public function test_head_of_non_root_department_cannot_self_validate_own_note(): void
+    {
+        // Département parent
+        $parentDepartment = Department::factory()->create();
+        // Sous-département (a un parent_id)
+        $childDepartment = Department::factory()->create(['parent_id' => $parentDepartment->id]);
+
+        // Responsable du sous-département uniquement
+        $head = User::factory()->create(['is_admin' => false]);
+        $childDepartment->users()->attach($head->id, ['is_head' => true]);
+
+        $form = Form::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $head->id,
+            'created_by' => $head->id,
+            'is_draft' => false,
+            'department_id' => $childDepartment->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy;
+
+        $this->assertFalse(
+            $policy->approve($head, $expenseSheet),
+            'Le responsable d\'un département non-racine ne doit pas pouvoir auto-valider'
+        );
+        $this->assertFalse(
+            $policy->shouldAppearInValidationList($head, $expenseSheet),
+            'La note ne doit pas apparaître dans la liste à valider de l\'auteur (non-racine)'
+        );
+    }
+
+    public function test_co_head_of_root_department_cannot_validate_other_head_note(): void
+    {
+        $rootDepartment = Department::factory()->create();
+
+        $headA = User::factory()->create(['is_admin' => false]);
+        $headB = User::factory()->create(['is_admin' => false]);
+        $rootDepartment->users()->attach($headA->id, ['is_head' => true]);
+        $rootDepartment->users()->attach($headB->id, ['is_head' => true]);
+
+        $form = Form::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $headA->id,
+            'created_by' => $headA->id,
+            'is_draft' => false,
+            'department_id' => $rootDepartment->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy;
+
+        // L'auto-validation est réservée à l'auteur ; les co-responsables ne se valident pas entre eux
+        $this->assertFalse(
+            $policy->approve($headB, $expenseSheet),
+            'Un co-responsable ne doit pas valider la note d\'un autre co-responsable'
+        );
+    }
+
+    public function test_resolve_approvers_for_root_department_head_returns_only_author(): void
+    {
+        $rootDepartment = Department::factory()->create();
+
+        $headA = User::factory()->create(['is_admin' => false]);
+        $headB = User::factory()->create(['is_admin' => false]);
+        $rootDepartment->users()->attach($headA->id, ['is_head' => true]);
+        $rootDepartment->users()->attach($headB->id, ['is_head' => true]);
+
+        $form = Form::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $headA->id,
+            'created_by' => $headA->id,
+            'is_draft' => false,
+            'department_id' => $rootDepartment->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $approvers = $expenseSheet->resolveApprovers($headA);
+
+        $this->assertCount(1, $approvers);
+        $this->assertTrue($approvers->contains($headA));
+        $this->assertFalse($approvers->contains($headB));
     }
 
     public function test_non_admin_cannot_return_expense_sheet(): void
@@ -310,7 +437,7 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => true,
         ]);
 
-        $policy = new ExpenseSheetPolicy();
+        $policy = new ExpenseSheetPolicy;
 
         // Un non-admin (même responsable) ne doit PAS pouvoir renvoyer une note approuvée
         $this->assertFalse(

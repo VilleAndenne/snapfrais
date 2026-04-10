@@ -40,15 +40,24 @@ class ExpenseSheetPolicy
             return false;
         }
 
-        // Ne jamais afficher ses propres notes dans la liste (même pour admin)
-        if ($expenseSheet->user_id === $user->id) {
-            return false;
-        }
-
         // Département de la note de frais
         $noteDepartment = $expenseSheet->department;
 
         if (! $noteDepartment) {
+            return false;
+        }
+
+        // Cas auto-validation : l'auteur est responsable d'un département racine
+        // (sans parent_id) atteignable depuis le département de la note
+        if ($expenseSheet->user_id === $user->id) {
+            $dept = $noteDepartment;
+            while ($dept) {
+                if (is_null($dept->parent_id) && $dept->heads->contains($user)) {
+                    return true;
+                }
+                $dept = $dept->parent;
+            }
+
             return false;
         }
 
@@ -103,10 +112,7 @@ class ExpenseSheetPolicy
             return true;
         }
 
-        // L'utilisateur tente de valider sa propre note (non-admin)
-        if ($expenseSheet->user_id === $user->id) {
-            return false;
-        }
+        $isOwnNote = $expenseSheet->user_id === $user->id;
 
         // Département lié à la note de frais
         $department = $expenseSheet->department;
@@ -115,6 +121,12 @@ class ExpenseSheetPolicy
         while ($department) {
             // 1. L'utilisateur est responsable ici ?
             if ($department->heads->contains($user)) {
+                // Auto-validation : l'auteur peut valider sa propre note uniquement
+                // s'il est responsable d'un département racine (sans parent_id)
+                if ($isOwnNote) {
+                    return is_null($department->parent_id);
+                }
+
                 // 2. L'auteur de la note est aussi responsable ici ?
                 if ($department->heads->contains($expenseSheet->user)) {
                     return false; // même service, 2 responsables : rejeté
