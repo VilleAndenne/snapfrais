@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -118,6 +119,37 @@ class ExpenseSheet extends Model
                 });
             }
         });
+    }
+
+    /**
+     * Détermine les utilisateurs qui doivent être notifiés pour valider cette note de frais.
+     *
+     * Règles :
+     * - Si l'auteur est responsable de son département et que celui-ci a un parent
+     *   → notifier les responsables du parent (escalade N+1).
+     * - Si l'auteur est responsable d'un département racine (sans parent_id)
+     *   → auto-validation : notifier uniquement l'auteur lui-même.
+     * - Sinon → notifier les responsables du département de la note.
+     */
+    public function resolveApprovers(User $author): Collection
+    {
+        $department = $this->department;
+
+        if (! $department) {
+            return collect();
+        }
+
+        $heads = $department->heads;
+
+        if ($heads->contains($author)) {
+            if ($department->parent) {
+                return $department->parent->heads;
+            }
+
+            return collect([$author]);
+        }
+
+        return $heads;
     }
 
     /**

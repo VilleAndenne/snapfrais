@@ -343,13 +343,7 @@ class ExpenseSheetController extends Controller
 
             // Ne pas envoyer de notifications pour les brouillons
             if (! $isDraft) {
-                $user = auth()->user();
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains($user) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -700,12 +694,7 @@ class ExpenseSheetController extends Controller
 
             // Notifier les responsables de la resoumission (sauf pour les brouillons)
             if (! $expenseSheet->is_draft) {
-                $department = $expenseSheet->department;
-                $heads = $department->heads;
-
-                if ($heads->contains(auth()->user()) && $department->parent) {
-                    $heads = $department->parent->heads;
-                }
+                $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
@@ -789,12 +778,7 @@ class ExpenseSheetController extends Controller
         ]);
 
         // Envoyer les notifications
-        $department = $expenseSheet->department;
-        $heads = $department->heads;
-
-        if ($heads->contains(auth()->user()) && $department->parent) {
-            $heads = $department->parent->heads;
-        }
+        $heads = $expenseSheet->resolveApprovers(auth()->user());
 
         $heads->each(function ($head) use ($expenseSheet) {
             $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
