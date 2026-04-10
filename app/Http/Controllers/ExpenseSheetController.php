@@ -74,24 +74,25 @@ class ExpenseSheetController extends Controller
         // Récupérer tous les départements uniques pour le filtre
         $departments = \App\Models\Department::orderBy('name')->pluck('name')->unique()->values();
 
-        // Récupérer les utilisateurs ayant des notes de frais dans le département sélectionné
-        $usersInDepartment = [];
+        // Récupérer les utilisateurs ayant des notes de frais visibles (filtrés par département si sélectionné)
+        $usersQuery = ExpenseSheet::visibleBy(auth()->user())
+            ->with('user:id,name');
+
         if ($selectedDepartmentName) {
             $department = \App\Models\Department::where('name', $selectedDepartmentName)->first();
             if ($department) {
-                $usersInDepartment = ExpenseSheet::where('department_id', $department->id)
-                    ->visibleBy(auth()->user())
-                    ->with('user:id,name')
-                    ->get()
-                    ->pluck('user')
-                    ->filter()
-                    ->unique('id')
-                    ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
-                    ->sortBy('name')
-                    ->values()
-                    ->toArray();
+                $usersQuery->where('department_id', $department->id);
             }
         }
+
+        $usersInDepartment = $usersQuery->get()
+            ->pluck('user')
+            ->filter()
+            ->unique('id')
+            ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+            ->sortBy('name')
+            ->values()
+            ->toArray();
 
         return Inertia::render('expenseSheet/Index', [
             'expenseSheets' => $expenseSheets,

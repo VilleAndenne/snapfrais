@@ -316,7 +316,7 @@ const breadcrumbs = [
                         </select>
                     </div>
 
-                    <div v-if="departmentFilter !== 'all' && usersInDepartment.length > 0" class="space-y-1 sm:space-y-2">
+                    <div v-if="usersInDepartment.length > 0" class="space-y-1 sm:space-y-2">
                         <label for="user-filter" class="text-xs sm:text-sm font-medium">Demandeur</label>
                         <select id="user-filter" v-model="userFilter" class="bg-white dark:bg-black w-full px-3 py-1.5 sm:py-2 border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs sm:text-sm">
                             <option value="all">Tous les demandeurs</option>
