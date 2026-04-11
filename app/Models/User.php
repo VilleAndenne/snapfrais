@@ -60,12 +60,31 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
             'password' => 'hashed',
             'notify_expense_sheet_to_approval' => 'boolean',
             'notify_receipt_expense_sheet' => 'boolean',
             'notify_remind_approval' => 'boolean',
             'super_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Determine whether the user has accepted the latest version of the terms.
+     */
+    public function hasAcceptedCurrentTerms(): bool
+    {
+        $threshold = config('app.terms_updated_at');
+
+        if (empty($threshold)) {
+            return true;
+        }
+
+        if ($this->terms_accepted_at === null) {
+            return false;
+        }
+
+        return $this->terms_accepted_at->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($threshold));
     }
 
     public function organizations()
