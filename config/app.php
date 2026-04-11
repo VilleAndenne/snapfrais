@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Terms of Service Update Date
+    |--------------------------------------------------------------------------
+    |
+    | Date à laquelle les conditions générales d'utilisation ont été mises à
+    | jour pour la dernière fois. Tout utilisateur dont l'acceptation est
+    | antérieure à cette date sera invité à les accepter de nouveau.
+    |
+    */
+
+    'terms_updated_at' => env('TERMS_UPDATED_AT', '2026-04-11 00:00:00'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

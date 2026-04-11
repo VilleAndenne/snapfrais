@@ -84,6 +84,11 @@ const submit = () => {
                     <LoaderCircle v-if="form.processing" class="h-4 w-4 animate-spin" />
                     Se connecter
                 </Button>
+
+                <p class="text-center text-xs text-muted-foreground">
+                    En vous connectant, vous acceptez sans réserve les
+                    <TextLink :href="route('terms.show')" :tabindex="6">conditions générales d'utilisation</TextLink>.
+                </p>
             </div>
 
 <!--            <div class="text-center text-sm text-muted-foreground">-->
