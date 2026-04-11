@@ -31,6 +31,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/activity-logs/{activity}', [\App\Http\Controllers\ActivityLogController::class, 'show'])->name('activity-logs.show');
 });
 
+// Statistics routes (admin only)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/admin/statistics', [\App\Http\Controllers\StatisticsController::class, 'index'])->name('statistics.index');
+});
+
 // Impersonation routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/impersonate/stop', [\App\Http\Controllers\ImpersonationController::class, 'stop'])->name('impersonate.stop');

@@ -135,11 +135,11 @@ class RemindApprovalExpenseSheetTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_no_notification_sent_for_expense_sheets_from_same_head(): void
+    public function test_notification_sent_for_root_department_head_own_sheets(): void
     {
         Notification::fake();
 
-        // Créer un département avec un responsable
+        // Créer un département racine avec un responsable
         $department = Department::factory()->create();
         $head = User::factory()->create();
         $department->heads()->attach($head->id, ['is_head' => true]);
@@ -159,7 +159,42 @@ class RemindApprovalExpenseSheetTest extends TestCase
         // Exécuter le job
         RemindApprovalExpenseSheet::dispatch();
 
-        // Vérifier qu'aucune notification n'a été envoyée
+        // Auto-validation : le responsable d'un département racine doit être notifié
+        // pour pouvoir valider lui-même ses propres notes
+        Notification::assertSentTo(
+            $head,
+            \App\Notifications\RemindApprovalExpenseSheetNotification::class
+        );
+    }
+
+    public function test_no_notification_sent_for_non_root_department_head_own_sheets(): void
+    {
+        Notification::fake();
+
+        // Département parent (racine)
+        $parent = Department::factory()->create();
+        // Sous-département avec parent_id défini
+        $department = Department::factory()->create(['parent_id' => $parent->id]);
+
+        // Responsable du sous-département uniquement
+        $head = User::factory()->create();
+        $department->heads()->attach($head->id, ['is_head' => true]);
+
+        $form = Form::factory()->create();
+
+        // Notes créées par le responsable lui-même dans le sous-département
+        ExpenseSheet::factory()->count(2)->create([
+            'user_id' => $head->id,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'is_draft' => false,
+            'approved' => null,
+        ]);
+
+        RemindApprovalExpenseSheet::dispatch();
+
+        // Pas d'auto-validation hors département racine : aucun rappel ne doit être envoyé
+        // (c'est au responsable du parent de valider, et il n'y en a pas ici)
         Notification::assertNothingSent();
     }
 
