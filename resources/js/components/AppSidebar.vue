@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Building2, FileText, Folder, LayoutGrid, Library, ScrollText, Users } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Building2, FileText, Folder, LayoutGrid, Library, ScrollText, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 import { usePage } from '@inertiajs/vue3';
@@ -54,6 +54,11 @@ const mainNavItems: NavItem[] = [
         title: 'Départements',
         href: '/departments',
         icon: Building2
+    }] : []),
+    ...(isAdmin ? [{
+        title: 'Statistiques',
+        href: '/admin/statistics',
+        icon: BarChart3
     }] : []),
     ...(isAdmin ? [{
         title: 'Logs d\'activité',
