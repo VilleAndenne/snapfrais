@@ -8,6 +8,15 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
+Route::get('/cgu', function () {
+    return Inertia::render('Legal/Terms');
+})->name('terms.show');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/cgu/accepter', [\App\Http\Controllers\TermsAcceptanceController::class, 'show'])->name('terms.accept');
+    Route::post('/cgu/accepter', [\App\Http\Controllers\TermsAcceptanceController::class, 'store'])->name('terms.accept.store');
+});
+
 Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('auth');
 
 Route::resource('departments', \App\Http\Controllers\DepartmentController::class)->middleware(['auth', 'verified']);
