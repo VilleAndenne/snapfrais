@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\NotificationController;
+use App\Http\Controllers\Settings\PasskeyController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,11 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');
     Route::put('settings/password', [PasswordController::class, 'update'])->name('password.update');
+
+    Route::get('settings/passkeys', [PasskeyController::class, 'edit'])->name('passkeys.edit');
+    Route::get('settings/passkeys/options', [PasskeyController::class, 'generateOptions'])->name('passkeys.options');
+    Route::post('settings/passkeys', [PasskeyController::class, 'store'])->name('passkeys.store');
+    Route::delete('settings/passkeys/{passkey}', [PasskeyController::class, 'destroy'])->name('passkeys.destroy');
 
     Route::get('settings/notifications', [NotificationController::class, 'edit'])->name('notifications.edit');
     Route::patch('settings/notifications', [NotificationController::class, 'update'])->name('notifications.update');
