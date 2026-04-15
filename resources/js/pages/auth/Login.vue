@@ -6,8 +6,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthBase from '@/layouts/AuthLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
+import { onMounted } from 'vue';
 
 defineProps<{
     status?: string;
@@ -25,6 +26,47 @@ const submit = () => {
         onFinish: () => form.reset('password')
     });
 };
+
+onMounted(async () => {
+    if (typeof window.browserSupportsWebAuthn !== 'function' || !window.browserSupportsWebAuthn()) {
+        return;
+    }
+
+    const conditionalAvailable = await (
+        typeof PublicKeyCredential !== 'undefined'
+        && typeof PublicKeyCredential.isConditionalMediationAvailable === 'function'
+            ? PublicKeyCredential.isConditionalMediationAvailable()
+            : Promise.resolve(false)
+    );
+
+    if (!conditionalAvailable) {
+        return;
+    }
+
+    try {
+        const response = await fetch(route('passkeys.authentication_options'), {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const optionsJSON = await response.json();
+        const authResponse = await window.startAuthentication({
+            optionsJSON,
+            useBrowserAutofill: true,
+        });
+
+        router.post(route('passkeys.login'), {
+            start_authentication_response: JSON.stringify(authResponse),
+            remember: form.remember,
+        });
+    } catch (error) {
+        console.debug('[passkey] conditional authentication skipped', error);
+    }
+});
 </script>
 
 <template>
@@ -46,7 +88,7 @@ const submit = () => {
                         required
                         autofocus
                         :tabindex="1"
-                        autocomplete="email"
+                        autocomplete="username webauthn"
                         v-model="form.email"
                         placeholder="exemple@ac.andenne.be"
                     />
