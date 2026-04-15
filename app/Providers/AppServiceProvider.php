@@ -6,6 +6,7 @@ use App\Listeners\LogFailedLogin;
 use App\Listeners\LogLogout;
 use App\Listeners\LogPasswordReset;
 use App\Listeners\LogSuccessfulLogin;
+use App\Listeners\RedirectUnverifiedPasskeyUser;
 use App\Models\Department;
 use App\Models\ExpenseSheet;
 use App\Models\User;
@@ -20,6 +21,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Spatie\LaravelPasskeys\Events\PasskeyUsedToAuthenticateEvent;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Failed::class, LogFailedLogin::class);
         Event::listen(Logout::class, LogLogout::class);
         Event::listen(PasswordReset::class, LogPasswordReset::class);
+        Event::listen(PasskeyUsedToAuthenticateEvent::class, RedirectUnverifiedPasskeyUser::class);
 
         if (class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);

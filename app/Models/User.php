@@ -4,20 +4,24 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\ResetPasswordNotification;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 use Mirror\Concerns\Impersonatable;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\LaravelPasskeys\Models\Concerns\HasPasskeys as HasPasskeysContract;
+use Spatie\LaravelPasskeys\Models\Concerns\InteractsWithPasskeys;
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasPasskeysContract
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Impersonatable, LogsActivity, Notifiable, SoftDeletes;
+    /** @use HasFactory<UserFactory> */
+    use HasApiTokens, HasFactory, Impersonatable, InteractsWithPasskeys, LogsActivity, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -84,7 +88,7 @@ class User extends Authenticatable
             return false;
         }
 
-        return $this->terms_accepted_at->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($threshold));
+        return $this->terms_accepted_at->greaterThanOrEqualTo(Carbon::parse($threshold));
     }
 
     public function organizations()

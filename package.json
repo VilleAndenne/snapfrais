@@ -25,6 +25,7 @@
     "dependencies": {
         "@googlemaps/js-api-loader": "^1.16.8",
         "@inertiajs/vue3": "^2.0.0-beta.3",
+        "@simplewebauthn/browser": "^13.3.0",
         "@vitejs/plugin-vue": "^5.2.1",
         "@vueuse/core": "^12.8.2",
         "autoprefixer": "^10.4.20",
@@ -32,7 +33,7 @@
         "clsx": "^2.1.1",
         "concurrently": "^9.0.1",
         "dompurify": "^3.2.7",
-        "html2pdf.js": "^0.10.3",
+        "html2pdf.js": "^0.14.0",
         "laravel-vite-plugin": "^1.0",
         "lucide": "^0.468.0",
         "lucide-vue-next": "^0.468.0",

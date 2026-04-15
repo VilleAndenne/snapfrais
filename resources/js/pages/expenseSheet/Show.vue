@@ -146,6 +146,10 @@
                             <span class="font-semibold">Approuvée par :</span>
                             <span>{{ expenseSheet.validated_by.name }}</span>
                         </p>
+                        <p v-if="expenseSheet.validated_at" class="flex items-baseline gap-1.5">
+                            <span class="font-semibold">Approuvée le :</span>
+                            <span>{{ formatDateTime(expenseSheet.validated_at) }}</span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -405,7 +409,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ExpenseSheetPdf from '@/pages/expenseSheet/Pdf.vue';
-import { formatCurrency, formatDate, getActiveRate, getStatusLabel } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, getActiveRate, getStatusLabel } from '@/utils/formatters';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertCircleIcon,

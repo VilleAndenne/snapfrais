@@ -33,6 +33,7 @@ class ExpenseSheet extends Model
     protected $casts = [
         'route' => 'array',
         'is_draft' => 'boolean',
+        'validated_at' => 'datetime',
     ];
 
     protected $appends = [
