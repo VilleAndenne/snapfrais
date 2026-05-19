@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Imports\UsersImport;
 use App\Models\User;
+use App\Notifications\AdminInitiatedPasswordReset;
 use App\Notifications\UserCreated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -65,30 +66,18 @@ class UserController extends Controller
             'is_admin' => 'boolean',
         ]);
 
-        if ($request->has('password')) {
-            $validated['password'] = $request->validate([
-                'password' => 'required|string|min:8|confirmed',
-            ])['password'];
-        } else {
-            $validated['password'] = bcrypt(Str::random(10)); // Default password
-        }
-
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => bcrypt($validated['password']),
+            'password' => Str::random(40),
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
 
-        if (! $request->has('password')) {
-            // generate a reset password token
-            $token = Password::broker()->createToken($user);
-        }
+        $token = Password::broker()->createToken($user);
 
-        // Send email to user to set their password
         $user->notify(new UserCreated($token, $validated['email']));
 
-        return redirect()->route('users.index')->with('success', 'Utilisatuer créé avec succès.');
+        return redirect()->route('users.index')->with('success', 'Utilisateur créé. Un lien de définition du mot de passe lui a été envoyé.');
     }
 
     /**
@@ -96,7 +85,41 @@ class UserController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $user = User::findOrFail($id);
+
+        if (! auth()->user()->can('view', $user)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
+
+        $user->load([
+            'departments:id,name',
+        ]);
+
+        $expenseSheets = $user->expenseSheets()
+            ->with(['department:id,name', 'form:id,name'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $baseQuery = $user->expenseSheets();
+
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('is_draft', true)->count(),
+            'pending' => (clone $baseQuery)->where('is_draft', false)->whereNull('approved')->count(),
+            'approved' => (clone $baseQuery)->where('is_draft', false)->where('approved', true)->count(),
+            'rejected' => (clone $baseQuery)->where('is_draft', false)->where('approved', false)->count(),
+            'approved_total' => (float) (clone $baseQuery)->where('is_draft', false)->where('approved', true)->sum('total'),
+        ];
+
+        return Inertia::render('users/Show', [
+            'user' => $user,
+            'expenseSheets' => $expenseSheets,
+            'stats' => $stats,
+            'canImpersonate' => (bool) auth()->user()->super_admin && ! $user->super_admin && auth()->id() !== $user->id,
+            'canUpdate' => auth()->user()->can('update', $user),
+            'canDelete' => auth()->user()->can('delete', $user),
+        ]);
     }
 
     /**
@@ -153,6 +176,22 @@ class UserController extends Controller
         $user->delete();
 
         return redirect()->route('users.index')->with('success', 'Utilisateur supprimé avec succès.');
+    }
+
+    /**
+     * Send a password reset link to the user, initiated by an admin.
+     */
+    public function sendPasswordReset(User $user)
+    {
+        if (! auth()->user()->can('update', $user)) {
+            return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
+        }
+
+        $token = Password::broker()->createToken($user);
+
+        $user->notify(new AdminInitiatedPasswordReset($token, auth()->user()->name));
+
+        return redirect()->back()->with('success', 'Un lien de réinitialisation a été envoyé à '.$user->email.'.');
     }
 
     public function import()

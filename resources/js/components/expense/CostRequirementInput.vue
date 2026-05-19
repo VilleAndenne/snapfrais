@@ -53,11 +53,12 @@
                         :key="`file-${req.name}-${fileKeys[req.name] || 0}`"
                         :id="`req-${req.name}`"
                         type="file"
-                        :accept="req.accept || undefined"
+                        :accept="req.accept || ACCEPTED_FILE_TYPES"
                         @change="onFileChange($event, req.name)"
-                        :aria-invalid="submitted && isEmpty(req)"
-                        :class="{ 'border-red-500': submitted && isEmpty(req) }"
+                        :aria-invalid="submitted && (isEmpty(req) || hasInvalidType(req))"
+                        :class="{ 'border-red-500': submitted && (isEmpty(req) || hasInvalidType(req)) }"
                     />
+                    <p class="text-xs text-muted-foreground mt-1">Formats acceptés : PDF, images (JPG, PNG, GIF, WEBP, HEIC).</p>
                     <Button
                         v-if="isReplacingFile(req.name)"
                         variant="ghost"
@@ -70,6 +71,7 @@
                     </Button>
                 </div>
                 <p v-if="submitted && isEmpty(req)" class="text-sm text-red-600">Ce fichier est requis.</p>
+                <p v-else-if="hasInvalidType(req)" class="text-sm text-red-600">Format non autorisé. Utilisez un PDF ou une image.</p>
             </div>
 
             <!-- Type inconnu -->
@@ -95,6 +97,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+
+const ACCEPTED_FILE_TYPES = 'application/pdf,image/*';
+const ACCEPTED_MIME_REGEX = /^(application\/pdf|image\/.+)$/i;
+const ACCEPTED_EXTENSION_REGEX = /\.(pdf|jpg|jpeg|png|gif|webp|heic|heif|bmp|svg|tiff?)$/i;
 
 // Initialiser localData avec les données existantes
 const initLocalData = () => {
@@ -134,7 +140,28 @@ watch(() => props.modelValue, (val) => {
 
 function onFileChange(event, key) {
     const file = event.target.files?.[0];
+    if (file && !isAcceptedFile(file)) {
+        event.target.value = '';
+        localData[key] = null;
+        window.alert('Format non autorisé. Seuls les PDF et images sont acceptés.');
+        return;
+    }
     localData[key] = file || null;
+}
+
+function isAcceptedFile(file) {
+    if (file.type && ACCEPTED_MIME_REGEX.test(file.type)) {
+        return true;
+    }
+    return ACCEPTED_EXTENSION_REGEX.test(file.name || '');
+}
+
+function hasInvalidType(req) {
+    if (req.type !== 'file') {
+        return false;
+    }
+    const val = localData[req.name];
+    return val instanceof File && !isAcceptedFile(val);
 }
 
 function startReplacingFile(key) {

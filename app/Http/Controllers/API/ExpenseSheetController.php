@@ -2,12 +2,25 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Models\Department;
 use App\Models\ExpenseSheet;
+use App\Models\ExpenseSheetCost;
+use App\Models\FormCost;
+use App\Models\FormCostRequirement;
+use App\Notifications\ApprovalExpenseSheet;
+use App\Notifications\ExpenseSheetToApproval;
+use App\Notifications\ReceiptExpenseSheet;
+use App\Notifications\ReceiptExpenseSheetForUser;
+use App\Notifications\RejectionExpenseSheet;
+use App\Services\DsfReimbursementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ExpenseSheetController extends BaseController
 {
@@ -90,15 +103,19 @@ class ExpenseSheetController extends BaseController
                 'costs.*.data' => 'required|array',
                 'costs.*.date' => 'required|date',
                 'costs.*.requirements' => 'nullable|array',
+                'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
                 'department_id' => 'required|exists:departments,id',
                 'target_user_id' => 'nullable|exists:users,id',
                 'is_draft' => 'required|boolean',
+            ], [
+                'costs.*.requirements.*.file.mimes' => 'Les annexes doivent être au format PDF ou image (JPG, PNG, GIF, WEBP, HEIC).',
+                'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
             ]);
 
             $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
 
             // Département + relations nécessaires (heads + users)
-            $department = \App\Models\Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
             $currentUserId = auth()->id();
             $targetUserId = $request->input('target_user_id');
 
@@ -115,7 +132,7 @@ class ExpenseSheetController extends BaseController
             }
 
             // Création de la note de frais
-            $expenseSheet = \App\Models\ExpenseSheet::create([
+            $expenseSheet = ExpenseSheet::create([
                 'user_id' => $targetUserId ?: $currentUserId,
                 'created_by' => $currentUserId,
                 'status' => $isDraft ? 'Brouillon' : 'En attente',
@@ -128,7 +145,7 @@ class ExpenseSheetController extends BaseController
             $globalTotal = 0;
 
             foreach ($validated['costs'] as $costItem) {
-                $formCost = \App\Models\FormCost::find($costItem['cost_id']);
+                $formCost = FormCost::find($costItem['cost_id']);
                 $type = $formCost->type;
                 $date = $costItem['date'];
 
@@ -186,7 +203,7 @@ class ExpenseSheetController extends BaseController
                             'key' => env('GOOGLE_MAPS_API_KEY'),
                         ];
 
-                        $response = \Illuminate\Support\Facades\Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
+                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
                         $json = $response->json();
 
                         if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
@@ -229,11 +246,11 @@ class ExpenseSheetController extends BaseController
                 if (isset($costItem['requirements'])) {
                     foreach ($costItem['requirements'] as $key => $requirement) {
                         // Récupérer le nom du requirement depuis la base de données
-                        $requirementModel = \App\Models\FormCostRequirement::find($key);
+                        $requirementModel = FormCostRequirement::find($key);
                         $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
 
-                        if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
-                            $path = \Illuminate\Support\Facades\Storage::url(\Illuminate\Support\Facades\Storage::putFile($requirement['file']));
+                        if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof UploadedFile) {
+                            $path = Storage::url(Storage::putFile($requirement['file']));
                             $requirements[$requirementName] = ['file' => $path];
                         } elseif (is_array($requirement) && isset($requirement['value'])) {
                             $requirements[$requirementName] = ['value' => $requirement['value']];
@@ -275,14 +292,14 @@ class ExpenseSheetController extends BaseController
                 $heads = $expenseSheet->resolveApprovers(auth()->user());
 
                 $heads->each(function ($head) use ($expenseSheet) {
-                    $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+                    $head->notify(new ExpenseSheetToApproval($expenseSheet));
                 });
 
                 if (auth()->user()->id !== $expenseSheet->user->id) {
-                    $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+                    $expenseSheet->creator->notify(new ReceiptExpenseSheetForUser($expenseSheet));
                 }
 
-                $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
+                $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
             }
 
             $message = $isDraft ? 'Brouillon enregistré.' : 'Note de frais enregistrée.';
@@ -293,7 +310,7 @@ class ExpenseSheetController extends BaseController
                 Response::HTTP_CREATED
             );
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             \Log::error('API ExpenseSheet validation failed', ['errors' => $e->errors()]);
 
             return $this->handleError('Erreur de validation', Response::HTTP_UNPROCESSABLE_ENTITY, $e->errors());
@@ -357,14 +374,14 @@ class ExpenseSheetController extends BaseController
             $heads = $expenseSheet->resolveApprovers($expenseSheet->user);
 
             $heads->each(function ($head) use ($expenseSheet) {
-                $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+                $head->notify(new ExpenseSheetToApproval($expenseSheet));
             });
 
             if (auth()->user()->id !== $expenseSheet->user->id) {
-                $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+                $expenseSheet->creator->notify(new ReceiptExpenseSheetForUser($expenseSheet));
             }
 
-            $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
+            $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
 
             return $this->handleResponse(
                 $expenseSheet->load(['costs.formCost', 'user', 'department']),
@@ -415,15 +432,19 @@ class ExpenseSheetController extends BaseController
                 'costs.*.date' => 'required|date',
                 'costs.*.id' => 'nullable|exists:expense_sheet_costs,id',
                 'costs.*.requirements' => 'nullable|array',
+                'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
                 'department_id' => 'required|exists:departments,id',
                 'is_draft' => 'required|boolean',
+            ], [
+                'costs.*.requirements.*.file.mimes' => 'Les annexes doivent être au format PDF ou image (JPG, PNG, GIF, WEBP, HEIC).',
+                'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
             ]);
 
             $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
             $wasDraft = $expenseSheet->is_draft;
 
             // Vérifier le département
-            $department = \App\Models\Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
 
             DB::beginTransaction();
 
@@ -441,7 +462,7 @@ class ExpenseSheetController extends BaseController
 
             // Recréer tous les coûts
             foreach ($validated['costs'] as $costIndex => $costItem) {
-                $formCost = \App\Models\FormCost::find($costItem['cost_id']);
+                $formCost = FormCost::find($costItem['cost_id']);
                 $type = $formCost->type;
                 $date = $costItem['date'];
 
@@ -499,7 +520,7 @@ class ExpenseSheetController extends BaseController
                             'key' => env('GOOGLE_MAPS_API_KEY'),
                         ];
 
-                        $response = \Illuminate\Support\Facades\Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
+                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
                         $json = $response->json();
 
                         if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
@@ -542,10 +563,10 @@ class ExpenseSheetController extends BaseController
                 if (isset($costItem['requirements'])) {
                     foreach ($costItem['requirements'] as $key => $requirement) {
                         // Récupérer le nom du requirement depuis la base de données
-                        $requirementModel = \App\Models\FormCostRequirement::find($key);
+                        $requirementModel = FormCostRequirement::find($key);
                         $requirementName = $requirementModel ? $requirementModel->name : "Requirement $key";
 
-                        if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof \Illuminate\Http\UploadedFile) {
+                        if (is_array($requirement) && isset($requirement['file']) && $requirement['file'] instanceof UploadedFile) {
                             // Nouveau fichier uploadé
                             $path = Storage::url(Storage::putFile($requirement['file']));
                             $requirements[$requirementName] = ['file' => $path];
@@ -553,7 +574,7 @@ class ExpenseSheetController extends BaseController
                             // Garder le fichier existant - récupérer depuis l'ancien coût
                             $oldCostId = $costItem['id'] ?? null;
                             if ($oldCostId) {
-                                $oldCost = \App\Models\ExpenseSheetCost::find($oldCostId);
+                                $oldCost = ExpenseSheetCost::find($oldCostId);
                                 if ($oldCost && $oldCost->requirements) {
                                     $oldRequirements = is_string($oldCost->requirements)
                                         ? json_decode($oldCost->requirements, true)
@@ -605,14 +626,14 @@ class ExpenseSheetController extends BaseController
                 $heads = $expenseSheet->resolveApprovers($expenseSheet->user);
 
                 $heads->each(function ($head) use ($expenseSheet) {
-                    $head->notify(new \App\Notifications\ExpenseSheetToApproval($expenseSheet));
+                    $head->notify(new ExpenseSheetToApproval($expenseSheet));
                 });
 
                 if (auth()->user()->id !== $expenseSheet->user->id) {
-                    $expenseSheet->creator->notify(new \App\Notifications\ReceiptExpenseSheetForUser($expenseSheet));
+                    $expenseSheet->creator->notify(new ReceiptExpenseSheetForUser($expenseSheet));
                 }
 
-                $expenseSheet->user->notify(new \App\Notifications\ReceiptExpenseSheet($expenseSheet));
+                $expenseSheet->user->notify(new ReceiptExpenseSheet($expenseSheet));
             }
 
             $message = $isDraft ? 'Brouillon mis à jour.' : 'Note de frais mise à jour et soumise.';
@@ -622,7 +643,7 @@ class ExpenseSheetController extends BaseController
                 $message
             );
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             DB::rollBack();
             \Log::error('API ExpenseSheet updateFull validation failed', ['errors' => $e->errors()]);
 
@@ -663,15 +684,15 @@ class ExpenseSheetController extends BaseController
         $expenseSheet->save();
 
         if ($validated['approval']) {
-            $expenseSheet->user->notify(new \App\Notifications\ApprovalExpenseSheet($expenseSheet));
+            $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
 
             // Générer et envoyer le PDF pour les coûts DSF
-            $dsfService = new \App\Services\DsfReimbursementService;
+            $dsfService = new DsfReimbursementService;
             if ($dsfService->hasDsfCosts($expenseSheet)) {
                 $dsfService->generateAndSendReimbursementPdf($expenseSheet);
             }
         } else {
-            $expenseSheet->user->notify(new \App\Notifications\RejectionExpenseSheet($expenseSheet));
+            $expenseSheet->user->notify(new RejectionExpenseSheet($expenseSheet));
         }
 
         $message = $validated['approval'] ? 'Note de frais approuvée.' : 'Note de frais rejetée.';
