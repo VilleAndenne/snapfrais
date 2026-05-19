@@ -55,6 +55,9 @@
                                     >
                                         <UserIcon class="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                                     </Button>
+                                    <Button variant="ghost" size="icon" @click="showUser(user.id)" class="h-8 w-8 sm:h-10 sm:w-10" title="Voir cet utilisateur">
+                                        <EyeIcon class="h-3 w-3 sm:h-4 sm:w-4" />
+                                    </Button>
                                     <Button variant="ghost" size="icon" @click="editUser(user.id)" class="h-8 w-8 sm:h-10 sm:w-10">
                                         <PencilIcon class="h-3 w-3 sm:h-4 sm:w-4" />
                                     </Button>
@@ -135,7 +138,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
-import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon, UserIcon } from 'lucide-vue-next'
+import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon, UserIcon, EyeIcon } from 'lucide-vue-next'
 
 // shadcn/ui
 import { Button } from '@/components/ui/button'
@@ -185,6 +188,10 @@ const addUser = () => {
 
 const editUser = (id) => {
     router.visit(route('users.edit', id))
+}
+
+const showUser = (id) => {
+    router.visit(route('users.show', id))
 }
 
 // Recherche automatique à la frappe

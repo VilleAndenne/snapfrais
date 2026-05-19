@@ -52,6 +52,13 @@
                     </label>
                 </div>
 
+                <div class="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <MailIcon class="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <p class="text-xs sm:text-sm text-muted-foreground">
+                        Après création, un e-mail sera automatiquement envoyé à l'utilisateur avec un lien lui permettant de définir lui-même son mot de passe.
+                    </p>
+                </div>
+
                 <!-- Boutons d'action -->
                 <div class="flex items-center gap-4 pt-4">
                     <Button
@@ -78,6 +85,7 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { MailIcon } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
