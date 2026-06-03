@@ -42,7 +42,6 @@ class UserShowTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('users/Show')
                 ->where('user.id', $target->id)
-                ->has('stats')
                 ->has('expenseSheets')
             );
     }

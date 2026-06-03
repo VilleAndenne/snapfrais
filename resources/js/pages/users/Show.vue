@@ -2,11 +2,11 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="user.name" />
 
-        <div class="container mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
-            <!-- Header -->
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+            <!-- En-tête -->
+            <div class="flex items-start justify-between gap-3 sm:gap-4">
                 <div class="flex items-start gap-3 sm:gap-4 min-w-0">
-                    <Avatar class="h-12 w-12 sm:h-14 sm:w-14 shrink-0">
+                    <Avatar class="h-12 w-12 sm:h-14 sm:w-14 shrink-0 border bg-background">
                         <AvatarFallback class="bg-muted text-foreground font-medium">
                             {{ initials }}
                         </AvatarFallback>
@@ -22,21 +22,49 @@
                         <div class="flex flex-wrap gap-1.5 pt-0.5">
                             <Badge v-if="user.super_admin" variant="default">Super admin</Badge>
                             <Badge v-if="user.is_admin && !user.super_admin" variant="secondary">Administrateur</Badge>
-                            <Badge v-if="user.is_head" variant="outline">Chef de département</Badge>
+                            <Badge v-if="user.is_head" variant="outline">Responsable de département</Badge>
                         </div>
                     </div>
                 </div>
+
+                <!-- Actions -->
+                <DropdownMenu v-if="canUpdate || canDelete || canImpersonate">
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="icon" class="shrink-0">
+                            <MoreVerticalIcon class="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="w-56">
+                        <DropdownMenuItem v-if="canUpdate" @click="editUser">
+                            <PencilIcon class="mr-2 h-4 w-4" />
+                            Modifier l'utilisateur
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="canUpdate" @click="confirmSendPasswordReset">
+                            <MailIcon class="mr-2 h-4 w-4" />
+                            Envoyer un lien de réinitialisation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="canImpersonate" @click="impersonateUser">
+                            <UserIcon class="mr-2 h-4 w-4" />
+                            Impersonner
+                        </DropdownMenuItem>
+                        <template v-if="canDelete && !user.deleted_at">
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem @click="confirmDelete" class="text-destructive focus:text-destructive">
+                                <TrashIcon class="mr-2 h-4 w-4" />
+                                Supprimer
+                            </DropdownMenuItem>
+                        </template>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             <!-- Bannière compte supprimé -->
             <div
                 v-if="user.deleted_at"
-                class="flex items-start gap-3 rounded-lg border-l-4 border-destructive bg-gradient-to-r from-destructive/10 to-destructive/5 px-4 py-3 shadow-sm"
+                class="flex items-start gap-3 rounded-lg border-l-4 border-destructive bg-destructive/5 px-4 py-3"
             >
-                <div class="flex-shrink-0 rounded-full bg-destructive/10 p-1.5">
-                    <TrashIcon class="h-4 w-4 text-destructive" />
-                </div>
-                <div class="flex-1 space-y-0.5">
+                <TrashIcon class="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div class="space-y-0.5">
                     <h3 class="text-sm font-medium text-destructive">Compte supprimé</h3>
                     <p class="text-xs text-destructive/90">
                         Supprimé le {{ formatDate(user.deleted_at) }}. L'utilisateur ne peut plus se connecter.
@@ -44,259 +72,129 @@
                 </div>
             </div>
 
-            <!-- Résumé inline -->
-            <div class="rounded-lg border border-border bg-card">
-                <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
-                    <div class="p-4 space-y-1">
-                        <p class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Montant validé</p>
-                        <p class="text-lg sm:text-xl font-semibold tabular-nums">{{ formatAmount(stats.approved_total) }}</p>
-                    </div>
-                    <div class="p-4 space-y-1">
-                        <p class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Validées</p>
-                        <p class="text-lg sm:text-xl font-semibold tabular-nums">
-                            {{ stats.approved }}<span class="text-sm text-muted-foreground font-normal"> / {{ stats.total }}</span>
-                        </p>
-                    </div>
-                    <div class="p-4 space-y-1">
-                        <p class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">En attente</p>
-                        <p class="text-lg sm:text-xl font-semibold tabular-nums">{{ stats.pending }}</p>
-                    </div>
-                    <div class="p-4 space-y-1">
-                        <p class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Refusées</p>
-                        <p class="text-lg sm:text-xl font-semibold tabular-nums">{{ stats.rejected }}</p>
-                    </div>
+            <!-- Départements -->
+            <section class="space-y-3">
+                <h2 class="text-base sm:text-lg font-semibold">Départements</h2>
+                <div v-if="user.departments?.length" class="flex flex-wrap gap-2">
+                    <span
+                        v-for="dept in user.departments"
+                        :key="dept.id"
+                        class="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-xs"
+                    >
+                        {{ dept.name }}
+                        <Badge v-if="dept.pivot?.is_head" variant="default" class="text-[10px]">Responsable</Badge>
+                        <Badge v-else variant="outline" class="text-[10px]">Membre</Badge>
+                    </span>
                 </div>
-            </div>
+                <div v-else class="rounded-lg border border-dashed py-6 px-4 text-center text-sm text-muted-foreground">
+                    Aucun département rattaché.
+                </div>
+            </section>
 
-            <!-- Deux colonnes -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                <!-- Colonne gauche : NDF (table façon expense-sheet index) -->
-                <div class="lg:col-span-2 space-y-3">
-                    <div class="flex items-end justify-between">
-                        <div>
-                            <h2 class="text-base sm:text-lg font-semibold">Notes de frais récentes</h2>
-                            <p class="text-xs text-muted-foreground">Les {{ expenseSheets.length }} dernières soumissions</p>
-                        </div>
-                    </div>
+            <!-- NDF récentes -->
+            <section class="space-y-3">
+                <div>
+                    <h2 class="text-base sm:text-lg font-semibold">Notes de frais récentes</h2>
+                    <p class="text-xs text-muted-foreground">Les {{ expenseSheets.length }} dernières soumissions</p>
+                </div>
 
-                    <!-- Mobile : cartes -->
-                    <div v-if="expenseSheets.length > 0" class="md:hidden space-y-3">
-                        <Link
-                            v-for="sheet in expenseSheets"
-                            :key="sheet.id"
-                            :href="route('expense-sheet.show', sheet.id)"
-                            class="block"
-                        >
-                            <div class="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
-                                <div class="flex items-start justify-between gap-2">
-                                    <div class="flex items-start gap-2 flex-1 min-w-0">
-                                        <component :is="statusIcon(sheet)" class="h-5 w-5 flex-shrink-0 mt-0.5" />
-                                        <div class="flex-1 min-w-0">
-                                            <h3 class="font-medium text-sm truncate">{{ sheet.form?.name ?? 'Note de frais' }}</h3>
-                                            <p class="text-xs text-muted-foreground">{{ sheet.department?.name ?? '—' }}</p>
-                                        </div>
+                <!-- Mobile : cartes -->
+                <div v-if="expenseSheets.length > 0" class="md:hidden space-y-3">
+                    <Link
+                        v-for="sheet in expenseSheets"
+                        :key="sheet.id"
+                        :href="route('expense-sheet.show', sheet.id)"
+                        class="block"
+                    >
+                        <div class="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-start gap-2 flex-1 min-w-0">
+                                    <component :is="statusIcon(sheet)" class="h-5 w-5 flex-shrink-0 mt-0.5" />
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-medium text-sm truncate">{{ sheet.form?.name ?? 'Note de frais' }}</h3>
+                                        <p class="text-xs text-muted-foreground">{{ sheet.department?.name ?? '—' }}</p>
                                     </div>
-                                    <Badge :variant="statusVariant(sheet)" class="text-xs flex-shrink-0">
+                                </div>
+                                <Badge :variant="statusVariant(sheet)" class="text-xs flex-shrink-0">
+                                    {{ statusLabel(sheet) }}
+                                </Badge>
+                            </div>
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-muted-foreground">Montant</span>
+                                    <span class="font-semibold text-sm tabular-nums">{{ formatAmount(sheet.total) }}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-muted-foreground">Créé le</span>
+                                    <div class="flex items-center gap-1">
+                                        <CalendarIcon class="h-3 w-3" />
+                                        <span class="tabular-nums">{{ formatDate(sheet.created_at) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+
+                <!-- Desktop : tableau -->
+                <div v-if="expenseSheets.length > 0" class="hidden md:block overflow-x-auto border rounded-xl">
+                    <table class="min-w-full divide-y">
+                        <thead class="bg-muted">
+                            <tr>
+                                <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Type</th>
+                                <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Département</th>
+                                <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Montant</th>
+                                <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Statut</th>
+                                <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Créé le</th>
+                                <th class="px-4 lg:px-6 py-3 text-right text-xs uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr
+                                v-for="sheet in expenseSheets"
+                                :key="sheet.id"
+                                class="hover:bg-muted/50 transition-colors"
+                            >
+                                <td class="px-4 lg:px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <component :is="statusIcon(sheet)" class="h-5 w-5 flex-shrink-0" />
+                                        <span class="text-sm font-medium">{{ sheet.form?.name ?? 'Note de frais' }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 lg:px-6 py-4 text-sm">{{ sheet.department?.name ?? '—' }}</td>
+                                <td class="px-4 lg:px-6 py-4 text-sm font-semibold tabular-nums">{{ formatAmount(sheet.total) }}</td>
+                                <td class="px-4 lg:px-6 py-4">
+                                    <Badge :variant="statusVariant(sheet)" class="text-xs">
                                         {{ statusLabel(sheet) }}
                                     </Badge>
-                                </div>
-                                <div class="space-y-2 text-xs">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-muted-foreground">Montant</span>
-                                        <span class="font-semibold text-sm tabular-nums">{{ formatAmount(sheet.total) }}</span>
+                                </td>
+                                <td class="px-4 lg:px-6 py-4 text-sm">
+                                    <div class="flex items-center gap-1 text-muted-foreground">
+                                        <CalendarIcon class="h-4 w-4" />
+                                        <span class="tabular-nums">{{ formatDate(sheet.created_at) }}</span>
                                     </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-muted-foreground">Créé le</span>
-                                        <div class="flex items-center gap-1">
-                                            <CalendarIcon class="h-3 w-3" />
-                                            <span class="tabular-nums">{{ formatDate(sheet.created_at) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                    </div>
-
-                    <!-- Desktop : tableau -->
-                    <div v-if="expenseSheets.length > 0" class="hidden md:block overflow-x-auto border rounded-xl">
-                        <table class="min-w-full divide-y">
-                            <thead class="bg-muted">
-                                <tr>
-                                    <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Type</th>
-                                    <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Département</th>
-                                    <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Montant</th>
-                                    <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Statut</th>
-                                    <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Créé le</th>
-                                    <th class="px-4 lg:px-6 py-3 text-right text-xs uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                <tr
-                                    v-for="sheet in expenseSheets"
-                                    :key="sheet.id"
-                                    class="hover:bg-muted/50 transition-colors"
-                                >
-                                    <td class="px-4 lg:px-6 py-4">
-                                        <div class="flex items-center gap-2">
-                                            <component :is="statusIcon(sheet)" class="h-5 w-5 flex-shrink-0" />
-                                            <span class="text-sm font-medium">{{ sheet.form?.name ?? 'Note de frais' }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 lg:px-6 py-4 text-sm">{{ sheet.department?.name ?? '—' }}</td>
-                                    <td class="px-4 lg:px-6 py-4 text-sm font-semibold tabular-nums">{{ formatAmount(sheet.total) }}</td>
-                                    <td class="px-4 lg:px-6 py-4">
-                                        <Badge :variant="statusVariant(sheet)" class="text-xs">
-                                            {{ statusLabel(sheet) }}
-                                        </Badge>
-                                    </td>
-                                    <td class="px-4 lg:px-6 py-4 text-sm">
-                                        <div class="flex items-center gap-1 text-muted-foreground">
-                                            <CalendarIcon class="h-4 w-4" />
-                                            <span class="tabular-nums">{{ formatDate(sheet.created_at) }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 lg:px-6 py-4 text-right">
-                                        <Link :href="route('expense-sheet.show', sheet.id)">
-                                            <button class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors">
-                                                Voir
-                                            </button>
-                                        </Link>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Empty -->
-                    <div v-if="expenseSheets.length === 0" class="rounded-lg border border-dashed border-border py-10 px-4 text-center">
-                        <FileTextIcon class="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                        <p class="text-sm font-medium">Aucune note de frais</p>
-                        <p class="text-xs text-muted-foreground mt-0.5">
-                            Cet utilisateur n'a encore soumis aucune note de frais.
-                        </p>
-                    </div>
+                                </td>
+                                <td class="px-4 lg:px-6 py-4 text-right">
+                                    <Link :href="route('expense-sheet.show', sheet.id)">
+                                        <button class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors">
+                                            Voir
+                                        </button>
+                                    </Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- Colonne droite : panneau latéral -->
-                <aside class="space-y-4">
-                    <!-- Actions rapides -->
-                    <section class="rounded-lg border border-border bg-card">
-                        <header class="px-4 py-2.5 border-b border-border">
-                            <h3 class="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Actions rapides</h3>
-                        </header>
-                        <div class="p-2">
-                            <button
-                                v-if="canUpdate"
-                                @click="confirmSendPasswordReset"
-                                :disabled="isSendingReset"
-                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-left transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <LoaderIcon v-if="isSendingReset" class="h-4 w-4 text-muted-foreground shrink-0 animate-spin" />
-                                <MailIcon v-else class="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span class="flex-1">Envoyer un lien de réinitialisation</span>
-                                <ChevronRightIcon class="h-3.5 w-3.5 text-muted-foreground/60" />
-                            </button>
-                            <button
-                                v-if="canUpdate"
-                                @click="editUser"
-                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-left transition-colors hover:bg-muted"
-                            >
-                                <PencilIcon class="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span class="flex-1">Modifier l'utilisateur</span>
-                                <ChevronRightIcon class="h-3.5 w-3.5 text-muted-foreground/60" />
-                            </button>
-                            <button
-                                v-if="canImpersonate"
-                                @click="impersonateUser"
-                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-left transition-colors hover:bg-muted"
-                            >
-                                <UserIcon class="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span class="flex-1">Impersonner</span>
-                                <ChevronRightIcon class="h-3.5 w-3.5 text-muted-foreground/60" />
-                            </button>
-                            <div v-if="canDelete && !user.deleted_at" class="border-t border-border my-1" />
-                            <button
-                                v-if="canDelete && !user.deleted_at"
-                                @click="confirmDelete"
-                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-left transition-colors text-destructive hover:bg-destructive/10"
-                            >
-                                <TrashIcon class="h-4 w-4 shrink-0" />
-                                <span class="flex-1">Supprimer</span>
-                            </button>
-                        </div>
-                    </section>
-
-                    <!-- Compte -->
-                    <section class="rounded-lg border border-border bg-card">
-                        <header class="px-4 py-2.5 border-b border-border">
-                            <h3 class="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Compte</h3>
-                        </header>
-                        <dl class="px-4 py-3 space-y-2.5 text-sm">
-                            <div class="flex items-center justify-between gap-3">
-                                <dt class="text-muted-foreground">Créé le</dt>
-                                <dd class="font-medium tabular-nums">{{ formatDate(user.created_at) }}</dd>
-                            </div>
-                            <div class="flex items-center justify-between gap-3">
-                                <dt class="text-muted-foreground">Email vérifié</dt>
-                                <dd>
-                                    <span v-if="user.email_verified_at" class="font-medium tabular-nums">{{ formatDate(user.email_verified_at) }}</span>
-                                    <span v-else class="text-xs text-destructive">Non vérifié</span>
-                                </dd>
-                            </div>
-                            <div class="flex items-center justify-between gap-3">
-                                <dt class="text-muted-foreground">CGU acceptées</dt>
-                                <dd>
-                                    <span v-if="user.terms_accepted_at" class="font-medium tabular-nums">{{ formatDate(user.terms_accepted_at) }}</span>
-                                    <span v-else class="text-xs text-muted-foreground">—</span>
-                                </dd>
-                            </div>
-                        </dl>
-                    </section>
-
-                    <!-- Départements -->
-                    <section class="rounded-lg border border-border bg-card">
-                        <header class="px-4 py-2.5 border-b border-border flex items-center justify-between">
-                            <h3 class="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Départements</h3>
-                            <span v-if="user.departments?.length" class="text-xs text-muted-foreground tabular-nums">{{ user.departments.length }}</span>
-                        </header>
-                        <div class="px-4 py-3">
-                            <ul v-if="user.departments?.length" class="space-y-1.5">
-                                <li
-                                    v-for="dept in user.departments"
-                                    :key="dept.id"
-                                    class="flex items-center justify-between gap-2 text-sm"
-                                >
-                                    <span class="truncate">{{ dept.name }}</span>
-                                    <Badge v-if="dept.pivot?.is_head" variant="default" class="text-[10px] shrink-0">Chef</Badge>
-                                    <Badge v-else variant="outline" class="text-[10px] shrink-0">Membre</Badge>
-                                </li>
-                            </ul>
-                            <p v-else class="text-xs text-muted-foreground">Aucun département.</p>
-                        </div>
-                    </section>
-
-                    <!-- Notifications -->
-                    <section class="rounded-lg border border-border bg-card">
-                        <header class="px-4 py-2.5 border-b border-border">
-                            <h3 class="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Notifications</h3>
-                        </header>
-                        <ul class="px-4 py-3 space-y-2.5 text-sm">
-                            <li class="flex items-center justify-between gap-3">
-                                <span class="text-muted-foreground">NDF à approuver</span>
-                                <NotifDot :enabled="!!user.notify_expense_sheet_to_approval" />
-                            </li>
-                            <li class="flex items-center justify-between gap-3">
-                                <span class="text-muted-foreground">Accusé de réception</span>
-                                <NotifDot :enabled="!!user.notify_receipt_expense_sheet" />
-                            </li>
-                            <li class="flex items-center justify-between gap-3">
-                                <span class="text-muted-foreground">Rappel d'approbation</span>
-                                <NotifDot :enabled="!!user.notify_remind_approval" />
-                            </li>
-                        </ul>
-                    </section>
-                </aside>
-            </div>
+                <!-- Empty -->
+                <div v-if="expenseSheets.length === 0" class="rounded-lg border border-dashed border-border py-10 px-4 text-center">
+                    <FileTextIcon class="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <p class="text-sm font-medium">Aucune note de frais</p>
+                    <p class="text-xs text-muted-foreground mt-0.5">
+                        Cet utilisateur n'a encore soumis aucune note de frais.
+                    </p>
+                </div>
+            </section>
 
             <!-- Modal confirmation envoi lien -->
             <AlertDialog v-model:open="showResetDialog">
@@ -340,17 +238,17 @@
 </template>
 
 <script setup>
-import { computed, h, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, usePage, router, Link } from '@inertiajs/vue3'
 import {
     AlertTriangleIcon,
     CalendarIcon,
     CheckCircleIcon,
-    ChevronRightIcon,
     ClockIcon,
     FileTextIcon,
     LoaderIcon,
     MailIcon,
+    MoreVerticalIcon,
     PencilIcon,
     TrashIcon,
     UserIcon,
@@ -361,6 +259,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
     AlertDialog,
     AlertDialogContent,
     AlertDialogHeader,
@@ -369,22 +274,9 @@ import {
     AlertDialogFooter,
 } from '@/components/ui/alert-dialog'
 
-const NotifDot = (props) =>
-    props.enabled
-        ? h('span', { class: 'inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400' }, [
-              h('span', { class: 'h-1.5 w-1.5 rounded-full bg-emerald-500' }),
-              'Activé',
-          ])
-        : h('span', { class: 'inline-flex items-center gap-1.5 text-xs text-muted-foreground' }, [
-              h('span', { class: 'h-1.5 w-1.5 rounded-full bg-muted-foreground/40' }),
-              'Désactivé',
-          ])
-NotifDot.props = ['enabled']
-
 const page = usePage()
 const user = computed(() => page.props.user)
 const expenseSheets = computed(() => page.props.expenseSheets ?? [])
-const stats = computed(() => page.props.stats ?? {})
 const canUpdate = computed(() => page.props.canUpdate)
 const canDelete = computed(() => page.props.canDelete)
 const canImpersonate = computed(() => page.props.canImpersonate)

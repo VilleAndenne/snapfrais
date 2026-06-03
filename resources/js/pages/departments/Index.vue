@@ -1,80 +1,113 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Départements" />
-        <div class="p-3 sm:p-4">
-            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
-                <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Départements</h2>
-                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
-                    <Input
-                        v-model="search"
-                        placeholder="Rechercher..."
-                        class="w-full xs:w-[200px]"
-                    >
-                        <template #leading>
-                            <SearchIcon class="h-4 w-4 text-muted-foreground" />
-                        </template>
-                    </Input>
-                    <Button @click="navigateToCreate" class="w-full xs:w-auto">
-                        <PlusIcon class="h-4 w-4 mr-2" />
-                        Ajouter
-                    </Button>
-                </div>
-            </header>
 
-            <Card>
-                <div class="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead class="text-xs sm:text-sm">Nom</TableHead>
-                                <TableHead class="hidden sm:table-cell text-xs sm:text-sm">Service supérieur</TableHead>
-                                <TableHead class="w-[80px] sm:w-[100px] text-xs sm:text-sm">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow v-for="department in filteredDepartments" :key="department.id">
-                                <TableCell class="text-xs sm:text-sm">
-                                    <div class="flex flex-col">
-                                        <span class="font-medium">{{ department.name }}</span>
-                                        <span class="sm:hidden text-xs text-muted-foreground">{{ getParentName(department.parent_id) || 'Aucun' }}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell class="hidden sm:table-cell text-xs sm:text-sm">
-                                    {{ getParentName(department.parent_id) || 'Aucun' }}
-                                </TableCell>
-                                <TableCell>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <Button variant="ghost" size="icon" @click="navigateToEdit(department.id)" class="h-8 w-8 sm:h-10 sm:w-10">
-                                        <PencilIcon class="h-3 w-3 sm:h-4 sm:w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" @click="confirmDelete(department)" class="h-8 w-8 sm:h-10 sm:w-10">
-                                        <TrashIcon class="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-                                    </Button>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-if="filteredDepartments?.length === 0">
-                            <TableCell colspan="3" class="h-20 sm:h-24 text-center text-xs sm:text-sm">
-                                Aucun département trouvé.
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                    <TableFooter v-if="departments.length > 0">
-                        <TableRow>
-                            <TableCell colspan="3" class="text-xs sm:text-sm">
-                                Total: {{ departments.length }} département{{ departments.length > 1 ? 's' : '' }}
-                            </TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Départements</h2>
+
+                <div class="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+                    <button @click="navigateToCreate" class="px-3 sm:px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center justify-center gap-2 text-sm">
+                        <PlusIcon class="h-4 w-4" />
+                        Ajouter
+                    </button>
+
+                    <div class="relative w-full">
+                        <SearchIcon class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input v-model="search" type="text" placeholder="Rechercher un département..." class="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
+                        <button v-if="search" @click="search = ''" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
-            </Card>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <Badge variant="outline" class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs">
+                    {{ filteredDepartments.length }} département{{ filteredDepartments.length > 1 ? 's' : '' }}
+                </Badge>
+            </div>
+
+            <!-- Vue Mobile (cartes) - visible uniquement sur mobile -->
+            <div class="md:hidden space-y-3">
+                <div
+                    v-for="department in filteredDepartments"
+                    :key="department.id"
+                    class="border rounded-lg p-4 bg-card space-y-3"
+                >
+                    <div class="flex items-start gap-2">
+                        <Building2Icon class="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-medium text-sm">{{ department.name }}</h3>
+                            <p class="text-xs text-muted-foreground truncate">
+                                Supérieur : {{ getParentName(department.parent_id) || 'Aucun' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t flex gap-2">
+                        <button @click="navigateToEdit(department.id)" class="flex-1 px-3 py-2 border rounded-md text-sm hover:bg-muted transition-colors flex items-center justify-center gap-1">
+                            <PencilIcon class="h-4 w-4" />
+                            Modifier
+                        </button>
+                        <button @click="confirmDelete(department)" class="px-3 py-2 border rounded-md text-sm hover:bg-muted transition-colors text-destructive">
+                            <TrashIcon class="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="filteredDepartments.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
+                    <Building2Icon class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Aucun département trouvé.</p>
+                </div>
+            </div>
+
+            <!-- Vue Desktop (tableau) - visible sur tablette et + -->
+            <div class="hidden md:block overflow-x-auto border rounded-xl">
+                <table class="min-w-full divide-y">
+                    <thead class="bg-muted">
+                    <tr>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Nom</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Service supérieur</th>
+                        <th class="px-4 lg:px-6 py-3 text-right text-xs uppercase">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                    <tr v-for="department in filteredDepartments" :key="department.id" class="hover:bg-muted/50 transition-colors">
+                        <td class="px-4 lg:px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <Building2Icon class="h-5 w-5 flex-shrink-0" />
+                                <span class="text-sm font-medium">{{ department.name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 lg:px-6 py-4 text-sm">{{ getParentName(department.parent_id) || 'Aucun' }}</td>
+                        <td class="px-4 lg:px-6 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button @click="navigateToEdit(department.id)" class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors flex items-center gap-1">
+                                    <PencilIcon class="h-4 w-4" />
+                                    Modifier
+                                </button>
+                                <button @click="confirmDelete(department)" class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors text-destructive">
+                                    <TrashIcon class="h-4 w-4" />
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div v-if="filteredDepartments.length === 0" class="text-center p-8 text-muted-foreground">
+                    <Building2Icon class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Aucun département trouvé.</p>
+                </div>
+            </div>
 
             <!-- Modal de confirmation de suppression -->
             <AlertDialog v-model:open="showDeleteDialog">
                 <AlertDialogContent class="max-w-[90vw] sm:max-w-md">
                     <AlertDialogHeader>
-                        <AlertDialogTitle class="text-base sm:text-lg">Êtes-vous sûr de vouloir supprimer ce département?</AlertDialogTitle>
+                        <AlertDialogTitle class="text-base sm:text-lg">Êtes-vous sûr de vouloir supprimer ce département ?</AlertDialogTitle>
                         <AlertDialogDescription class="text-xs sm:text-sm">
                             Cette action ne peut pas être annulée. Le département "{{ departmentToDelete?.name }}" sera
                             définitivement supprimé.
@@ -100,22 +133,12 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, usePage, router, useForm } from '@inertiajs/vue3';
-import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon } from 'lucide-vue-next';
+import { Head, usePage, router } from '@inertiajs/vue3';
+import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon, X, Building2Icon } from 'lucide-vue-next';
 
-// Import explicite des composants shadcn/ui
+// shadcn/ui
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import {
-    Table,
-    TableHeader,
-    TableBody,
-    TableFooter,
-    TableHead,
-    TableRow,
-    TableCell
-} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import {
     AlertDialog,
     AlertDialogContent,
@@ -124,10 +147,6 @@ import {
     AlertDialogDescription,
     AlertDialogFooter
 } from '@/components/ui/alert-dialog';
-import {
-    Avatar,
-    AvatarFallback
-} from '@/components/ui/avatar';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const page = usePage();
@@ -166,16 +185,10 @@ const navigateToEdit = (departmentId) => {
     router.visit(route('departments.edit', departmentId));
 };
 
-// Confirmer la suppression
+// Ouvrir la modale de confirmation
 const confirmDelete = (department) => {
     departmentToDelete.value = department;
     showDeleteDialog.value = true;
-    const formDelete = useForm({
-        id: department.id
-    });
-
-    formDelete.delete(route('departments.destroy', department.id));
-
 };
 
 // Supprimer un département
@@ -199,15 +212,5 @@ const getParentName = (parentId) => {
     if (!parentId) return null;
     const parent = departments.value.find(d => d.id === parentId);
     return parent ? parent.name : null;
-};
-
-// Obtenir les initiales d'un utilisateur
-const getUserInitials = (name) => {
-    return name
-        .split(' ')
-        .map(part => part[0])
-        .join('')
-        .toUpperCase()
-        .substring(0, 2);
 };
 </script>

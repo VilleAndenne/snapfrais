@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Imports\UsersImport;
+use App\Models\Department;
 use App\Models\User;
 use App\Notifications\AdminInitiatedPasswordReset;
 use App\Notifications\UserCreated;
@@ -49,7 +50,9 @@ class UserController extends Controller
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
 
-        return Inertia::render('users/Create');
+        return Inertia::render('users/Create', [
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
     /**
@@ -64,6 +67,9 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'is_admin' => 'boolean',
+            'departments' => 'array',
+            'departments.*.id' => 'required|integer|exists:departments,id',
+            'departments.*.is_head' => 'boolean',
         ]);
 
         $user = User::create([
@@ -72,6 +78,13 @@ class UserController extends Controller
             'password' => Str::random(40),
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
+
+        $attach = collect($validated['departments'] ?? [])
+            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => ['is_head' => $dept['is_head'] ?? false]]);
+
+        if ($attach->isNotEmpty()) {
+            $user->departments()->attach($attach);
+        }
 
         $token = Password::broker()->createToken($user);
 
@@ -101,21 +114,9 @@ class UserController extends Controller
             ->limit(10)
             ->get();
 
-        $baseQuery = $user->expenseSheets();
-
-        $stats = [
-            'total' => (clone $baseQuery)->count(),
-            'draft' => (clone $baseQuery)->where('is_draft', true)->count(),
-            'pending' => (clone $baseQuery)->where('is_draft', false)->whereNull('approved')->count(),
-            'approved' => (clone $baseQuery)->where('is_draft', false)->where('approved', true)->count(),
-            'rejected' => (clone $baseQuery)->where('is_draft', false)->where('approved', false)->count(),
-            'approved_total' => (float) (clone $baseQuery)->where('is_draft', false)->where('approved', true)->sum('total'),
-        ];
-
         return Inertia::render('users/Show', [
             'user' => $user,
             'expenseSheets' => $expenseSheets,
-            'stats' => $stats,
             'canImpersonate' => (bool) auth()->user()->super_admin && ! $user->super_admin && auth()->id() !== $user->id,
             'canUpdate' => auth()->user()->can('update', $user),
             'canDelete' => auth()->user()->can('delete', $user),
@@ -131,9 +132,11 @@ class UserController extends Controller
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $user = User::findOrFail($id);
+        $user->load('departments:id,name');
 
         return Inertia::render('users/Edit', [
             'user' => $user,
+            'departments' => Department::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -150,16 +153,24 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,'.$id,
             'password' => 'nullable|string|min:8|confirmed',
             'is_admin' => 'boolean',
+            'departments' => 'array',
+            'departments.*.id' => 'required|integer|exists:departments,id',
+            'departments.*.is_head' => 'boolean',
         ]);
 
         $user = User::findOrFail($id);
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->is_admin = $validated['is_admin'] ?? false;
-        if ($validated['password']) {
+        if (! empty($validated['password'])) {
             $user->password = bcrypt($validated['password']);
         }
         $user->save();
+
+        $sync = collect($validated['departments'] ?? [])
+            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => ['is_head' => $dept['is_head'] ?? false]]);
+
+        $user->departments()->sync($sync);
 
         return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour avec succès.');
     }
