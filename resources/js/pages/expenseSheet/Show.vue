@@ -2,7 +2,7 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`Note de frais #${expenseSheet.id}`" />
 
-        <div class="container mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
                     <h1 class="text-xl sm:text-2xl font-semibold text-foreground">Note de frais #{{ expenseSheet.id }}</h1>
@@ -525,7 +525,28 @@ const duplicateExpenseSheet = () => {
     useForm({}).post('/expense-sheet/' + props.expenseSheet.id + '/duplicate');
 };
 const printExpenseSheet = () => {
-    /* ... ton code d'impression inchangé ... */
+    const url = route('expenseSheets.pdf', props.expenseSheet.id);
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = url;
+
+    iframe.onload = () => {
+        try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+        } catch {
+            window.open(url, '_blank');
+            iframe.remove();
+        }
+    };
+
+    document.body.appendChild(iframe);
 };
 
 const getInitials = (name: string) =>

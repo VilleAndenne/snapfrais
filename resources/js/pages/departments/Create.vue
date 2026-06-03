@@ -1,40 +1,58 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Créer un département" />
-        <div class="p-6 space-y-6">
-            <header class="flex items-center justify-between">
-                <h2 class="text-2xl font-semibold tracking-tight">Créer un département</h2>
-                <Button variant="outline" @click="goBack">
-                    <ArrowLeftIcon class="h-4 w-4 mr-2" />
-                    Retour
-                </Button>
-            </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Informations du département</CardTitle>
-                    <CardDescription>
-                        Définissez les détails du nouveau département et assignez des utilisateurs.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form @submit.prevent="submitForm" class="space-y-6">
-                        <!-- Nom du département -->
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+            <!-- En-tête -->
+            <div class="space-y-1">
+                <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Créer un département</h2>
+                <p class="text-sm text-muted-foreground">
+                    Définissez le service, sa place dans la hiérarchie et assignez ses membres.
+                </p>
+            </div>
+
+            <form @submit.prevent="submitForm" class="max-w-2xl space-y-6">
+                <!-- Carte principale -->
+                <div class="rounded-xl border bg-card shadow-sm overflow-hidden">
+                    <!-- Bandeau d'aperçu en direct -->
+                    <div class="flex items-center gap-3 sm:gap-4 border-b bg-muted/30 px-5 sm:px-8 py-4">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-full border bg-background shrink-0">
+                            <Building2Icon class="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium truncate">{{ form.name || 'Nouveau département' }}</p>
+                            <p class="text-sm text-muted-foreground truncate">
+                                {{ parentName ? `Sous « ${parentName} »` : 'Département racine' }}
+                            </p>
+                        </div>
+                        <Badge v-if="form.users.length" variant="secondary" class="shrink-0">
+                            {{ form.users.length }} membre{{ form.users.length > 1 ? 's' : '' }}
+                        </Badge>
+                    </div>
+
+                    <!-- Corps -->
+                    <div class="p-5 sm:p-8 space-y-6">
+                        <!-- Nom -->
                         <div class="space-y-2">
                             <Label for="name">Nom du département</Label>
-                            <Input id="name" v-model="form.name" placeholder="Nom du département"
-                                :class="{ 'border-destructive': form.errors.name }" />
+                            <div class="relative">
+                                <Building2Icon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="name"
+                                    v-model="form.name"
+                                    placeholder="Nom du département"
+                                    :class="['pl-10', form.errors.name ? 'border-destructive focus-visible:ring-destructive' : '']"
+                                />
+                            </div>
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
-                        <!-- Département parent -->
+                        <!-- Service supérieur -->
                         <div class="space-y-2">
                             <Label for="parent">Service supérieur</Label>
-
                             <Select v-model="form.parent_id">
                                 <SelectTrigger id="parent" class="w-full">
-                                    <SelectValue :placeholder="'Aucun (département racine)'"
-                                        :defaultValue="form.parent_id" />
+                                    <SelectValue :placeholder="'Aucun (département racine)'" :defaultValue="form.parent_id" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem :value="null">Aucun (département racine)</SelectItem>
@@ -43,265 +61,281 @@
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-
-                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">{{ form.errors.parent_id }}
-                            </p>
-                            <p class="text-sm text-muted-foreground">
+                            <p v-if="form.errors.parent_id" class="text-sm text-destructive">{{ form.errors.parent_id }}</p>
+                            <p class="text-xs text-muted-foreground">
                                 Laissez vide si ce département est au plus haut niveau de la hiérarchie.
                             </p>
                         </div>
 
-
-                        <!-- Liste des utilisateurs -->
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <Label>Utilisateurs du département</Label>
-                                <div class="flex items-center gap-2">
-                                    <Input v-model="userSearch" placeholder="Rechercher un utilisateur..."
-                                        class="w-[200px]">
-                                    <template #leading>
-                                        <SearchIcon class="h-4 w-4 text-muted-foreground" />
-                                    </template>
-                                    </Input>
-                                    <Button type="button" variant="outline" size="sm" @click="toggleSelectAll">
-                                        {{ allSelected ? 'Désélectionner tout' : 'Sélectionner tout' }}
-                                    </Button>
+                        <!-- Membres -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <Label>Membres</Label>
+                                    <p class="text-xs text-muted-foreground">Assignez des utilisateurs et désignez les responsables.</p>
                                 </div>
+                                <Button type="button" variant="outline" size="sm" @click="openUserModal">
+                                    <UsersIcon class="h-4 w-4 mr-2" />
+                                    Ajouter
+                                </Button>
                             </div>
 
-                            <Card>
-                                <div class="max-h-[300px] overflow-y-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead class="w-[50px]"></TableHead>
-                                                <TableHead>Nom</TableHead>
-                                                <TableHead>Email</TableHead>
-                                                <TableHead>Rôle</TableHead>
-                                                <TableHead class="w-[120px]">Responsable</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            <TableRow v-for="user in filteredUsers" :key="user.id">
-                                                <TableCell>
-                                                    <Checkbox :id="`user-${user.id}`" :checked="isUserSelected(user.id)"
-                                                        @update:checked="toggleUser(user.id)" />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Label :for="`user-${user.id}`"
-                                                        class="flex items-center gap-2 cursor-pointer">
-                                                        <Avatar class="h-8 w-8">
-                                                            <AvatarImage :src="user.avatar" :alt="user.name" />
-                                                            <AvatarFallback>{{ getUserInitials(user.name) }}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        {{ user.name }}
-                                                    </Label>
-                                                </TableCell>
-                                                <TableCell>{{ user.email }}</TableCell>
-                                                <TableCell>{{ user.role }}</TableCell>
-                                                <TableCell>
-                                                    <div class="flex justify-center">
-                                                        <Checkbox :id="`head-${user.id}`"
-                                                            :disabled="!isUserSelected(user.id)"
-                                                            :checked="isUserHead(user.id)"
-                                                            @update:checked="toggleUserHead(user.id, $event)" />
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                            <TableRow v-if="filteredUsers.length === 0">
-                                                <TableCell colspan="5" class="h-24 text-center">
-                                                    Aucun utilisateur trouvé.
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </Card>
+                            <div v-if="form.users.length" class="flex flex-wrap gap-2">
+                                <span
+                                    v-for="member in selectedUsersDetails"
+                                    :key="member.id"
+                                    class="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-3 pr-2 text-xs"
+                                >
+                                    {{ member.name }}
+                                    <Badge v-if="member.is_head" variant="default" class="text-[10px]">Responsable</Badge>
+                                    <button type="button" @click="removeUser(member.id)" class="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors">
+                                        <XIcon class="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </div>
+                            <button
+                                v-else
+                                type="button"
+                                @click="openUserModal"
+                                class="w-full rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                            >
+                                <UsersIcon class="mx-auto h-5 w-5 mb-1 opacity-60" />
+                                Aucun membre assigné — cliquez pour en ajouter
+                            </button>
                             <p v-if="form.errors.users" class="text-sm text-destructive">{{ form.errors.users }}</p>
-                            <p class="text-sm text-muted-foreground">
-                                Cochez la case "Responsable" pour désigner un utilisateur comme responsable du
-                                département.
-                            </p>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="flex justify-end gap-2">
-                            <Button type="button" variant="outline" @click="goBack">Annuler</Button>
-                            <Button type="submit" :disabled="form.processing">
-                                <LoaderIcon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                                Créer
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+                <!-- Boutons d'action -->
+                <div class="flex flex-col-reverse xs:flex-row items-stretch xs:items-center gap-3">
+                    <Button type="submit" :disabled="form.processing" class="w-full xs:w-auto">
+                        <LoaderIcon v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        {{ form.processing ? 'Création...' : 'Créer le département' }}
+                    </Button>
+                    <Button type="button" variant="outline" @click="goBack" class="w-full xs:w-auto">
+                        Annuler
+                    </Button>
+                </div>
+            </form>
         </div>
+
+        <!-- Modale de sélection des membres -->
+        <Dialog v-model:open="showUserModal">
+            <DialogContent class="max-w-[90vw] sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Assigner des membres</DialogTitle>
+                    <DialogDescription>
+                        Cochez les utilisateurs à rattacher. Cochez « Responsable du service » pour en faire un chef.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <SearchIcon class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input
+                            v-model="userSearch"
+                            type="text"
+                            placeholder="Rechercher un utilisateur..."
+                            class="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                        />
+                    </div>
+                    <Button type="button" variant="outline" size="sm" @click="toggleSelectAll" class="shrink-0">
+                        {{ allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
+                    </Button>
+                </div>
+
+                <div class="max-h-[55vh] overflow-y-auto -mx-1 px-1">
+                    <p v-if="props.users.length === 0" class="py-6 text-center text-sm text-muted-foreground">
+                        Aucun utilisateur disponible.
+                    </p>
+                    <p v-else-if="filteredModalUsers.length === 0" class="py-6 text-center text-sm text-muted-foreground">
+                        Aucun utilisateur ne correspond à « {{ userSearch }} ».
+                    </p>
+                    <ul v-else class="divide-y">
+                        <li
+                            v-for="user in filteredModalUsers"
+                            :key="user.id"
+                            class="flex items-center justify-between gap-3 py-2.5"
+                        >
+                            <label class="flex items-center gap-2.5 text-sm cursor-pointer min-w-0">
+                                <input
+                                    type="checkbox"
+                                    :checked="draft[user.id]?.selected"
+                                    @change="toggleSelected(user.id)"
+                                    class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                />
+                                <span class="min-w-0">
+                                    <span class="block truncate">{{ user.name }}</span>
+                                    <span class="block text-xs text-muted-foreground truncate">{{ user.email }}</span>
+                                </span>
+                            </label>
+
+                            <label
+                                class="flex items-center gap-2 text-xs whitespace-nowrap"
+                                :class="draft[user.id]?.selected ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :checked="draft[user.id]?.is_head"
+                                    :disabled="!draft[user.id]?.selected"
+                                    @change="toggleHead(user.id)"
+                                    class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                />
+                                Responsable du service
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button type="button" variant="outline" @click="showUserModal = false" class="w-full xs:w-auto">
+                        Annuler
+                    </Button>
+                    <Button type="button" @click="applyUsers" class="w-full xs:w-auto">
+                        Valider
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
-import {
-    ArrowLeftIcon,
-    SearchIcon,
-    LoaderIcon
-} from 'lucide-vue-next';
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
+import { SearchIcon, LoaderIcon, Building2Icon, UsersIcon, XIcon } from 'lucide-vue-next';
 
-// Import explicite des composants shadcn/ui
+// shadcn/ui
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent
-} from '@/components/ui/card';
-import {
-    Table,
-    TableHeader,
-    TableBody,
-    TableHead,
-    TableRow,
-    TableCell
-} from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Avatar,
-    AvatarImage,
-    AvatarFallback
-} from '@/components/ui/avatar';
-import AppLayout from '@/layouts/AppLayout.vue';
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog';
 import Select from '@/components/ui/select/Select.vue';
 import SelectTrigger from '@/components/ui/select/SelectTrigger.vue';
 import SelectValue from '@/components/ui/select/SelectValue.vue';
 import SelectContent from '@/components/ui/select/SelectContent.vue';
 import SelectItem from '@/components/ui/select/SelectItem.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 
 const breadcrumbs = [
     { title: 'Départements', href: route('departments.index') },
-    { title: 'Créer un département' }
+    { title: 'Créer un département' },
 ];
 
-// Props
 const props = defineProps({
     departments: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     users: {
         type: Array,
-        default: () => []
-    }
+        default: () => [],
+    },
 });
-
-// État
-const userSearch = ref('');
 
 // Formulaire Inertia
 const form = useForm({
     name: '',
     parent_id: null,
-    users: []
+    users: [], // [{ id, is_head }]
 });
 
-// Filtrer les utilisateurs en fonction de la recherche
-const filteredUsers = computed(() => {
-    if (!userSearch.value) return props.users;
+const parentName = computed(() =>
+    props.departments.find((d) => d.id === form.parent_id)?.name ?? null
+);
 
-    const query = userSearch.value.toLowerCase();
-    return props.users.filter(user =>
-        user.name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        user.role?.toLowerCase().includes(query)
+const selectedUsersDetails = computed(() =>
+    form.users.map((u) => ({
+        id: u.id,
+        name: props.users.find((user) => user.id === u.id)?.name ?? `#${u.id}`,
+        is_head: u.is_head,
+    }))
+);
+
+const removeUser = (id) => {
+    form.users = form.users.filter((u) => u.id !== id);
+};
+
+// === Modale membres ===
+const showUserModal = ref(false);
+const draft = ref({}); // { [id]: { selected, is_head } }
+const userSearch = ref('');
+
+const filteredModalUsers = computed(() => {
+    const term = userSearch.value.trim().toLowerCase();
+    if (!term) {
+        return props.users;
+    }
+    return props.users.filter(
+        (user) =>
+            user.name.toLowerCase().includes(term) ||
+            user.email?.toLowerCase().includes(term)
     );
 });
 
-// Vérifier si un utilisateur est sélectionné
-const isUserSelected = (userId) => {
-    return form.users.some(user => user.id === userId);
+const allFilteredSelected = computed(() =>
+    filteredModalUsers.value.length > 0 &&
+    filteredModalUsers.value.every((u) => draft.value[u.id]?.selected)
+);
+
+const openUserModal = () => {
+    const state = {};
+    for (const user of props.users) {
+        const existing = form.users.find((u) => u.id === user.id);
+        state[user.id] = {
+            selected: !!existing,
+            is_head: existing?.is_head ?? false,
+        };
+    }
+    draft.value = state;
+    userSearch.value = '';
+    showUserModal.value = true;
 };
 
-// Vérifier si un utilisateur est responsable
-const isUserHead = (userId) => {
-    const user = form.users.find(user => user.id === userId);
-    return user ? user.is_head : false;
-};
-
-// Vérifier si tous les utilisateurs sont sélectionnés
-const allSelected = computed(() => {
-    return filteredUsers.value.length > 0 &&
-        filteredUsers.value.every(user => isUserSelected(user.id));
-});
-
-// Basculer la sélection d'un utilisateur
-const toggleUser = (userId) => {
-    const index = form.users.findIndex(user => user.id === userId);
-    if (index === -1) {
-        // Ajouter l'utilisateur
-        form.users.push({
-            id: userId,
-            is_head: false
-        });
-    } else {
-        // Supprimer l'utilisateur
-        form.users.splice(index, 1);
+const toggleSelected = (id) => {
+    const entry = draft.value[id];
+    entry.selected = !entry.selected;
+    if (!entry.selected) {
+        entry.is_head = false;
     }
 };
 
-// Basculer le statut de responsable d'un utilisateur
-const toggleUserHead = (userId, isHead) => {
-    const index = form.users.findIndex(user => user.id === userId);
-    if (index !== -1) {
-        form.users[index].is_head = isHead;
+const toggleHead = (id) => {
+    const entry = draft.value[id];
+    if (!entry.selected) {
+        return;
     }
+    entry.is_head = !entry.is_head;
 };
 
-// Sélectionner/désélectionner tous les utilisateurs
 const toggleSelectAll = () => {
-    if (allSelected.value) {
-        // Désélectionner tous les utilisateurs filtrés
-        form.users = form.users.filter(
-            user => !filteredUsers.value.some(filteredUser => filteredUser.id === user.id)
-        );
-    } else {
-        // Sélectionner tous les utilisateurs filtrés
-        const currentUserIds = form.users.map(user => user.id);
-
-        // Ajouter uniquement les utilisateurs qui ne sont pas déjà sélectionnés
-        filteredUsers.value.forEach(user => {
-            if (!currentUserIds.includes(user.id)) {
-                form.users.push({
-                    id: user.id,
-                    is_head: false
-                });
-            }
-        });
+    const target = !allFilteredSelected.value;
+    for (const user of filteredModalUsers.value) {
+        draft.value[user.id].selected = target;
+        if (!target) {
+            draft.value[user.id].is_head = false;
+        }
     }
 };
 
-// Obtenir les initiales d'un utilisateur
-const getUserInitials = (name) => {
-    return name
-        .split(' ')
-        .map(part => part[0])
-        .join('')
-        .toUpperCase()
-        .substring(0, 2);
+const applyUsers = () => {
+    form.users = Object.entries(draft.value)
+        .filter(([, v]) => v.selected)
+        .map(([id, v]) => ({ id: Number(id), is_head: v.is_head }));
+    showUserModal.value = false;
 };
 
 // Soumettre le formulaire
 const submitForm = () => {
-    // Assurez-vous que les données sont correctement formatées
-    const formattedUsers = form.users.map(user => ({
-        id: user.id,
-        is_head: user.is_head ? 1 : 0  // Convertir en 1/0 pour le backend
-    }));
-
-    form.users = formattedUsers;
     form.post(route('departments.store'));
 };
 
