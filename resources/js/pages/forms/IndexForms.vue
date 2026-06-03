@@ -2,100 +2,130 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Formulaires" />
 
-        <div class="p-3 sm:p-4">
+        <div class="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
             <!-- Header -->
-            <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Formulaires</h2>
-                <div class="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
-                    <Input
-                        v-model="filters.search"
-                        placeholder="Rechercher un formulaire..."
-                        class="w-full xs:w-[260px]"
-                    >
-                        <template #leading>
-                            <SearchIcon class="h-4 w-4 text-muted-foreground" />
-                        </template>
-                    </Input>
-                    <Button @click="addForm" class="w-full xs:w-auto">
-                        <PlusIcon class="h-4 w-4 mr-2" />
+
+                <div class="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+                    <button @click="addForm" class="px-3 sm:px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex items-center justify-center gap-2 text-sm">
+                        <PlusIcon class="h-4 w-4" />
                         Ajouter
-                    </Button>
+                    </button>
+
+                    <div class="relative w-full">
+                        <SearchIcon class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input v-model="filters.search" type="text" placeholder="Rechercher un formulaire..." class="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
+                        <button v-if="filters.search" @click="filters.search = ''" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
-            </header>
+            </div>
 
-            <Card>
-                <div class="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead class="text-xs sm:text-sm">Nom du formulaire</TableHead>
-                                <TableHead class="hidden sm:table-cell text-xs sm:text-sm">Description</TableHead>
-                                <TableHead class="w-[80px] sm:w-[120px] text-right text-xs sm:text-sm">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
+            <div class="flex items-center justify-between">
+                <Badge variant="outline" class="px-2 sm:px-3 py-0.5 sm:py-1 text-xs">
+                    {{ totalCount }} formulaire{{ totalCount > 1 ? 's' : '' }}
+                </Badge>
+            </div>
 
-                        <TableBody>
-                            <TableRow v-for="form in currentRows" :key="form.id">
-                                <TableCell class="font-medium text-xs sm:text-sm">
-                                    <div class="flex flex-col">
-                                        <span>{{ form.name }}</span>
-                                        <span class="sm:hidden text-xs text-muted-foreground line-clamp-2">{{ form.description }}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell class="hidden sm:table-cell text-xs sm:text-sm">{{ form.description }}</TableCell>
-                                <TableCell class="text-right">
-                                <div class="flex justify-end gap-1 sm:gap-2">
-                                    <Button variant="ghost" size="icon" @click="editForm(form.id)" class="h-8 w-8 sm:h-10 sm:w-10">
-                                        <PencilIcon class="h-3 w-3 sm:h-4 sm:w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" @click="confirmDelete(form)" class="h-8 w-8 sm:h-10 sm:w-10">
-                                        <TrashIcon class="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-                                    </Button>
-                                </div>
-                            </TableCell>
-                        </TableRow>
+            <!-- Vue Mobile (cartes) - visible uniquement sur mobile -->
+            <div class="md:hidden space-y-3">
+                <div
+                    v-for="form in currentRows"
+                    :key="form.id"
+                    class="border rounded-lg p-4 bg-card space-y-3"
+                >
+                    <div class="flex items-start gap-2">
+                        <FileText class="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-medium text-sm">{{ form.name }}</h3>
+                            <p class="text-xs text-muted-foreground line-clamp-2">{{ form.description }}</p>
+                        </div>
+                    </div>
 
-                        <TableRow v-if="currentRows.length === 0">
-                            <TableCell colspan="3" class="h-20 sm:h-24 text-center text-xs sm:text-sm">Pas de formulaire trouvé.</TableCell>
-                        </TableRow>
-                    </TableBody>
-
-                    <TableFooter v-if="totalCount > 0">
-                        <TableRow>
-                            <TableCell colspan="3" class="text-xs sm:text-sm">
-                                Total: {{ totalCount }} formulaire{{ totalCount > 1 ? 's' : '' }}
-                            </TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
+                    <div class="pt-2 border-t flex gap-2">
+                        <button @click="editForm(form.id)" class="flex-1 px-3 py-2 border rounded-md text-sm hover:bg-muted transition-colors flex items-center justify-center gap-1">
+                            <PencilIcon class="h-4 w-4" />
+                            Modifier
+                        </button>
+                        <button @click="confirmDelete(form)" class="px-3 py-2 border rounded-md text-sm hover:bg-muted transition-colors text-destructive">
+                            <TrashIcon class="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
-            </Card>
+
+                <div v-if="currentRows.length === 0" class="text-center p-8 text-muted-foreground border rounded-lg">
+                    <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Pas de formulaire trouvé.</p>
+                </div>
+            </div>
+
+            <!-- Vue Desktop (tableau) - visible sur tablette et + -->
+            <div class="hidden md:block overflow-x-auto border rounded-xl">
+                <table class="min-w-full divide-y">
+                    <thead class="bg-muted">
+                    <tr>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Nom du formulaire</th>
+                        <th class="px-4 lg:px-6 py-3 text-left text-xs uppercase">Description</th>
+                        <th class="px-4 lg:px-6 py-3 text-right text-xs uppercase">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                    <tr v-for="form in currentRows" :key="form.id" class="hover:bg-muted/50 transition-colors">
+                        <td class="px-4 lg:px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <FileText class="h-5 w-5 flex-shrink-0" />
+                                <span class="text-sm font-medium">{{ form.name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 lg:px-6 py-4 text-sm">{{ form.description }}</td>
+                        <td class="px-4 lg:px-6 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button @click="editForm(form.id)" class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors flex items-center gap-1">
+                                    <PencilIcon class="h-4 w-4" />
+                                    Modifier
+                                </button>
+                                <button @click="confirmDelete(form)" class="px-3 py-1.5 border rounded-md text-sm hover:bg-muted transition-colors text-destructive">
+                                    <TrashIcon class="h-4 w-4" />
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div v-if="currentRows.length === 0" class="text-center p-8 text-muted-foreground">
+                    <FileText class="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <p class="text-sm">Pas de formulaire trouvé.</p>
+                </div>
+            </div>
 
             <!-- Pagination (affichée uniquement si pagination serveur) -->
-            <div v-if="isPaginated && totalCount > 0" class="mt-3 sm:mt-4 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2">
-                <div class="text-xs sm:text-sm text-muted-foreground">
+            <div v-if="isPaginated && totalCount > 0" class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+                <div class="text-sm text-muted-foreground order-2 sm:order-1">
                     Affichage de {{ meta.from }} à {{ meta.to }} sur {{ meta.total }} formulaires
                 </div>
-                <div class="flex gap-1 sm:gap-2 w-full xs:w-auto">
-                    <Button
-                        variant="outline"
-                        size="sm"
+                <nav class="flex items-center gap-1 order-1 sm:order-2">
+                    <button
                         :disabled="!meta.prev_page_url"
                         @click="goToPage(meta.current_page - 1)"
-                        class="flex-1 xs:flex-initial text-xs sm:text-sm"
+                        class="px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-1"
+                        :class="meta.prev_page_url ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'"
                     >
+                        <ChevronLeft class="h-4 w-4" />
                         Précédent
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
+                    </button>
+                    <button
                         :disabled="!meta.next_page_url"
                         @click="goToPage(meta.current_page + 1)"
-                        class="flex-1 xs:flex-initial text-xs sm:text-sm"
+                        class="px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-1"
+                        :class="meta.next_page_url ? 'hover:bg-muted' : 'opacity-50 cursor-not-allowed'"
                     >
                         Suivant
-                    </Button>
-                </div>
+                        <ChevronRight class="h-4 w-4" />
+                    </button>
+                </nav>
             </div>
 
             <!-- Modal de confirmation de suppression -->
@@ -123,21 +153,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
-import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon } from 'lucide-vue-next'
+import { PlusIcon, SearchIcon, PencilIcon, TrashIcon, LoaderIcon, X, FileText, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 // shadcn/ui
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
-import {
-    Table,
-    TableHeader,
-    TableBody,
-    TableFooter,
-    TableHead,
-    TableRow,
-    TableCell
-} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import {
     AlertDialog,
     AlertDialogContent,
