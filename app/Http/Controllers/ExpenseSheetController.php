@@ -150,6 +150,7 @@ class ExpenseSheetController extends Controller
                     'costs.*.date' => 'required|date',
                     'costs.*.requirements' => 'nullable|array',
                     'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
+                    'costs.*.requirements.*.value' => 'nullable|string',
                     'department_id' => 'required|exists:departments,id',
                     'target_user_id' => 'nullable|exists:users,id',
                     'is_draft' => 'required|boolean',
@@ -521,6 +522,8 @@ class ExpenseSheetController extends Controller
             'costs.*.date' => 'required|date',
             'costs.*.requirements' => 'nullable|array',
             'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
+            'costs.*.requirements.*.value' => 'nullable|string',
+            'costs.*.requirements.*.existing_file' => 'nullable|string',
         ], [
             'costs.*.requirements.*.file.mimes' => 'Les annexes doivent être au format PDF ou image (JPG, PNG, GIF, WEBP, HEIC).',
             'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',

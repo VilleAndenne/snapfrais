@@ -104,6 +104,7 @@ class ExpenseSheetController extends BaseController
                 'costs.*.date' => 'required|date',
                 'costs.*.requirements' => 'nullable|array',
                 'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
+                'costs.*.requirements.*.value' => 'nullable|string',
                 'department_id' => 'required|exists:departments,id',
                 'target_user_id' => 'nullable|exists:users,id',
                 'is_draft' => 'required|boolean',
@@ -433,6 +434,7 @@ class ExpenseSheetController extends BaseController
                 'costs.*.id' => 'nullable|exists:expense_sheet_costs,id',
                 'costs.*.requirements' => 'nullable|array',
                 'costs.*.requirements.*.file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:20480',
+                'costs.*.requirements.*.value' => 'nullable|string',
                 'department_id' => 'required|exists:departments,id',
                 'is_draft' => 'required|boolean',
             ], [
