@@ -53,6 +53,16 @@
                 >
                     <!-- Boutons d'action -->
                     <div class="absolute right-2 top-2 flex gap-1 sm:gap-2">
+                        <Button
+                            v-if="canUseMultiDate(cost)"
+                            variant="ghost"
+                            size="icon"
+                            class="h-8 w-8 sm:h-10 sm:w-10 text-primary"
+                            title="Répartir ce coût sur plusieurs dates"
+                            @click="openMultiDateDialog(index)"
+                        >
+                            <CalendarPlusIcon class="h-4 w-4 sm:h-5 sm:w-5" />
+                        </Button>
                         <Button variant="ghost" size="icon" class="h-8 w-8 sm:h-10 sm:w-10 text-primary" @click="openDuplicateDialog(index)">
                             <CopyIcon class="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
@@ -170,6 +180,59 @@
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <!-- Modal de répartition sur plusieurs dates -->
+        <Dialog v-model:open="multiDateDialog.isOpen">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="text-base sm:text-lg">Répartir sur plusieurs dates</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">
+                        Sélectionnez les dates auxquelles vous avez effectué "{{ multiDateDialog.costName }}". Une copie du coût sera créée pour chaque date.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="py-3 sm:py-4">
+                    <!-- Navigation des mois -->
+                    <div class="mb-3 flex items-center justify-between">
+                        <Button type="button" variant="ghost" size="icon" class="h-8 w-8" @click="prevMonth">
+                            <ChevronLeftIcon class="h-4 w-4" />
+                        </Button>
+                        <span class="text-sm font-medium capitalize">{{ calendarLabel }}</span>
+                        <Button type="button" variant="ghost" size="icon" class="h-8 w-8" @click="nextMonth">
+                            <ChevronRightIcon class="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <!-- Jours de la semaine -->
+                    <div class="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+                        <span v-for="wd in weekdays" :key="wd">{{ wd }}</span>
+                    </div>
+
+                    <!-- Grille des jours -->
+                    <div class="grid grid-cols-7 gap-1">
+                        <template v-for="(cell, i) in calendarCells" :key="i">
+                            <div v-if="!cell" />
+                            <button
+                                v-else
+                                type="button"
+                                :class="[
+                                    'flex h-9 items-center justify-center rounded text-sm transition-colors',
+                                    isDateSelected(cell.iso) ? 'bg-primary font-semibold text-primary-foreground' : 'text-foreground hover:bg-muted',
+                                ]"
+                                @click="toggleDate(cell.iso)"
+                            >
+                                {{ cell.day }}
+                            </button>
+                        </template>
+                    </div>
+
+                    <p class="mt-3 text-xs text-muted-foreground">{{ multiDateDialog.dates.length }} date(s) sélectionnée(s)</p>
+                </div>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="multiDateDialog.isOpen = false" class="w-full xs:w-auto">Annuler</Button>
+                    <Button @click="confirmMultiDate" class="w-full xs:w-auto">Ajouter les coûts</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
@@ -181,7 +244,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { CopyIcon, Loader2Icon, Trash2Icon } from 'lucide-vue-next';
+import { CalendarPlusIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, Loader2Icon, Trash2Icon } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
@@ -337,6 +400,135 @@ const confirmDuplicate = () => {
 
     // Fermer le modal
     duplicateDialog.value.isOpen = false;
+};
+
+// Répartition d'un coût sur plusieurs dates
+// Disponible pour les coûts sans annexe (prérequis de type fichier) : km,
+// pourcentage et fixe. Les éventuels prérequis texte sont recopiés sur chaque date.
+const hasAnnexeRequirement = (cost) => (cost.requirements || []).some((r) => r.type === 'file');
+const canUseMultiDate = (cost) => !hasAnnexeRequirement(cost);
+
+const multiDateDialog = ref({
+    isOpen: false,
+    costIndex: -1,
+    costName: '',
+    dates: [],
+});
+
+// Calendrier de sélection multi-dates
+const weekdays = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
+const monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const calendarMonth = ref({ year: 2026, month: 0 });
+
+const pad = (n) => String(n).padStart(2, '0');
+const toIso = (year, month, day) => `${year}-${pad(month + 1)}-${pad(day)}`;
+
+const calendarLabel = computed(() => `${monthNames[calendarMonth.value.month]} ${calendarMonth.value.year}`);
+
+const calendarCells = computed(() => {
+    const { year, month } = calendarMonth.value;
+    const offset = (new Date(year, month, 1).getDay() + 6) % 7; // lundi = 0
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < offset; i++) {
+        cells.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+        cells.push({ day: d, iso: toIso(year, month, d) });
+    }
+    return cells;
+});
+
+const isDateSelected = (iso) => multiDateDialog.value.dates.includes(iso);
+
+const toggleDate = (iso) => {
+    const dates = multiDateDialog.value.dates;
+    const idx = dates.indexOf(iso);
+    if (idx === -1) {
+        dates.push(iso);
+    } else {
+        dates.splice(idx, 1);
+    }
+};
+
+const prevMonth = () => {
+    const { year, month } = calendarMonth.value;
+    calendarMonth.value = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
+};
+
+const nextMonth = () => {
+    const { year, month } = calendarMonth.value;
+    calendarMonth.value = month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+};
+
+const openMultiDateDialog = (index) => {
+    const cost = selectedCosts.value[index];
+    const now = new Date();
+    calendarMonth.value = { year: now.getFullYear(), month: now.getMonth() };
+    multiDateDialog.value = {
+        isOpen: true,
+        costIndex: index,
+        costName: cost.name,
+        dates: [],
+    };
+};
+
+const buildCostDataForDate = (cost, sourceData, date) => {
+    const rate = getActiveRate(cost, date);
+
+    // Recopie des prérequis texte (les annexes sont exclues via canUseMultiDate)
+    const requirements = {};
+    Object.entries(sourceData.requirements || {}).forEach(([key, value]) => {
+        if (!(value instanceof File)) {
+            requirements[key] = value;
+        }
+    });
+
+    const data = {
+        date,
+        kmData: JSON.parse(JSON.stringify(sourceData.kmData || {})),
+        percentageData: {
+            paidAmount: sourceData.percentageData?.paidAmount ?? null,
+            percentage: rate,
+            reimbursedAmount: 0,
+        },
+        requirements,
+        fixedAmount: rate,
+    };
+
+    if (cost.type === 'percentage') {
+        const paid = data.percentageData.paidAmount;
+        if (paid !== null && typeof paid !== 'undefined' && paid !== '') {
+            data.percentageData.reimbursedAmount = (paid * rate) / 100;
+        }
+    }
+
+    return data;
+};
+
+const confirmMultiDate = () => {
+    const { costIndex, dates } = multiDateDialog.value;
+
+    const validDates = [...new Set(dates.filter((d) => !!d))];
+    if (!validDates.length) {
+        multiDateDialog.value.isOpen = false;
+        return;
+    }
+
+    if (selectedCosts.value.length + validDates.length > 30) {
+        alert(`Vous ne pouvez pas ajouter ${validDates.length} coûts. Maximum 30 coûts au total.`);
+        return;
+    }
+
+    const originalCost = selectedCosts.value[costIndex];
+    const originalData = costData.value[costIndex];
+
+    validDates.forEach((date) => {
+        selectedCosts.value.push(originalCost);
+        costData.value.push(buildCostDataForDate(originalCost, originalData, date));
+    });
+
+    multiDateDialog.value.isOpen = false;
 };
 
 const submitted = ref(false);
