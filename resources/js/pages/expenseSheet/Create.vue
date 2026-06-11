@@ -53,6 +53,16 @@
                 >
                     <!-- Boutons d'action -->
                     <div class="absolute right-2 top-2 flex gap-1 sm:gap-2">
+                        <Button
+                            v-if="canUseMultiDate(cost)"
+                            variant="ghost"
+                            size="icon"
+                            class="h-8 w-8 sm:h-10 sm:w-10 text-primary"
+                            title="Répartir ce coût sur plusieurs dates"
+                            @click="openMultiDateDialog(index)"
+                        >
+                            <CalendarPlusIcon class="h-4 w-4 sm:h-5 sm:w-5" />
+                        </Button>
                         <Button variant="ghost" size="icon" class="h-8 w-8 sm:h-10 sm:w-10 text-primary" @click="openDuplicateDialog(index)">
                             <CopyIcon class="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
@@ -170,6 +180,43 @@
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <!-- Modal de répartition sur plusieurs dates -->
+        <Dialog v-model:open="multiDateDialog.isOpen">
+            <DialogContent class="max-w-[90vw] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="text-base sm:text-lg">Répartir sur plusieurs dates</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm">
+                        Sélectionnez les dates auxquelles vous avez effectué "{{ multiDateDialog.costName }}". Une copie du coût sera créée pour chaque date.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="max-h-[50vh] space-y-2 overflow-y-auto py-3 sm:py-4">
+                    <div v-for="(d, i) in multiDateDialog.dates" :key="i" class="flex items-center gap-2">
+                        <input
+                            type="date"
+                            v-model="multiDateDialog.dates[i]"
+                            class="w-full rounded border border-border bg-background p-1.5 sm:p-2 text-sm sm:text-base text-foreground"
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            class="h-8 w-8 shrink-0 text-destructive"
+                            :disabled="multiDateDialog.dates.length <= 1"
+                            @click="removeMultiDateRow(i)"
+                        >
+                            <Trash2Icon class="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <Button variant="outline" size="sm" class="w-full" @click="addMultiDateRow">
+                        <PlusIcon class="mr-2 h-4 w-4" /> Ajouter une date
+                    </Button>
+                </div>
+                <DialogFooter class="flex-col xs:flex-row gap-2">
+                    <Button variant="outline" @click="multiDateDialog.isOpen = false" class="w-full xs:w-auto">Annuler</Button>
+                    <Button @click="confirmMultiDate" class="w-full xs:w-auto">Ajouter les coûts</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
@@ -181,7 +228,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { CopyIcon, Loader2Icon, Trash2Icon } from 'lucide-vue-next';
+import { CalendarPlusIcon, CopyIcon, Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
@@ -337,6 +384,87 @@ const confirmDuplicate = () => {
 
     // Fermer le modal
     duplicateDialog.value.isOpen = false;
+};
+
+// Répartition d'un coût sur plusieurs dates
+// Disponible uniquement pour les coûts sans prérequis (annexe ou texte)
+// et remboursés au pourcentage ou au montant fixe.
+const canUseMultiDate = (cost) => !cost.requirements?.length && (cost.type === 'percentage' || cost.type === 'fixed');
+
+const multiDateDialog = ref({
+    isOpen: false,
+    costIndex: -1,
+    costName: '',
+    dates: [],
+});
+
+const openMultiDateDialog = (index) => {
+    const cost = selectedCosts.value[index];
+    const today = new Date().toISOString().split('T')[0];
+    multiDateDialog.value = {
+        isOpen: true,
+        costIndex: index,
+        costName: cost.name,
+        dates: [today],
+    };
+};
+
+const addMultiDateRow = () => {
+    const today = new Date().toISOString().split('T')[0];
+    multiDateDialog.value.dates.push(today);
+};
+
+const removeMultiDateRow = (i) => {
+    multiDateDialog.value.dates.splice(i, 1);
+};
+
+const buildCostDataForDate = (cost, sourceData, date) => {
+    const rate = getActiveRate(cost, date);
+    const data = {
+        date,
+        kmData: { ...sourceData.kmData },
+        percentageData: {
+            paidAmount: sourceData.percentageData?.paidAmount ?? null,
+            percentage: rate,
+            reimbursedAmount: 0,
+        },
+        requirements: {},
+        fixedAmount: rate,
+    };
+
+    if (cost.type === 'percentage') {
+        const paid = data.percentageData.paidAmount;
+        if (paid !== null && typeof paid !== 'undefined' && paid !== '') {
+            data.percentageData.reimbursedAmount = (paid * rate) / 100;
+        }
+    }
+
+    return data;
+};
+
+const confirmMultiDate = () => {
+    const { costIndex, dates } = multiDateDialog.value;
+
+    const validDates = [...new Set(dates.filter((d) => !!d))];
+    if (!validDates.length) {
+        multiDateDialog.value.isOpen = false;
+        return;
+    }
+
+    if (selectedCosts.value.length + validDates.length > 30) {
+        alert(`Vous ne pouvez pas ajouter ${validDates.length} coûts. Maximum 30 coûts au total.`);
+        return;
+    }
+
+    const originalCost = selectedCosts.value[costIndex];
+    const originalData = costData.value[costIndex];
+
+    validDates.forEach((date) => {
+        selectedCosts.value.push(originalCost);
+        costData.value.push(buildCostDataForDate(originalCost, originalData, date));
+    });
+
+    multiDateDialog.value.isOpen = false;
 };
 
 const submitted = ref(false);
