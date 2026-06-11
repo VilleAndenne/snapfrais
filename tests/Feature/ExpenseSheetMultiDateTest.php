@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
+use App\Models\ExpenseSheet;
 use App\Models\ExpenseSheetCost;
 use App\Models\Form;
 use App\Models\FormCost;
@@ -69,6 +70,56 @@ class ExpenseSheetMultiDateTest extends TestCase
 
         foreach ($dates as $date) {
             $this->assertDatabaseHas('expense_sheet_costs', [
+                'form_cost_id' => $context['formCost']->id,
+                'date' => $date,
+                'total' => 25,
+            ]);
+        }
+    }
+
+    public function test_multi_date_update_replaces_with_one_cost_per_date(): void
+    {
+        $context = $this->bootstrap();
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $expenseSheet = ExpenseSheet::create([
+            'user_id' => $context['user']->id,
+            'created_by' => $context['user']->id,
+            'status' => 'En attente',
+            'total' => 25,
+            'form_id' => $context['form']->id,
+            'department_id' => $context['department']->id,
+            'is_draft' => false,
+        ]);
+        $expenseSheet->costs()->create([
+            'form_cost_id' => $context['formCost']->id,
+            'type' => 'fixed',
+            'total' => 25,
+            'date' => '2026-04-01',
+            'requirements' => json_encode([]),
+        ]);
+
+        $dates = ['2026-06-01', '2026-06-08', '2026-06-15'];
+
+        $payload = [
+            '_method' => 'PUT',
+            'department_id' => $context['department']->id,
+            'costs' => array_map(fn (string $date): array => [
+                'cost_id' => $context['formCost']->id,
+                'data' => ['amount' => 25],
+                'date' => $date,
+            ], $dates),
+        ];
+
+        $response = $this->actingAs($admin)
+            ->put("/expense-sheet/{$expenseSheet->id}", $payload);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(3, ExpenseSheetCost::count());
+
+        foreach ($dates as $date) {
+            $this->assertDatabaseHas('expense_sheet_costs', [
+                'expense_sheet_id' => $expenseSheet->id,
                 'form_cost_id' => $context['formCost']->id,
                 'date' => $date,
                 'total' => 25,
