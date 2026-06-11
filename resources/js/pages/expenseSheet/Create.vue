@@ -387,9 +387,10 @@ const confirmDuplicate = () => {
 };
 
 // Répartition d'un coût sur plusieurs dates
-// Disponible uniquement pour les coûts sans prérequis (annexe ou texte)
-// et remboursés au pourcentage ou au montant fixe.
-const canUseMultiDate = (cost) => !cost.requirements?.length && (cost.type === 'percentage' || cost.type === 'fixed');
+// Disponible pour les coûts sans annexe (prérequis de type fichier) : km,
+// pourcentage et fixe. Les éventuels prérequis texte sont recopiés sur chaque date.
+const hasAnnexeRequirement = (cost) => (cost.requirements || []).some((r) => r.type === 'file');
+const canUseMultiDate = (cost) => !hasAnnexeRequirement(cost);
 
 const multiDateDialog = ref({
     isOpen: false,
@@ -420,15 +421,24 @@ const removeMultiDateRow = (i) => {
 
 const buildCostDataForDate = (cost, sourceData, date) => {
     const rate = getActiveRate(cost, date);
+
+    // Recopie des prérequis texte (les annexes sont exclues via canUseMultiDate)
+    const requirements = {};
+    Object.entries(sourceData.requirements || {}).forEach(([key, value]) => {
+        if (!(value instanceof File)) {
+            requirements[key] = value;
+        }
+    });
+
     const data = {
         date,
-        kmData: { ...sourceData.kmData },
+        kmData: JSON.parse(JSON.stringify(sourceData.kmData || {})),
         percentageData: {
             paidAmount: sourceData.percentageData?.paidAmount ?? null,
             percentage: rate,
             reimbursedAmount: 0,
         },
-        requirements: {},
+        requirements,
         fixedAmount: rate,
     };
 
