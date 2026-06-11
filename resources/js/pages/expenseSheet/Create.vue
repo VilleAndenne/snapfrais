@@ -190,26 +190,42 @@
                         Sélectionnez les dates auxquelles vous avez effectué "{{ multiDateDialog.costName }}". Une copie du coût sera créée pour chaque date.
                     </DialogDescription>
                 </DialogHeader>
-                <div class="max-h-[50vh] space-y-2 overflow-y-auto py-3 sm:py-4">
-                    <div v-for="(d, i) in multiDateDialog.dates" :key="i" class="flex items-center gap-2">
-                        <input
-                            type="date"
-                            v-model="multiDateDialog.dates[i]"
-                            class="w-full rounded border border-border bg-background p-1.5 sm:p-2 text-sm sm:text-base text-foreground"
-                        />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            class="h-8 w-8 shrink-0 text-destructive"
-                            :disabled="multiDateDialog.dates.length <= 1"
-                            @click="removeMultiDateRow(i)"
-                        >
-                            <Trash2Icon class="h-4 w-4" />
+                <div class="py-3 sm:py-4">
+                    <!-- Navigation des mois -->
+                    <div class="mb-3 flex items-center justify-between">
+                        <Button type="button" variant="ghost" size="icon" class="h-8 w-8" @click="prevMonth">
+                            <ChevronLeftIcon class="h-4 w-4" />
+                        </Button>
+                        <span class="text-sm font-medium capitalize">{{ calendarLabel }}</span>
+                        <Button type="button" variant="ghost" size="icon" class="h-8 w-8" @click="nextMonth">
+                            <ChevronRightIcon class="h-4 w-4" />
                         </Button>
                     </div>
-                    <Button variant="outline" size="sm" class="w-full" @click="addMultiDateRow">
-                        <PlusIcon class="mr-2 h-4 w-4" /> Ajouter une date
-                    </Button>
+
+                    <!-- Jours de la semaine -->
+                    <div class="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+                        <span v-for="wd in weekdays" :key="wd">{{ wd }}</span>
+                    </div>
+
+                    <!-- Grille des jours -->
+                    <div class="grid grid-cols-7 gap-1">
+                        <template v-for="(cell, i) in calendarCells" :key="i">
+                            <div v-if="!cell" />
+                            <button
+                                v-else
+                                type="button"
+                                :class="[
+                                    'flex h-9 items-center justify-center rounded text-sm transition-colors',
+                                    isDateSelected(cell.iso) ? 'bg-primary font-semibold text-primary-foreground' : 'text-foreground hover:bg-muted',
+                                ]"
+                                @click="toggleDate(cell.iso)"
+                            >
+                                {{ cell.day }}
+                            </button>
+                        </template>
+                    </div>
+
+                    <p class="mt-3 text-xs text-muted-foreground">{{ multiDateDialog.dates.length }} date(s) sélectionnée(s)</p>
                 </div>
                 <DialogFooter class="flex-col xs:flex-row gap-2">
                     <Button variant="outline" @click="multiDateDialog.isOpen = false" class="w-full xs:w-auto">Annuler</Button>
@@ -228,7 +244,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { CalendarPlusIcon, CopyIcon, Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-vue-next';
+import { CalendarPlusIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, Loader2Icon, Trash2Icon } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import CostPicker from '@/components/expense/CostPicker.vue';
@@ -399,24 +415,62 @@ const multiDateDialog = ref({
     dates: [],
 });
 
+// Calendrier de sélection multi-dates
+const weekdays = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
+const monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const calendarMonth = ref({ year: 2026, month: 0 });
+
+const pad = (n) => String(n).padStart(2, '0');
+const toIso = (year, month, day) => `${year}-${pad(month + 1)}-${pad(day)}`;
+
+const calendarLabel = computed(() => `${monthNames[calendarMonth.value.month]} ${calendarMonth.value.year}`);
+
+const calendarCells = computed(() => {
+    const { year, month } = calendarMonth.value;
+    const offset = (new Date(year, month, 1).getDay() + 6) % 7; // lundi = 0
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < offset; i++) {
+        cells.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+        cells.push({ day: d, iso: toIso(year, month, d) });
+    }
+    return cells;
+});
+
+const isDateSelected = (iso) => multiDateDialog.value.dates.includes(iso);
+
+const toggleDate = (iso) => {
+    const dates = multiDateDialog.value.dates;
+    const idx = dates.indexOf(iso);
+    if (idx === -1) {
+        dates.push(iso);
+    } else {
+        dates.splice(idx, 1);
+    }
+};
+
+const prevMonth = () => {
+    const { year, month } = calendarMonth.value;
+    calendarMonth.value = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
+};
+
+const nextMonth = () => {
+    const { year, month } = calendarMonth.value;
+    calendarMonth.value = month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+};
+
 const openMultiDateDialog = (index) => {
     const cost = selectedCosts.value[index];
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    calendarMonth.value = { year: now.getFullYear(), month: now.getMonth() };
     multiDateDialog.value = {
         isOpen: true,
         costIndex: index,
         costName: cost.name,
-        dates: [today],
+        dates: [],
     };
-};
-
-const addMultiDateRow = () => {
-    const today = new Date().toISOString().split('T')[0];
-    multiDateDialog.value.dates.push(today);
-};
-
-const removeMultiDateRow = (i) => {
-    multiDateDialog.value.dates.splice(i, 1);
 };
 
 const buildCostDataForDate = (cost, sourceData, date) => {
