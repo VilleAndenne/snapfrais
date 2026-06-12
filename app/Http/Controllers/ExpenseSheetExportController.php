@@ -4,17 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\ExpenseSheet;
 use App\Models\ExpenseSheetExport;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Illuminate\Support\Facades\Storage;
 
 class ExpenseSheetExportController extends Controller
 {
-    public function index() {
-$exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
+    public function index()
+    {
+        $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         return Inertia::render('expenseSheet/Export/Index', [
             'exports' => $exports,
@@ -24,28 +26,27 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
     /**
      * Export the expense sheets total to a CSV file.
      */
-
     public function export(Request $request)
     {
         // Vérifie que l'utilisateur à la permission d'exporter
-        if (!auth()->user()->can('export', ExpenseSheet::class)) {
+        if (! auth()->user()->can('export', ExpenseSheet::class)) {
             abort(403);
         }
 
         $validated = $request->validate([
             'start_date' => 'required|date',
-            'end_date'   => 'required|date',
+            'end_date' => 'required|date',
         ]);
 
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
-        $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
+        $endDate = Carbon::parse($validated['end_date'])->endOfDay();
 
         // Petite validation supplémentaire : début <= fin
         if ($startDate->gt($endDate)) {
             return back()->withErrors(['end_date' => 'La date de fin doit être postérieure à la date de début.']);
         }
 
-        $users = \App\Models\User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
+        $users = User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
             $q->where('approved', true)
                 ->whereBetween('validated_at', [$startDate, $endDate]);
         })
@@ -54,50 +55,80 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
                     $q->where('approved', true)
                         ->whereBetween('validated_at', [$startDate, $endDate]);
                 },
-                'expenseSheets.expenseSheetCosts.formCost.form'
+                'expenseSheets.expenseSheetCosts.formCost.form',
             ])->get();
 
-        // Préparer entêtes dynamiques : collecter tous les types de coûts uniques
-        $headers = ['Username'];
-        $costTypes = [];
+        // Préparer entêtes dynamiques regroupées par mois (selon la date du coût) :
+        // pour chaque mois, on collecte les types de coûts utilisés par au moins un agent.
+        // $months['Y-m'] = ['label' => 'AVRIL 2026', 'costTypes' => [key => type]]
+        $months = [];
 
         foreach ($users as $user) {
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    // Déterminer le préfixe selon le type
+                    if (empty($cost->date)) {
+                        continue;
+                    }
+
+                    $date = Carbon::parse($cost->date);
+                    $monthKey = $date->format('Y-m');
+
+                    if (! isset($months[$monthKey])) {
+                        $months[$monthKey] = [
+                            'label' => mb_strtoupper($date->locale('fr')->translatedFormat('F Y')),
+                            'costTypes' => [],
+                        ];
+                    }
+
                     $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
-                    // Stocker le type de coût si pas déjà présent
-                    if (!isset($costTypes[$key])) {
-                        $costTypes[$key] = $cost->formCost->type;
+                    if (! isset($months[$monthKey]['costTypes'][$key])) {
+                        $months[$monthKey]['costTypes'][$key] = $cost->formCost->type;
                     }
                 }
             }
         }
 
-        $headers = array_merge($headers, array_keys($costTypes));
+        // Trier les mois chronologiquement
+        ksort($months);
 
-        // Construire les lignes
+        // Construire les entêtes : Username, puis pour chaque mois une colonne titre
+        // (vide dans les lignes) suivie des colonnes de coûts du mois.
+        $headers = ['Username'];
+        foreach ($months as $month) {
+            $headers[] = $month['label'];
+            foreach (array_keys($month['costTypes']) as $key) {
+                $headers[] = $key;
+            }
+        }
+
+        // Construire les lignes : total par utilisateur, par mois et par coût.
         $data = [];
         foreach ($users as $user) {
-            $costSums = array_fill_keys(array_keys($costTypes), 0);
+            // $sums['Y-m'][key] = total
+            $sums = [];
+            foreach ($months as $monthKey => $month) {
+                $sums[$monthKey] = array_fill_keys(array_keys($month['costTypes']), 0);
+            }
 
             foreach ($user->expenseSheets as $expenseSheet) {
                 foreach ($expenseSheet->expenseSheetCosts as $cost) {
-                    // Utiliser la même logique de clé qu'au-dessus
+                    if (empty($cost->date)) {
+                        continue;
+                    }
+
+                    $monthKey = Carbon::parse($cost->date)->format('Y-m');
                     $typePrefix = strtolower($cost->formCost->type) === 'km' ? 'KM' : 'EURO';
                     $key = $typePrefix.' - '.$cost->formCost->name.' ('.$cost->formCost->form->name.')';
 
-                    if (isset($costSums[$key])) {
+                    if (isset($sums[$monthKey][$key])) {
                         // Si c'est un coût de type KM, on ajoute la distance arrondie
                         if (strtolower($cost->formCost->type) === 'km') {
-                            $googleDistance = $cost->google_distance;
-                            $costSums[$key] += round($googleDistance);
+                            $sums[$monthKey][$key] += round($cost->google_distance);
                         } else {
                             // Sinon, on ajoute le montant en euros
-                            $amount = (float) $cost->amount;
-                            $costSums[$key] += $amount;
+                            $sums[$monthKey][$key] += (float) $cost->amount;
                         }
                     }
                 }
@@ -105,25 +136,30 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
             // Vérifier si l'utilisateur a au moins un montant non-nul
             $hasNonZeroAmount = false;
-            foreach ($costSums as $sum) {
-                if ($sum > 0) {
-                    $hasNonZeroAmount = true;
-                    break;
+            foreach ($sums as $monthSums) {
+                foreach ($monthSums as $sum) {
+                    if ($sum > 0) {
+                        $hasNonZeroAmount = true;
+                        break 2;
+                    }
                 }
             }
 
             // N'ajouter la ligne que si l'utilisateur a au moins un montant
             if ($hasNonZeroAmount) {
                 $row = [$user->name];
-                foreach (array_keys($costTypes) as $key) {
-                    $row[] = $costSums[$key];
+                foreach ($months as $monthKey => $month) {
+                    $row[] = ''; // colonne titre du mois, vide dans les lignes
+                    foreach (array_keys($month['costTypes']) as $key) {
+                        $row[] = $sums[$monthKey][$key];
+                    }
                 }
                 $data[] = $row;
             }
         }
 
         // Générer Excel en mémoire (fichier temporaire)
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         // Entêtes
@@ -163,10 +199,10 @@ $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         // 🆕 1) Créer l'export en "pending" (sans file_path au départ)
         $export = ExpenseSheetExport::create([
-            'start_date'    => $startDate,
-            'end_date'      => $endDate,
-            'status'        => 'completed',
-            'file_path'     => null,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'status' => 'completed',
+            'file_path' => null,
             'created_by_id' => auth()->id(),
         ]);
 
