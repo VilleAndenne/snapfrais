@@ -359,7 +359,7 @@ class ExpenseSheetController extends Controller
 
             // Ne pas envoyer de notifications pour les brouillons
             if (! $isDraft) {
-                $heads = $expenseSheet->resolveApprovers(auth()->user());
+                $heads = $expenseSheet->resolveApprovers();
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new ExpenseSheetToApproval($expenseSheet));
@@ -716,7 +716,7 @@ class ExpenseSheetController extends Controller
 
             // Notifier les responsables de la resoumission (sauf pour les brouillons)
             if (! $expenseSheet->is_draft) {
-                $heads = $expenseSheet->resolveApprovers(auth()->user());
+                $heads = $expenseSheet->resolveApprovers();
 
                 $heads->each(function ($head) use ($expenseSheet) {
                     $head->notify(new ExpenseSheetToApproval($expenseSheet));
@@ -800,7 +800,7 @@ class ExpenseSheetController extends Controller
         ]);
 
         // Envoyer les notifications
-        $heads = $expenseSheet->resolveApprovers(auth()->user());
+        $heads = $expenseSheet->resolveApprovers();
 
         $heads->each(function ($head) use ($expenseSheet) {
             $head->notify(new ExpenseSheetToApproval($expenseSheet));

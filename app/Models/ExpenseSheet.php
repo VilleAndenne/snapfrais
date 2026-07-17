@@ -125,14 +125,17 @@ class ExpenseSheet extends Model
     /**
      * Détermine les utilisateurs qui doivent être notifiés pour valider cette note de frais.
      *
+     * L'escalade se base sur l'agent bénéficiaire de la note (et non sur l'encodeur),
+     * afin de rester cohérente avec la politique de validation (ExpenseSheetPolicy).
+     *
      * Règles :
-     * - Si l'auteur est responsable de son département et que celui-ci a un parent
+     * - Si le bénéficiaire est responsable de son département et que celui-ci a un parent
      *   → notifier les responsables du parent (escalade N+1).
-     * - Si l'auteur est responsable d'un département racine (sans parent_id)
-     *   → auto-validation : notifier uniquement l'auteur lui-même.
+     * - Si le bénéficiaire est responsable d'un département racine (sans parent_id)
+     *   → auto-validation : notifier uniquement le bénéficiaire lui-même.
      * - Sinon → notifier les responsables du département de la note.
      */
-    public function resolveApprovers(User $author): Collection
+    public function resolveApprovers(): Collection
     {
         $department = $this->department;
 
@@ -140,14 +143,15 @@ class ExpenseSheet extends Model
             return collect();
         }
 
+        $beneficiary = $this->user;
         $heads = $department->heads;
 
-        if ($heads->contains($author)) {
+        if ($heads->contains($beneficiary)) {
             if ($department->parent) {
                 return $department->parent->heads;
             }
 
-            return collect([$author]);
+            return collect([$beneficiary]);
         }
 
         return $heads;

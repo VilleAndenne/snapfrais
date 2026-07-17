@@ -405,11 +405,45 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => null,
         ]);
 
-        $approvers = $expenseSheet->resolveApprovers($headA);
+        $approvers = $expenseSheet->resolveApprovers();
 
         $this->assertCount(1, $approvers);
-        $this->assertTrue($approvers->contains($headA));
-        $this->assertFalse($approvers->contains($headB));
+        $this->assertTrue($approvers->contains('id', $headA->id));
+        $this->assertFalse($approvers->contains('id', $headB->id));
+    }
+
+    public function test_resolve_approvers_ignores_encoder_and_uses_beneficiary(): void
+    {
+        $parentDepartment = Department::factory()->create();
+        $childDepartment = Department::factory()->create(['parent_id' => $parentDepartment->id]);
+
+        $parentHead = User::factory()->create(['is_admin' => false]);
+        $parentDepartment->users()->attach($parentHead->id, ['is_head' => true]);
+
+        $childHead = User::factory()->create(['is_admin' => false]);
+        $agent = User::factory()->create(['is_admin' => false]);
+        $childDepartment->users()->attach($childHead->id, ['is_head' => true]);
+        $childDepartment->users()->attach($agent->id);
+
+        $form = Form::factory()->create();
+
+        // Le responsable encode pour un agent de son propre service.
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $agent->id,
+            'created_by' => $childHead->id,
+            'is_draft' => false,
+            'department_id' => $childDepartment->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $approvers = $expenseSheet->resolveApprovers();
+
+        // L'agent bénéficiaire n'est pas responsable → pas d'escalade vers le parent.
+        // Le responsable du service valide ; le service au-dessus ne reçoit rien.
+        $this->assertTrue($approvers->contains($childHead));
+        $this->assertFalse($approvers->contains($parentHead));
     }
 
     public function test_non_admin_cannot_return_expense_sheet(): void
