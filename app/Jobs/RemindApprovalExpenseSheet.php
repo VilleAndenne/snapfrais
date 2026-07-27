@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\ExpenseSheet;
+use App\Models\User;
 use App\Notifications\RemindApprovalExpenseSheetNotification as Reminder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 
 class RemindApprovalExpenseSheet implements ShouldQueue
@@ -24,7 +27,7 @@ class RemindApprovalExpenseSheet implements ShouldQueue
         Log::info('RemindApprovalExpenseSheet job started.');
 
         // Récupérer tous les validateurs potentiels (users qui sont heads d'au moins un département)
-        $potentialValidators = \App\Models\User::whereHas('departments', function ($query) {
+        $potentialValidators = User::whereHas('departments', function ($query) {
             $query->where('is_head', true);
         })->get();
 
@@ -33,25 +36,14 @@ class RemindApprovalExpenseSheet implements ShouldQueue
         // Pour chaque validateur, compter combien de notes il peut valider
         foreach ($potentialValidators as $validator) {
             // Récupérer les notes candidates pour ce validateur (même logique que DashboardController)
-            $candidateSheets = \App\Models\ExpenseSheet::with([
-                'form',
-                'department.heads',
-                'department.parent.heads',
-                'user',
-            ])
-                ->where(function ($q) use ($validator) {
-                    $q->whereHas('department.heads', function ($h) use ($validator) {
-                        $h->where('users.id', $validator->id);
-                    })
-                        ->orWhereHas('department.parent.heads', function ($h) use ($validator) {
-                            $h->where('users.id', $validator->id);
-                        });
-                })
+            $candidateSheets = ExpenseSheet::query()
+                ->withValidationRelations()
+                ->pendingValidationBy($validator)
                 ->get();
 
             // Filtrer avec la même logique que le dashboard (Policy shouldAppearInValidationList)
             $sheetsToValidate = $candidateSheets->filter(function ($sheet) use ($validator) {
-                return \Illuminate\Support\Facades\Gate::forUser($validator)->allows('shouldAppearInValidationList', $sheet);
+                return Gate::forUser($validator)->allows('shouldAppearInValidationList', $sheet);
             });
 
             $count = $sheetsToValidate->count();
