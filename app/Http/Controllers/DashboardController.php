@@ -33,6 +33,7 @@ class DashboardController extends Controller
         // Candidats à la validation : je suis head du département de la note OU du parent (N+1)
         $candidateToValidate = ExpenseSheet::query()
             ->withValidationRelations()
+            ->with('costs')
             ->pendingValidationBy($user)
             ->orderBy('created_at', 'desc')
             ->get();

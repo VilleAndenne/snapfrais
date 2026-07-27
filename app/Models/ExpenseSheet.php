@@ -82,12 +82,15 @@ class ExpenseSheet extends Model
 
     /**
      * Eager loading commun aux listes de validation (dashboard et rappel).
+     *
+     * Volontairement sans `costs` : le job de rappel ne fait que compter les
+     * notes et évaluer la policy. Le dashboard, qui affiche le détail, ajoute
+     * `costs` de son côté.
      */
     public function scopeWithValidationRelations(Builder $query): Builder
     {
         return $query->with([
             'form',
-            'costs',
             'department.heads',
             'department.parent.heads',
             'user',
