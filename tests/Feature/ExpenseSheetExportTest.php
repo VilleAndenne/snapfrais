@@ -110,6 +110,20 @@ class ExpenseSheetExportTest extends TestCase
         $this->assertEquals(30, $userRow[4]);
     }
 
+    public function test_export_history_is_forbidden_for_user_without_export_permission(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+
+        $this->actingAs($user)->get(route('export'))->assertForbidden();
+    }
+
+    public function test_export_history_is_accessible_for_user_with_export_permission(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->actingAs($admin)->get(route('export'))->assertOk();
+    }
+
     public function test_export_only_includes_months_that_have_costs(): void
     {
         Storage::fake();
