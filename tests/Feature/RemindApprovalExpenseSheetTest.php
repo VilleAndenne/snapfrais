@@ -8,6 +8,7 @@ use App\Models\ExpenseSheet;
 use App\Models\Form;
 use App\Models\User;
 use App\Notifications\RemindApprovalExpenseSheetNotification;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -163,7 +164,7 @@ class RemindApprovalExpenseSheetTest extends TestCase
         // pour pouvoir valider lui-même ses propres notes
         Notification::assertSentTo(
             $head,
-            \App\Notifications\RemindApprovalExpenseSheetNotification::class
+            RemindApprovalExpenseSheetNotification::class
         );
     }
 
@@ -196,6 +197,46 @@ class RemindApprovalExpenseSheetTest extends TestCase
         // Pas d'auto-validation hors département racine : aucun rappel ne doit être envoyé
         // (c'est au responsable du parent de valider, et il n'y en a pas ici)
         Notification::assertNothingSent();
+    }
+
+    public function test_only_one_reminder_sent_per_validator(): void
+    {
+        Notification::fake();
+
+        // Créer un département avec un responsable
+        $department = Department::factory()->create();
+        $head = User::factory()->create();
+        $department->heads()->attach($head->id, ['is_head' => true]);
+
+        // Créer un utilisateur membre du département (non responsable)
+        $employee = User::factory()->create();
+        $department->users()->attach($employee->id, ['is_head' => false]);
+
+        // Créer un formulaire
+        $form = Form::factory()->create();
+
+        // Créer plusieurs notes de frais en attente de validation
+        ExpenseSheet::factory()->count(3)->create([
+            'user_id' => $employee->id,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'is_draft' => false,
+            'approved' => null,
+        ]);
+
+        // Exécuter le job
+        RemindApprovalExpenseSheet::dispatch();
+
+        // Un seul rappel doit être envoyé au validateur, quel que soit le nombre de notes
+        Notification::assertSentToTimes($head, RemindApprovalExpenseSheetNotification::class, 1);
+    }
+
+    public function test_reminder_notification_is_queued(): void
+    {
+        $this->assertInstanceOf(
+            ShouldQueue::class,
+            new RemindApprovalExpenseSheetNotification(User::factory()->make(), 1)
+        );
     }
 
     public function test_notification_count_matches_dashboard_filtered_count(): void

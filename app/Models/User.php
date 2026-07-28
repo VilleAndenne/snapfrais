@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\ResetPasswordNotification;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -94,6 +95,33 @@ class User extends Authenticatable implements HasPasskeysContract
     public function organizations()
     {
         return $this->belongsToMany(Organization::class);
+    }
+
+    /**
+     * Determine whether the user is a member of the given organization.
+     */
+    public function belongsToOrganization(Organization $organization): bool
+    {
+        return $this->organizations()
+            ->whereKey($organization->getKey())
+            ->exists();
+    }
+
+    /**
+     * Restrict a query to members of the organization resolved for the current
+     * request. Outside a tenant context (console, queue) it is a no-op.
+     */
+    public function scopeInCurrentOrganization(Builder $query): Builder
+    {
+        $organization = currentOrganization();
+
+        if ($organization !== null) {
+            $query->whereHas('organizations', function ($q) use ($organization) {
+                $q->whereKey($organization->getKey());
+            });
+        }
+
+        return $query;
     }
 
     public function getIsHeadAttribute(): bool

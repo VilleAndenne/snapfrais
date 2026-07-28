@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Department;
+use App\Models\Form;
+use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -39,17 +42,24 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        $organization = currentOrganization();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'organization' => $organization === null ? null : [
+                'name' => $organization->name,
+                'slug' => $organization->slug,
+                'organizationName' => $organization->organization_name,
+            ],
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
                 'can' => [
-                    'departments' => $request->user()?->can('viewAny', \App\Models\Department::class),
-                    'users' => $request->user()?->can('viewAny', \App\Models\User::class),
-                    'forms' => $request->user()?->can('viewAny', \App\Models\Form::class),
-                ]
+                    'departments' => $request->user()?->can('viewAny', Department::class),
+                    'users' => $request->user()?->can('viewAny', User::class),
+                    'forms' => $request->user()?->can('viewAny', Form::class),
+                ],
             ],
             'ziggy' => [
                 ...(new Ziggy)->toArray(),

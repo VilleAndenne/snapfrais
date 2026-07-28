@@ -9,13 +9,19 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExpenseSheetExportController extends Controller
 {
-    public function index()
+    public function index(): Response
     {
+        // Vérifie que l'utilisateur à la permission d'exporter
+        if (! auth()->user()->can('export', ExpenseSheet::class)) {
+            abort(403);
+        }
+
         $exports = ExpenseSheetExport::orderBy('created_at', 'desc')->get();
 
         return Inertia::render('expenseSheet/Export/Index', [
@@ -46,10 +52,11 @@ class ExpenseSheetExportController extends Controller
             return back()->withErrors(['end_date' => 'La date de fin doit être postérieure à la date de début.']);
         }
 
-        $users = User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
-            $q->where('approved', true)
-                ->whereBetween('validated_at', [$startDate, $endDate]);
-        })
+        $users = User::inCurrentOrganization()
+            ->whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
+                $q->where('approved', true)
+                    ->whereBetween('validated_at', [$startDate, $endDate]);
+            })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
                     $q->where('approved', true)

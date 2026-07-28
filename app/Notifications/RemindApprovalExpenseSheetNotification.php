@@ -6,10 +6,11 @@ use App\Models\User;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class RemindApprovalExpenseSheetNotification extends Notification
+class RemindApprovalExpenseSheetNotification extends Notification implements ShouldQueue
 {
     use Queueable, SendsExpoPushNotifications;
 

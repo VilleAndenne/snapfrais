@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class ExpenseSheet extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use BelongsToOrganization, HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -78,6 +79,42 @@ class ExpenseSheet extends Model
     public function expenseSheetCosts()
     {
         return $this->hasMany(ExpenseSheetCost::class);
+    }
+
+    /**
+     * Eager loading commun aux listes de validation (dashboard et rappel).
+     *
+     * Volontairement sans `costs` : le job de rappel ne fait que compter les
+     * notes et évaluer la policy. Le dashboard, qui affiche le détail, ajoute
+     * `costs` de son côté.
+     */
+    public function scopeWithValidationRelations(Builder $query): Builder
+    {
+        return $query->with([
+            'form',
+            'department.heads',
+            'department.parent.heads',
+            'user',
+        ]);
+    }
+
+    /**
+     * Scope des notes candidates à la validation par un responsable donné.
+     *
+     * Sélectionne les notes dont le validateur est responsable du département
+     * de la note OU du département parent (N+1). Le filtrage fin
+     * (shouldAppearInValidationList) reste appliqué en PHP car il dépend de la policy.
+     */
+    public function scopePendingValidationBy(Builder $query, User $validator): Builder
+    {
+        return $query->where(function ($q) use ($validator) {
+            $q->whereHas('department.heads', function ($h) use ($validator) {
+                $h->where('users.id', $validator->id);
+            })
+                ->orWhereHas('department.parent.heads', function ($h) use ($validator) {
+                    $h->where('users.id', $validator->id);
+                });
+        });
     }
 
     /**
