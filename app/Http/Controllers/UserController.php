@@ -25,6 +25,7 @@ class UserController extends Controller
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $users = User::query()
+            ->inCurrentOrganization()
             ->when(request('search'), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -78,6 +79,10 @@ class UserController extends Controller
             'password' => Str::random(40),
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
+
+        if (($organization = currentOrganization()) !== null) {
+            $user->organizations()->syncWithoutDetaching([$organization->getKey()]);
+        }
 
         $attach = collect($validated['departments'] ?? [])
             ->mapWithKeys(fn (array $dept): array => [$dept['id'] => ['is_head' => $dept['is_head'] ?? false]]);

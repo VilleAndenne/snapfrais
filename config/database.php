@@ -42,6 +42,24 @@ return [
             'synchronous' => null,
         ],
 
+        /*
+         * Connexion en lecture seule vers une copie de la base source à fusionner
+         * (ex. dump de la prod CPAS), utilisée par `organizations:import-source`.
+         */
+        'import_source' => [
+            'driver' => env('IMPORT_DB_CONNECTION', 'mysql'),
+            'url' => env('IMPORT_DB_URL'),
+            'host' => env('IMPORT_DB_HOST', '127.0.0.1'),
+            'port' => env('IMPORT_DB_PORT', '3306'),
+            'database' => env('IMPORT_DB_DATABASE'),
+            'username' => env('IMPORT_DB_USERNAME'),
+            'password' => env('IMPORT_DB_PASSWORD', ''),
+            'charset' => env('IMPORT_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('IMPORT_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

@@ -828,7 +828,7 @@ class ExpenseSheetController extends Controller
 
         return Pdf::loadView('expenseSheet.pdf', [
             'expenseSheet' => $expenseSheet,
-            'organizationName' => config('app.organization_name'),
+            'organizationName' => currentOrganization()?->organization_name ?? config('app.organization_name'),
         ])->setPaper('a4', 'landscape')
             ->stream('note_de_frais_'.$id.'.pdf'); // inline
     }

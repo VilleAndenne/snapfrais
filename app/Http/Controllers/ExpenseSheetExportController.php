@@ -52,10 +52,11 @@ class ExpenseSheetExportController extends Controller
             return back()->withErrors(['end_date' => 'La date de fin doit être postérieure à la date de début.']);
         }
 
-        $users = User::whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
-            $q->where('approved', true)
-                ->whereBetween('validated_at', [$startDate, $endDate]);
-        })
+        $users = User::inCurrentOrganization()
+            ->whereHas('expenseSheets', function ($q) use ($startDate, $endDate) {
+                $q->where('approved', true)
+                    ->whereBetween('validated_at', [$startDate, $endDate]);
+            })
             ->with([
                 'expenseSheets' => function ($q) use ($startDate, $endDate) {
                     $q->where('approved', true)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,7 +14,7 @@ class DepartmentController extends Controller
      */
     public function index()
     {
-        if (!auth()->user()->can('viewAny', Department::class)) {
+        if (! auth()->user()->can('viewAny', Department::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
 
@@ -27,14 +28,14 @@ class DepartmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public
-    function create()
+    public function create()
     {
-        if (!auth()->user()->can('create', Department::class)) {
+        if (! auth()->user()->can('create', Department::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
+
         return Inertia::render('departments/Create', [
-            'users' => \App\Models\User::all(),
+            'users' => User::inCurrentOrganization()->get(),
             'departments' => Department::all(),
         ]);
     }
@@ -42,10 +43,9 @@ class DepartmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public
-    function store(Request $request)
+    public function store(Request $request)
     {
-        if (!auth()->user()->can('create', Department::class)) {
+        if (! auth()->user()->can('create', Department::class)) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
@@ -74,8 +74,7 @@ class DepartmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public
-    function show(string $id)
+    public function show(string $id)
     {
         //
     }
@@ -83,17 +82,17 @@ class DepartmentController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public
-    function edit(string $id)
+    public function edit(string $id)
     {
-        if (!auth()->user()->can('update', Department::findOrFail($id))) {
+        if (! auth()->user()->can('update', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
+
         return Inertia::render('departments/Edit', [
             'department' => Department::with(['users' => function ($query) {
                 $query->withPivot('is_head');
             }])->find($id),
-            'users' => \App\Models\User::all(),
+            'users' => User::inCurrentOrganization()->get(),
             'departments' => Department::all(),
         ]);
     }
@@ -101,10 +100,9 @@ class DepartmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public
-    function update(Request $request, string $id)
+    public function update(Request $request, string $id)
     {
-        if (!auth()->user()->can('update', Department::findOrFail($id))) {
+        if (! auth()->user()->can('update', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         $validated = $request->validate([
@@ -135,10 +133,9 @@ class DepartmentController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public
-    function destroy(string $id)
+    public function destroy(string $id)
     {
-        if (!auth()->user()->can('delete', Department::findOrFail($id))) {
+        if (! auth()->user()->can('delete', Department::findOrFail($id))) {
             return redirect()->route('dashboard')->with('error', 'Vous n\'avez pas la permission de faire ceci.');
         }
         Department::destroy($id);
