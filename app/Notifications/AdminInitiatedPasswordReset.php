@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Models\Organization;
+use App\Notifications\Concerns\LinksToOrganization;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -9,11 +11,12 @@ use Illuminate\Notifications\Notification;
 
 class AdminInitiatedPasswordReset extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use LinksToOrganization, Queueable;
 
     public function __construct(
         private string $token,
         private string $adminName,
+        private ?Organization $organization = null,
     ) {}
 
     /**
@@ -26,7 +29,7 @@ class AdminInitiatedPasswordReset extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = url(route('password.reset', [
+        $url = $this->organizationUrl($this->organization, route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
         ], false));

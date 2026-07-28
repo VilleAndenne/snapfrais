@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Models\Organization;
+use App\Notifications\Concerns\LinksToOrganization;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
@@ -11,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class UserCreated extends Notification implements ShouldQueue
 {
-    use Queueable, SendsExpoPushNotifications;
+    use LinksToOrganization, Queueable, SendsExpoPushNotifications;
 
     /**
      * Create a new notification instance.
@@ -20,10 +22,13 @@ class UserCreated extends Notification implements ShouldQueue
 
     private string $email;
 
-    public function __construct(string $token, string $email)
+    private ?Organization $organization;
+
+    public function __construct(string $token, string $email, ?Organization $organization = null)
     {
         $this->token = $token;
         $this->email = $email;
+        $this->organization = $organization;
     }
 
     /**
@@ -47,7 +52,7 @@ class UserCreated extends Notification implements ShouldQueue
             ->subject('Création de compte sur la plateforme de gestion des notes de frais')
             ->greeting('Bonjour ,')
             ->line('Nous vous informons que votre compte a été créé avec succès.')
-            ->action('Réinitialiser le mot de passe', url('/reset-password/'.$this->token.'?email='.$this->email))
+            ->action('Réinitialiser le mot de passe', $this->organizationUrl($this->organization, '/reset-password/'.$this->token.'?email='.$this->email))
             ->line('Cette application vous permet de gérer vos notes de frais de manière plus efficace.')
             ->line('Merci d\'utiliser notre application !')
             ->salutation('Cordialement,');

@@ -225,7 +225,7 @@ class User extends Authenticatable implements HasPasskeysContract
 
     public function sendPasswordResetNotification($token)
     {
-        $this->notify(new ResetPasswordNotification($token));
+        $this->notify(new ResetPasswordNotification($token, currentOrganization()));
     }
 
     /**

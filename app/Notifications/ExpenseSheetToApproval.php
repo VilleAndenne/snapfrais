@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\ExpenseSheet;
+use App\Notifications\Concerns\LinksToOrganization;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class ExpenseSheetToApproval extends Notification implements ShouldQueue
 {
-    use Queueable, SendsExpoPushNotifications;
+    use LinksToOrganization, Queueable, SendsExpoPushNotifications;
 
     public ExpenseSheet $sheet;
 
@@ -31,7 +32,7 @@ class ExpenseSheetToApproval extends Notification implements ShouldQueue
         $channels = ['mail'];
 
         return $this->addExpoPushChannel($channels, $notifiable);
-        if (!$notifiable->notify_expense_sheet_to_approval) {
+        if (! $notifiable->notify_expense_sheet_to_approval) {
             return [];
         }
 
@@ -45,7 +46,7 @@ class ExpenseSheetToApproval extends Notification implements ShouldQueue
             ->greeting('Bonjour,')
             ->line("Une nouvelle note de frais a été soumise par : **{$this->sheet->user->name}**.")
             ->line("Date de création : {$this->sheet->created_at->format('d/m/Y')}")
-            ->action('Voir la note de frais', url("/expense-sheet/{$this->sheet->id}"))
+            ->action('Voir la note de frais', $this->organizationUrl($this->sheet->organization, "/expense-sheet/{$this->sheet->id}"))
             ->line('Merci de valider ou refuser cette note dès que possible.');
     }
 

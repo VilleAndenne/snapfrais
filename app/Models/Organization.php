@@ -46,6 +46,34 @@ class Organization extends Model
     }
 
     /**
+     * Base URL of the organization: its own `domain` if set, otherwise the
+     * `{slug}.{APP_URL host}` subdomain convention. Used to build absolute
+     * links in queued notifications, which run without a request context.
+     */
+    public function baseUrl(): string
+    {
+        $appUrl = (string) config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'https';
+
+        if (! empty($this->domain)) {
+            return $scheme.'://'.$this->domain;
+        }
+
+        $appHost = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
+        $port = parse_url($appUrl, PHP_URL_PORT);
+
+        return $scheme.'://'.$this->slug.'.'.$appHost.($port ? ':'.$port : '');
+    }
+
+    /**
+     * Build an absolute URL on the organization's own host.
+     */
+    public function url(string $path = ''): string
+    {
+        return rtrim($this->baseUrl(), '/').'/'.ltrim($path, '/');
+    }
+
+    /**
      * Configure activity logging options.
      */
     public function getActivitylogOptions(): LogOptions
