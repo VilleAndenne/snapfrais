@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\ExpenseSheet;
+use App\Notifications\Concerns\LinksToOrganization;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class ApprovalExpenseSheet extends Notification implements ShouldQueue
 {
-    use Queueable, SendsExpoPushNotifications;
+    use LinksToOrganization, Queueable, SendsExpoPushNotifications;
 
     public ExpenseSheet $expenseSheet;
 
@@ -45,7 +46,7 @@ class ApprovalExpenseSheet extends Notification implements ShouldQueue
             ->subject('Votre note de frais #'.$this->expenseSheet->id.' a été approuvée')
             ->greeting('Bonjour,')
             ->line($this->expenseSheet->validatedBy->name.' a approuvé votre note de frais #'.$this->expenseSheet->id)
-            ->action('Voir la note de frais', url('/expense-sheet/'.$this->expenseSheet->id))
+            ->action('Voir la note de frais', $this->organizationUrl($this->expenseSheet->organization, '/expense-sheet/'.$this->expenseSheet->id))
             ->line('Merci d\'utiliser notre application !')
             ->salutation('Bien cordialement,');
     }

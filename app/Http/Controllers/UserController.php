@@ -93,7 +93,7 @@ class UserController extends Controller
 
         $token = Password::broker()->createToken($user);
 
-        $user->notify(new UserCreated($token, $validated['email']));
+        $user->notify(new UserCreated($token, $validated['email'], currentOrganization()));
 
         return redirect()->route('users.index')->with('success', 'Utilisateur créé. Un lien de définition du mot de passe lui a été envoyé.');
     }
@@ -205,7 +205,7 @@ class UserController extends Controller
 
         $token = Password::broker()->createToken($user);
 
-        $user->notify(new AdminInitiatedPasswordReset($token, auth()->user()->name));
+        $user->notify(new AdminInitiatedPasswordReset($token, auth()->user()->name, currentOrganization()));
 
         return redirect()->back()->with('success', 'Un lien de réinitialisation a été envoyé à '.$user->email.'.');
     }

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\ExpenseSheet;
+use App\Notifications\Concerns\LinksToOrganization;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class SRHReturnExpenseSheet extends Notification implements ShouldQueue
 {
-    use Queueable, SendsExpoPushNotifications;
+    use LinksToOrganization, Queueable, SendsExpoPushNotifications;
 
     public ExpenseSheet $expenseSheet;
 
@@ -51,7 +52,7 @@ class SRHReturnExpenseSheet extends Notification implements ShouldQueue
         }
 
         return $message
-            ->action('Voir la note de frais', url('/expense-sheet/'.$this->expenseSheet->id))
+            ->action('Voir la note de frais', $this->organizationUrl($this->expenseSheet->organization, '/expense-sheet/'.$this->expenseSheet->id))
             ->line('Veuillez prendre les mesures nécessaires pour corriger cette note de frais.')
             ->salutation('Bien cordialement,');
     }

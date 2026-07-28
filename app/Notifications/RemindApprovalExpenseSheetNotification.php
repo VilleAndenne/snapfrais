@@ -2,7 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\Organization;
 use App\Models\User;
+use App\Notifications\Concerns\LinksToOrganization;
 use App\Notifications\Concerns\SendsExpoPushNotifications;
 use App\Notifications\Messages\ExpoPushMessage;
 use Illuminate\Bus\Queueable;
@@ -12,19 +14,22 @@ use Illuminate\Notifications\Notification;
 
 class RemindApprovalExpenseSheetNotification extends Notification implements ShouldQueue
 {
-    use Queueable, SendsExpoPushNotifications;
+    use LinksToOrganization, Queueable, SendsExpoPushNotifications;
 
     public int $count;
 
     public User $user;
 
+    public ?Organization $organization;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct(User $user, int $count)
+    public function __construct(User $user, int $count, ?Organization $organization = null)
     {
         $this->user = $user;
         $this->count = $count;
+        $this->organization = $organization;
     }
 
     /**
@@ -53,7 +58,7 @@ class RemindApprovalExpenseSheetNotification extends Notification implements Sho
             ->subject('Rappel : Notes de frais en attente de validation')
             ->greeting('Bonjour,')
             ->line('Vous avez encore '.$this->count.' note(s) de frais à valider.')
-            ->action('Voir les notes de frais', url('/dashboard'))
+            ->action('Voir les notes de frais', $this->organizationUrl($this->organization, '/dashboard'))
             ->line('Merci de traiter ces demandes dès que possible.')
             ->salutation('Bien cordialement,');
     }
