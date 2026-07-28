@@ -21,6 +21,7 @@ class Organization extends Model
     protected $fillable = [
         'name',
         'slug',
+        'domain',
         'organization_name',
     ];
 
@@ -50,7 +51,7 @@ class Organization extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'slug', 'organization_name'])
+            ->logOnly(['name', 'slug', 'domain', 'organization_name'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('organization')

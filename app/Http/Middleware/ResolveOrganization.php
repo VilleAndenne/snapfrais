@@ -16,16 +16,10 @@ class ResolveOrganization
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $slug = $this->resolveSlug($request);
-
-        if ($slug === null) {
-            return $next($request);
-        }
-
-        $organization = Organization::where('slug', $slug)->first();
+        $organization = $this->resolveOrganization($request);
 
         if ($organization === null) {
-            abort(404);
+            return $next($request);
         }
 
         setCurrentOrganization($organization);
@@ -37,6 +31,39 @@ class ResolveOrganization
         }
 
         return $next($request);
+    }
+
+    /**
+     * Resolve the organization for the request.
+     *
+     * Priority to an exact match on the organization's own `domain`, then a
+     * fallback to the `{slug}.{APP_URL host}` subdomain convention. A subdomain
+     * that matches no organization aborts with 404; the bare application host
+     * (no subdomain, no matching domain) resolves to null (no tenant context).
+     */
+    private function resolveOrganization(Request $request): ?Organization
+    {
+        $host = $request->getHost();
+
+        $organization = Organization::where('domain', $host)->first();
+
+        if ($organization !== null) {
+            return $organization;
+        }
+
+        $slug = $this->resolveSlug($request);
+
+        if ($slug === null) {
+            return null;
+        }
+
+        $organization = Organization::where('slug', $slug)->first();
+
+        if ($organization === null) {
+            abort(404);
+        }
+
+        return $organization;
     }
 
     /**

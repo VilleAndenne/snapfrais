@@ -102,6 +102,20 @@ class OrganizationTenancyTest extends TestCase
             );
     }
 
+    public function test_organization_is_resolved_by_its_own_domain(): void
+    {
+        $organization = Organization::factory()->create([
+            'slug' => 'cpas',
+            'domain' => 'frais.cpas-andenne.be',
+        ]);
+        $user = $this->memberOf($organization);
+
+        $this->actingAs($user)
+            ->get('http://frais.cpas-andenne.be'.route('dashboard', absolute: false))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('organization.slug', 'cpas'));
+    }
+
     public function test_inertia_shares_current_organization_branding(): void
     {
         $organization = Organization::factory()->create([
