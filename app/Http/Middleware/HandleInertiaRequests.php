@@ -78,28 +78,33 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Organization switcher payload shared with super_admins only, letting them
-     * change the active organization without changing the URL. Returns null for
-     * every other user.
+     * Organization switcher payload shared with admins, letting them change the
+     * active organization without changing the URL. A super_admin gets every
+     * organization; a platform admin only their own. Null for everyone else.
      *
      * @return array{current: int|null, options: list<array{id: int, organizationName: string}>}|null
      */
     protected function organizationSwitcher(?User $user, ?Organization $organization): ?array
     {
-        if ($user === null || ! $user->super_admin) {
+        if ($user === null || ! $user->canSwitchOrganizations()) {
+            return null;
+        }
+
+        $options = $user->switchableOrganizations()
+            ->map(fn (Organization $org): array => [
+                'id' => $org->id,
+                'organizationName' => $org->organization_name,
+            ])
+            ->values()
+            ->all();
+
+        if (count($options) < 2) {
             return null;
         }
 
         return [
             'current' => $organization?->id,
-            'options' => Organization::query()
-                ->orderBy('organization_name')
-                ->get(['id', 'organization_name'])
-                ->map(fn (Organization $org): array => [
-                    'id' => $org->id,
-                    'organizationName' => $org->organization_name,
-                ])
-                ->all(),
+            'options' => $options,
         ];
     }
 }

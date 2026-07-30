@@ -41,14 +41,14 @@ class ResolveOrganization
     }
 
     /**
-     * Determine the active organization for the request. A super_admin's session
-     * override takes precedence — it is how they switch organization without
+     * Determine the active organization for the request. A switched-to session
+     * override takes precedence — it is how an admin changes organization without
      * changing the URL — otherwise the organization is resolved from the host.
      */
     private function resolveActiveOrganization(Request $request, ?User $user): ?Organization
     {
-        if ($user?->super_admin) {
-            $override = $this->resolveOverride($request);
+        if ($user !== null) {
+            $override = $this->resolveOverride($request, $user);
 
             if ($override !== null) {
                 return $override;
@@ -59,10 +59,11 @@ class ResolveOrganization
     }
 
     /**
-     * Resolve the organization a super_admin switched to, clearing the session
-     * key if it points to an organization that no longer exists.
+     * Resolve the organization the user switched to, honouring it only when the
+     * user is still allowed to reach it, and clearing a stale or forbidden
+     * override so the request falls back to the host organization.
      */
-    private function resolveOverride(Request $request): ?Organization
+    private function resolveOverride(Request $request, User $user): ?Organization
     {
         $overrideId = $request->session()->get(self::SESSION_KEY);
 
@@ -72,8 +73,10 @@ class ResolveOrganization
 
         $organization = Organization::find($overrideId);
 
-        if ($organization === null) {
+        if ($organization === null || ! $user->canSwitchToOrganization($organization)) {
             $request->session()->forget(self::SESSION_KEY);
+
+            return null;
         }
 
         return $organization;

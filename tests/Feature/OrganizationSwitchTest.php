@@ -68,7 +68,41 @@ class OrganizationSwitchTest extends TestCase
             );
     }
 
-    public function test_non_super_admin_cannot_switch_organization(): void
+    public function test_platform_admin_can_switch_among_their_own_organizations(): void
+    {
+        $ville = Organization::factory()->create(['slug' => 'ville']);
+        $cpas = Organization::factory()->create(['slug' => 'cpas', 'organization_name' => 'CPAS de Test']);
+        $admin = User::factory()->create(['is_admin' => true, 'super_admin' => false]);
+        $admin->organizations()->attach([$ville->id, $cpas->id]);
+
+        $this->actingAs($admin)
+            ->post(route('organizations.switch', $cpas))
+            ->assertSessionHas(ResolveOrganization::SESSION_KEY, $cpas->id);
+
+        $this->actingAs($admin)
+            ->get($this->on('ville', 'dashboard'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('organization.slug', 'cpas'));
+    }
+
+    public function test_platform_admin_only_sees_their_own_organizations_in_switcher(): void
+    {
+        $ville = Organization::factory()->create(['slug' => 'ville', 'organization_name' => 'Ville de Test']);
+        $cpas = Organization::factory()->create(['slug' => 'cpas', 'organization_name' => 'CPAS de Test']);
+        Organization::factory()->create(['slug' => 'autre', 'organization_name' => 'Autre Org']);
+        $admin = User::factory()->create(['is_admin' => true, 'super_admin' => false]);
+        $admin->organizations()->attach([$ville->id, $cpas->id]);
+
+        $this->actingAs($admin)
+            ->get($this->on('ville', 'dashboard'))
+            ->assertInertia(fn ($page) => $page
+                ->has('organizationSwitcher.options', 2)
+                ->where('organizationSwitcher.options.0.organizationName', 'CPAS de Test')
+                ->where('organizationSwitcher.options.1.organizationName', 'Ville de Test')
+            );
+    }
+
+    public function test_platform_admin_cannot_switch_to_a_foreign_organization(): void
     {
         $ville = Organization::factory()->create(['slug' => 'ville']);
         $cpas = Organization::factory()->create(['slug' => 'cpas']);
@@ -82,13 +116,25 @@ class OrganizationSwitchTest extends TestCase
         $this->assertNull(session(ResolveOrganization::SESSION_KEY));
     }
 
-    public function test_non_super_admin_does_not_receive_switcher(): void
+    public function test_single_organization_admin_does_not_receive_switcher(): void
     {
         $ville = Organization::factory()->create(['slug' => 'ville']);
         $admin = User::factory()->create(['is_admin' => true, 'super_admin' => false]);
         $admin->organizations()->attach($ville);
 
         $this->actingAs($admin)
+            ->get($this->on('ville', 'dashboard'))
+            ->assertInertia(fn ($page) => $page->where('organizationSwitcher', null));
+    }
+
+    public function test_regular_user_does_not_receive_switcher(): void
+    {
+        $ville = Organization::factory()->create(['slug' => 'ville']);
+        Organization::factory()->create(['slug' => 'cpas']);
+        $user = User::factory()->create(['is_admin' => false, 'super_admin' => false]);
+        $user->organizations()->attach($ville);
+
+        $this->actingAs($user)
             ->get($this->on('ville', 'dashboard'))
             ->assertInertia(fn ($page) => $page->where('organizationSwitcher', null));
     }
