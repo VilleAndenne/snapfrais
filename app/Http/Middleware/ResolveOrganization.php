@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Organization;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -11,12 +12,20 @@ use Symfony\Component\HttpFoundation\Response;
 class ResolveOrganization
 {
     /**
+     * Session key holding the organization a super_admin switched to, letting
+     * them operate on another organization without changing the request host.
+     */
+    public const SESSION_KEY = 'active_organization_id';
+
+    /**
      * Resolve the current organization from the request subdomain, bind it for
      * the request lifecycle, and ensure the authenticated user belongs to it.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $organization = $this->resolveOrganization($request);
+        $user = $request->user();
+
+        $organization = $this->resolveActiveOrganization($request, $user);
 
         if ($organization === null) {
             return $next($request);
@@ -24,13 +33,50 @@ class ResolveOrganization
 
         setCurrentOrganization($organization);
 
-        $user = $request->user();
-
         if ($user !== null && ! $user->super_admin && ! $user->belongsToOrganization($organization)) {
             abort(403, "Vous n'avez pas accès à cette organisation.");
         }
 
         return $next($request);
+    }
+
+    /**
+     * Determine the active organization for the request. A super_admin's session
+     * override takes precedence — it is how they switch organization without
+     * changing the URL — otherwise the organization is resolved from the host.
+     */
+    private function resolveActiveOrganization(Request $request, ?User $user): ?Organization
+    {
+        if ($user?->super_admin) {
+            $override = $this->resolveOverride($request);
+
+            if ($override !== null) {
+                return $override;
+            }
+        }
+
+        return $this->resolveOrganization($request);
+    }
+
+    /**
+     * Resolve the organization a super_admin switched to, clearing the session
+     * key if it points to an organization that no longer exists.
+     */
+    private function resolveOverride(Request $request): ?Organization
+    {
+        $overrideId = $request->session()->get(self::SESSION_KEY);
+
+        if ($overrideId === null) {
+            return null;
+        }
+
+        $organization = Organization::find($overrideId);
+
+        if ($organization === null) {
+            $request->session()->forget(self::SESSION_KEY);
+        }
+
+        return $organization;
     }
 
     /**

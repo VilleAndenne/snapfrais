@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ImpersonationController;
+use App\Http\Controllers\OrganizationSwitchController;
 use App\Http\Controllers\PatchNoteController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\TermsAcceptanceController;
@@ -52,6 +53,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/statistics', [StatisticsController::class, 'index'])->name('statistics.index');
 });
+
+// Organization switching (super_admin only)
+Route::post('/organizations/switch/{organization}', [OrganizationSwitchController::class, 'update'])
+    ->middleware(['auth', 'verified'])
+    ->name('organizations.switch');
 
 // Impersonation routes
 Route::middleware(['auth', 'verified'])->group(function () {

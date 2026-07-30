@@ -15,10 +15,13 @@ import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 import { BarChart3, BookOpen, Building2, FileText, Folder, LayoutGrid, Library, ScrollText, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
+import OrgSwitcher from './OrgSwitcher.vue';
 
+import { type SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-const page = usePage();
+const page = usePage<SharedData>();
 const can = page.props.auth.can as {
     departments: boolean;
     users: boolean;
@@ -27,6 +30,8 @@ const can = page.props.auth.can as {
 };
 
 const isAdmin = page.props.auth.user?.is_admin || false;
+
+const canSwitchOrganization = computed<boolean>(() => (page.props.organizationSwitcher?.options.length ?? 0) > 1);
 
 
 const mainNavItems: NavItem[] = [
@@ -87,7 +92,8 @@ const footerNavItems: NavItem[] = [
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
+                    <OrgSwitcher v-if="canSwitchOrganization" />
+                    <SidebarMenuButton v-else size="lg" as-child>
                         <Link :href="route('dashboard')">
                             <AppLogo />
                         </Link>
