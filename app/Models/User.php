@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use Mirror\Concerns\Impersonatable;
 use Spatie\Activitylog\LogOptions;
@@ -105,6 +106,47 @@ class User extends Authenticatable implements HasPasskeysContract
         return $this->organizations()
             ->whereKey($organization->getKey())
             ->exists();
+    }
+
+    /**
+     * Determine whether the user may switch the active organization at all: a
+     * super_admin can, and so can a platform admin who belongs to several.
+     */
+    public function canSwitchOrganizations(): bool
+    {
+        return (bool) $this->super_admin || (bool) $this->is_admin;
+    }
+
+    /**
+     * Organizations the user may switch the active context to: every organization
+     * for a super_admin, only their own memberships for a platform admin.
+     *
+     * @return Collection<int, Organization>
+     */
+    public function switchableOrganizations(): Collection
+    {
+        if ($this->super_admin) {
+            return Organization::query()->orderBy('organization_name')->get();
+        }
+
+        if ($this->is_admin) {
+            return $this->organizations()->orderBy('organization_name')->get();
+        }
+
+        return collect();
+    }
+
+    /**
+     * Determine whether the user may switch the active context to the given
+     * organization.
+     */
+    public function canSwitchToOrganization(Organization $organization): bool
+    {
+        if ($this->super_admin) {
+            return true;
+        }
+
+        return (bool) $this->is_admin && $this->belongsToOrganization($organization);
     }
 
     /**

@@ -31,7 +31,7 @@ const can = page.props.auth.can as {
 
 const isAdmin = page.props.auth.user?.is_admin || false;
 
-const canSwitchOrganization = computed<boolean>(() => (page.props.organizationSwitcher?.options.length ?? 0) > 1);
+const canSwitchOrganization = computed<boolean>(() => page.props.organizationSwitcher !== null);
 
 
 const mainNavItems: NavItem[] = [
