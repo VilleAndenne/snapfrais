@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Department;
 use App\Models\Form;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -48,10 +49,12 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'organization' => $organization === null ? null : [
+                'id' => $organization->id,
                 'name' => $organization->name,
                 'slug' => $organization->slug,
                 'organizationName' => $organization->organization_name,
             ],
+            'organizationSwitcher' => $this->organizationSwitcher($request->user(), $organization),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
@@ -71,6 +74,32 @@ class HandleInertiaRequests extends Middleware
                 'warning' => fn () => session()->get('warning'),
                 'info' => fn () => session()->get('info'),
             ],
+        ];
+    }
+
+    /**
+     * Organization switcher payload shared with super_admins only, letting them
+     * change the active organization without changing the URL. Returns null for
+     * every other user.
+     *
+     * @return array{current: int|null, options: list<array{id: int, organizationName: string}>}|null
+     */
+    protected function organizationSwitcher(?User $user, ?Organization $organization): ?array
+    {
+        if ($user === null || ! $user->super_admin) {
+            return null;
+        }
+
+        return [
+            'current' => $organization?->id,
+            'options' => Organization::query()
+                ->orderBy('organization_name')
+                ->get(['id', 'organization_name'])
+                ->map(fn (Organization $org): array => [
+                    'id' => $org->id,
+                    'organizationName' => $org->organization_name,
+                ])
+                ->all(),
         ];
     }
 }

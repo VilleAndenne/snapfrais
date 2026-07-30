@@ -18,10 +18,24 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface Organization {
+    id: number;
+    name: string;
+    slug: string;
+    organizationName: string;
+}
+
+export interface OrganizationSwitcher {
+    current: number | null;
+    options: Array<{ id: number; organizationName: string }>;
+}
+
 export interface SharedData extends PageProps {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
+    organization: Organization | null;
+    organizationSwitcher: OrganizationSwitcher | null;
     ziggy: Config & { location: string };
 }
 
@@ -31,6 +45,8 @@ export interface User {
     email: string;
     avatar?: string;
     email_verified_at: string | null;
+    is_admin?: boolean;
+    super_admin?: boolean;
     notify_expense_sheet_to_approval?: boolean;
     notify_receipt_expense_sheet?: boolean;
     notify_remind_approval?: boolean;
