@@ -85,7 +85,8 @@
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
         <p style="color: #6b7280; font-size: 12px;">
-            Cet email a été généré automatiquement par le système de gestion des notes de frais de la Ville d'Andenne.
+            Cet email a été généré automatiquement par le système de gestion des notes de frais de
+            {{ $expenseSheet->organization?->organization_name ?? $expenseSheet->organization?->name ?? config('app.name') }}.
             <br>
             Pour toute question, veuillez contacter le service concerné.
         </p>

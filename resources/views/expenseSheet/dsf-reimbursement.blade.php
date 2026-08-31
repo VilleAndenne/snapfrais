@@ -3,20 +3,24 @@
 
     $sheet = $expenseSheet;
 
-    function fr_date($d) {
-        return $d ? Carbon::parse($d)->locale('fr_BE')->translatedFormat('d/m/Y') : '';
-    }
-    function money_eur($v) {
-        return number_format((float)$v, 2, ',', ' ') . ' €';
-    }
-    function safe_array($value) {
-        if (is_array($value)) return $value;
-        if (is_object($value)) return (array)$value;
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            return is_array($decoded) ? $decoded : [];
+    // Le corps d'une vue est ré-exécuté à chaque rendu : sans ce garde, générer
+    // deux demandes DSF dans le même process redéclare ces fonctions (erreur fatale).
+    if (! function_exists('fr_date')) {
+        function fr_date($d) {
+            return $d ? Carbon::parse($d)->locale('fr_BE')->translatedFormat('d/m/Y') : '';
         }
-        return [];
+        function money_eur($v) {
+            return number_format((float)$v, 2, ',', ' ') . ' €';
+        }
+        function safe_array($value) {
+            if (is_array($value)) return $value;
+            if (is_object($value)) return (array)$value;
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                return is_array($decoded) ? $decoded : [];
+            }
+            return [];
+        }
     }
 
     // Calculer les totaux uniquement pour les coûts DSF
@@ -183,7 +187,7 @@
 <!-- Header -->
 <div class="header">
     <div class="brand">
-        Ville d'Andenne<br>
+        {{ $expenseSheet->organization?->organization_name ?? $expenseSheet->organization?->name ?? config('app.name') }}<br>
         <span class="muted small">Demande de remboursement DSF</span>
     </div>
     <div class="right">

@@ -6,9 +6,9 @@ use App\Models\ExpenseSheet;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use setasign\Fpdi\Fpdi;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\Settings;
+use setasign\Fpdi\Fpdi;
 
 class DsfReimbursementService
 {
@@ -23,7 +23,7 @@ class DsfReimbursementService
             'user',
             'department',
             'validatedBy',
-            'form'
+            'form',
         ]);
 
         // Filtrer uniquement les coûts DSF
@@ -33,6 +33,19 @@ class DsfReimbursementService
 
         // Si aucun coût DSF, ne rien faire
         if ($dsfCosts->isEmpty()) {
+            return;
+        }
+
+        // Sans destinataire configuré pour l'organisation, il n'y a personne à
+        // qui envoyer la demande : on ne génère pas le PDF pour rien.
+        $recipientEmail = $this->resolveRecipientEmail($expenseSheet);
+
+        if ($recipientEmail === null) {
+            \Log::warning('Aucune adresse DSF configurée pour cette organisation, envoi ignoré', [
+                'expense_sheet_id' => $expenseSheet->id,
+                'organization_id' => $expenseSheet->organization_id,
+            ]);
+
             return;
         }
 
@@ -47,19 +60,19 @@ class DsfReimbursementService
         ])->setPaper('a4', 'landscape');
 
         // Créer le nom du fichier
-        $fileName = 'demande_remboursement_DSF_' . $expenseSheet->id . '_' . now()->format('YmdHis') . '.pdf';
-        $filePath = 'dsf_reimbursements/' . $fileName;
+        $fileName = 'demande_remboursement_DSF_'.$expenseSheet->id.'_'.now()->format('YmdHis').'.pdf';
+        $filePath = 'dsf_reimbursements/'.$fileName;
 
         // Sauvegarder le PDF principal dans le storage temporaire
         $tempDir = storage_path('app/temp');
-        if (!file_exists($tempDir)) {
+        if (! file_exists($tempDir)) {
             mkdir($tempDir, 0777, true);
         }
 
-        $tempMainPdfPath = $tempDir . '/main_' . $expenseSheet->id . '_' . time() . '.pdf';
+        $tempMainPdfPath = $tempDir.'/main_'.$expenseSheet->id.'_'.time().'.pdf';
         file_put_contents($tempMainPdfPath, $pdf->output());
 
-        \Log::info("PDF principal créé", ['path' => $tempMainPdfPath, 'size' => filesize($tempMainPdfPath)]);
+        \Log::info('PDF principal créé', ['path' => $tempMainPdfPath, 'size' => filesize($tempMainPdfPath)]);
 
         // Fusionner avec les PDFs annexes si présents
         $finalPdfPath = $this->mergePdfsWithAttachments($tempMainPdfPath, $attachments, $expenseSheet->id);
@@ -67,37 +80,39 @@ class DsfReimbursementService
         // Sauvegarder le PDF final
         if (file_exists($finalPdfPath)) {
             Storage::put($filePath, file_get_contents($finalPdfPath));
-            \Log::info("PDF final sauvegardé", ['path' => $filePath, 'size' => filesize($finalPdfPath)]);
+            \Log::info('PDF final sauvegardé', ['path' => $filePath, 'size' => filesize($finalPdfPath)]);
         } else {
             \Log::error("Le PDF final n'existe pas", ['expected_path' => $finalPdfPath]);
         }
 
         // Nettoyer les fichiers temporaires
-        if (file_exists($tempMainPdfPath)) @unlink($tempMainPdfPath);
-        if (file_exists($finalPdfPath) && $finalPdfPath !== $tempMainPdfPath) @unlink($finalPdfPath);
+        if (file_exists($tempMainPdfPath)) {
+            @unlink($tempMainPdfPath);
+        }
+        if (file_exists($finalPdfPath) && $finalPdfPath !== $tempMainPdfPath) {
+            @unlink($finalPdfPath);
+        }
 
         // Nettoyer les PDFs convertis temporaires
         foreach ($attachments as $attachment) {
             if (isset($attachment['is_converted']) && $attachment['is_converted'] && file_exists($attachment['path'])) {
                 @unlink($attachment['path']);
-                \Log::info("Fichier temporaire nettoyé", ['path' => $attachment['path']]);
+                \Log::info('Fichier temporaire nettoyé', ['path' => $attachment['path']]);
             }
         }
 
         // Envoyer par email
-        $this->sendReimbursementEmail($expenseSheet, $dsfCosts, $filePath, $attachments);
+        $this->sendReimbursementEmail($expenseSheet, $dsfCosts, $filePath, $attachments, $recipientEmail);
     }
 
     /**
      * Envoie l'email avec le PDF de demande de remboursement (avec annexes fusionnées)
      */
-    private function sendReimbursementEmail(ExpenseSheet $expenseSheet, $dsfCosts, string $pdfPath, array $attachments): void
+    private function sendReimbursementEmail(ExpenseSheet $expenseSheet, $dsfCosts, string $pdfPath, array $attachments, string $recipientEmail): void
     {
-        $recipientEmail = 'sebastien.merveille@ac.andenne.be';
-
         // Compter les annexes
         $attachmentCount = count($attachments);
-        $convertedCount = count(array_filter($attachments, fn($a) => $a['is_converted'] ?? false));
+        $convertedCount = count(array_filter($attachments, fn ($a) => $a['is_converted'] ?? false));
 
         Mail::send('emails.dsf-reimbursement', [
             'expenseSheet' => $expenseSheet,
@@ -106,9 +121,35 @@ class DsfReimbursementService
             'convertedCount' => $convertedCount,
         ], function ($message) use ($expenseSheet, $pdfPath, $recipientEmail) {
             $message->to($recipientEmail)
-                ->subject('Demande de remboursement DSF - Note de frais #' . $expenseSheet->id)
+                ->subject($this->buildSubject($expenseSheet))
                 ->attach(Storage::path($pdfPath));
         });
+    }
+
+    /**
+     * Adresse du service comptabilité destinataire, définie par organisation
+     * dans les paramètres. Retourne null si l'organisation n'en a pas configuré
+     * (ou si la note de frais n'est rattachée à aucune organisation).
+     */
+    private function resolveRecipientEmail(ExpenseSheet $expenseSheet): ?string
+    {
+        $email = $expenseSheet->organization?->dsf_recipient_email;
+
+        return filled($email) ? $email : null;
+    }
+
+    /**
+     * Sujet de l'email. Les organisations pouvant partager une même boîte
+     * comptable, le nom de l'organisation y est repris.
+     */
+    private function buildSubject(ExpenseSheet $expenseSheet): string
+    {
+        $organization = $expenseSheet->organization;
+        $organizationName = $organization?->organization_name ?: $organization?->name;
+
+        return filled($organizationName)
+            ? 'Demande de remboursement DSF ('.$organizationName.') - Note de frais #'.$expenseSheet->id
+            : 'Demande de remboursement DSF - Note de frais #'.$expenseSheet->id;
     }
 
     /**
@@ -130,71 +171,75 @@ class DsfReimbursementService
     {
         $attachments = [];
 
-        \Log::info("Début de collecte des attachments", ['costs_count' => $dsfCosts->count()]);
+        \Log::info('Début de collecte des attachments', ['costs_count' => $dsfCosts->count()]);
 
         foreach ($dsfCosts as $cost) {
-            \Log::info("Traitement du coût", [
+            \Log::info('Traitement du coût', [
                 'cost_id' => $cost->id,
                 'cost_name' => $cost->formCost->name ?? 'N/A',
-                'requirements_raw' => $cost->requirements
+                'requirements_raw' => $cost->requirements,
             ]);
 
             $requirements = is_string($cost->requirements)
                 ? json_decode($cost->requirements, true)
                 : $cost->requirements;
 
-            if (!is_array($requirements)) {
+            if (! is_array($requirements)) {
                 \Log::warning("Requirements n'est pas un tableau", ['cost_id' => $cost->id]);
+
                 continue;
             }
 
-            \Log::info("Requirements trouvés", [
+            \Log::info('Requirements trouvés', [
                 'cost_id' => $cost->id,
                 'requirements_count' => count($requirements),
-                'requirements' => $requirements
+                'requirements' => $requirements,
             ]);
 
             foreach ($requirements as $key => $requirement) {
-                if (!is_array($requirement) || !isset($requirement['file'])) {
-                    \Log::info("Requirement ignoré (pas de fichier)", ['key' => $key, 'requirement' => $requirement]);
+                if (! is_array($requirement) || ! isset($requirement['file'])) {
+                    \Log::info('Requirement ignoré (pas de fichier)', ['key' => $key, 'requirement' => $requirement]);
+
                     continue;
                 }
 
                 $fileUrl = $requirement['file'];
-                \Log::info("Fichier trouvé", ['key' => $key, 'url' => $fileUrl]);
+                \Log::info('Fichier trouvé', ['key' => $key, 'url' => $fileUrl]);
 
                 // Extraire le chemin relatif depuis l'URL
                 // Format attendu: /storage/xxx/yyy.ext
                 $relativePath = str_replace('/storage/', '', parse_url($fileUrl, PHP_URL_PATH));
-                \Log::info("Chemin extrait", ['url' => $fileUrl, 'relative_path' => $relativePath]);
+                \Log::info('Chemin extrait', ['url' => $fileUrl, 'relative_path' => $relativePath]);
 
                 // Construire le chemin absolu directement
-                $fullPath = storage_path('app/public/' . $relativePath);
+                $fullPath = storage_path('app/public/'.$relativePath);
 
                 // Vérifier si le fichier existe
-                if (!file_exists($fullPath)) {
+                if (! file_exists($fullPath)) {
                     \Log::warning("Fichier n'existe pas", [
                         'relative_path' => $relativePath,
                         'full_path' => $fullPath,
-                        'file_exists' => file_exists($fullPath)
+                        'file_exists' => file_exists($fullPath),
                     ]);
+
                     continue;
                 }
 
                 $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
                 $mimeType = mime_content_type($fullPath);
 
-                \Log::info("Fichier validé", [
+                \Log::info('Fichier validé', [
                     'path' => $fullPath,
                     'extension' => $extension,
                     'mime' => $mimeType,
-                    'size' => filesize($fullPath)
+                    'size' => filesize($fullPath),
                 ]);
 
                 // Vérifier si le type de fichier est supporté
                 $supportedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'docx', 'doc'];
-                if (!in_array($extension, $supportedExtensions)) {
-                    \Log::warning("Type de fichier non supporté", ['extension' => $extension, 'path' => $fullPath]);
+                if (! in_array($extension, $supportedExtensions)) {
+                    \Log::warning('Type de fichier non supporté', ['extension' => $extension, 'path' => $fullPath]);
+
                     continue;
                 }
 
@@ -203,15 +248,16 @@ class DsfReimbursementService
                 $isConverted = false;
 
                 if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'docx', 'doc'])) {
-                    \Log::info("Conversion en PDF nécessaire", ['extension' => $extension, 'file' => basename($fullPath)]);
+                    \Log::info('Conversion en PDF nécessaire', ['extension' => $extension, 'file' => basename($fullPath)]);
                     $convertedPath = $this->convertToPdf($fullPath, $extension, $expenseSheet->id);
 
                     if ($convertedPath && file_exists($convertedPath)) {
                         $pdfPath = $convertedPath;
                         $isConverted = true;
-                        \Log::info("Fichier converti avec succès", ['original' => basename($fullPath), 'pdf' => basename($pdfPath)]);
+                        \Log::info('Fichier converti avec succès', ['original' => basename($fullPath), 'pdf' => basename($pdfPath)]);
                     } else {
-                        \Log::warning("Échec de la conversion en PDF", ['file' => basename($fullPath)]);
+                        \Log::warning('Échec de la conversion en PDF', ['file' => basename($fullPath)]);
+
                         continue;
                     }
                 }
@@ -227,10 +273,10 @@ class DsfReimbursementService
             }
         }
 
-        \Log::info("Collecte terminée", [
+        \Log::info('Collecte terminée', [
             'total_attachments' => count($attachments),
             'pdfs' => count($attachments),
-            'converted' => count(array_filter($attachments, fn($a) => $a['is_converted'] ?? false))
+            'converted' => count(array_filter($attachments, fn ($a) => $a['is_converted'] ?? false)),
         ]);
 
         return $attachments;
@@ -242,26 +288,27 @@ class DsfReimbursementService
     private function mergePdfsWithAttachments(string $mainPdfPath, array $attachments, int $expenseSheetId): string
     {
         // Si pas de PDFs à fusionner, retourner le PDF principal
-        $pdfAttachments = array_filter($attachments, fn($a) => $a['type'] === 'pdf');
+        $pdfAttachments = array_filter($attachments, fn ($a) => $a['type'] === 'pdf');
 
         if (empty($pdfAttachments)) {
-            \Log::info("Aucun PDF à fusionner, retour du PDF principal");
+            \Log::info('Aucun PDF à fusionner, retour du PDF principal');
+
             return $mainPdfPath;
         }
 
-        \Log::info("Début de fusion de PDFs", [
+        \Log::info('Début de fusion de PDFs', [
             'main_pdf' => $mainPdfPath,
-            'annexes_count' => count($pdfAttachments)
+            'annexes_count' => count($pdfAttachments),
         ]);
 
         $tempDir = storage_path('app/temp');
-        $outputPath = $tempDir . '/merged_' . $expenseSheetId . '_' . time() . '.pdf';
+        $outputPath = $tempDir.'/merged_'.$expenseSheetId.'_'.time().'.pdf';
 
         try {
-            $fpdi = new Fpdi();
+            $fpdi = new Fpdi;
 
             // Ajouter toutes les pages du PDF principal
-            \Log::info("Import du PDF principal");
+            \Log::info('Import du PDF principal');
             $pageCount = $fpdi->setSourceFile($mainPdfPath);
             \Log::info("PDF principal: $pageCount pages");
 
@@ -278,11 +325,12 @@ class DsfReimbursementService
                 \Log::info("Traitement de l'annexe PDF", [
                     'index' => $index + 1,
                     'name' => $attachment['name'],
-                    'path' => $attachment['path']
+                    'path' => $attachment['path'],
                 ]);
 
-                if (!file_exists($attachment['path'])) {
-                    \Log::warning("Fichier annexe introuvable", ['path' => $attachment['path']]);
+                if (! file_exists($attachment['path'])) {
+                    \Log::warning('Fichier annexe introuvable', ['path' => $attachment['path']]);
+
                     continue;
                 }
 
@@ -299,32 +347,34 @@ class DsfReimbursementService
                         $fpdi->useTemplate($templateId);
                     }
 
-                    \Log::info("Annexe PDF fusionnée avec succès", ['name' => $attachment['name']]);
+                    \Log::info('Annexe PDF fusionnée avec succès', ['name' => $attachment['name']]);
 
                 } catch (\Exception $e) {
-                    \Log::warning("Erreur lors de la fusion du PDF annexe", [
+                    \Log::warning('Erreur lors de la fusion du PDF annexe', [
                         'name' => $attachment['name'],
                         'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'trace' => $e->getTraceAsString(),
                     ]);
+
                     continue;
                 }
             }
 
             // Sauvegarder le PDF fusionné
             $fpdi->Output('F', $outputPath);
-            \Log::info("PDF fusionné sauvegardé", [
+            \Log::info('PDF fusionné sauvegardé', [
                 'path' => $outputPath,
-                'size' => filesize($outputPath)
+                'size' => filesize($outputPath),
             ]);
 
             return $outputPath;
 
         } catch (\Exception $e) {
-            \Log::error("Erreur critique lors de la fusion des PDFs", [
+            \Log::error('Erreur critique lors de la fusion des PDFs', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             // En cas d'erreur, retourner le PDF principal sans fusion
             return $mainPdfPath;
         }
@@ -337,7 +387,7 @@ class DsfReimbursementService
     {
         try {
             $tempDir = storage_path('app/temp');
-            $outputPath = $tempDir . '/img_' . $expenseSheetId . '_' . time() . '_' . basename($imagePath, pathinfo($imagePath, PATHINFO_EXTENSION)) . '.pdf';
+            $outputPath = $tempDir.'/img_'.$expenseSheetId.'_'.time().'_'.basename($imagePath, pathinfo($imagePath, PATHINFO_EXTENSION)).'.pdf';
 
             // Utiliser TCPDF pour créer un PDF avec l'image
             $pdf = new \TCPDF('L', 'mm', 'A4', true, 'UTF-8', false);
@@ -350,7 +400,7 @@ class DsfReimbursementService
             $pdf->AddPage();
 
             // Obtenir les dimensions de l'image
-            list($width, $height) = getimagesize($imagePath);
+            [$width, $height] = getimagesize($imagePath);
 
             // Calculer les dimensions pour centrer l'image sur la page A4 landscape (297x210mm)
             $pageWidth = 297;
@@ -375,7 +425,7 @@ class DsfReimbursementService
             // Sauvegarder le PDF
             $pdf->Output($outputPath, 'F');
 
-            \Log::info("Image convertie en PDF", ['image' => $imagePath, 'pdf' => $outputPath, 'size' => filesize($outputPath)]);
+            \Log::info('Image convertie en PDF', ['image' => $imagePath, 'pdf' => $outputPath, 'size' => filesize($outputPath)]);
 
             return $outputPath;
 
@@ -383,8 +433,9 @@ class DsfReimbursementService
             \Log::error("Erreur lors de la conversion d'image en PDF", [
                 'image' => $imagePath,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -396,7 +447,7 @@ class DsfReimbursementService
     {
         try {
             $tempDir = storage_path('app/temp');
-            $outputPath = $tempDir . '/word_' . $expenseSheetId . '_' . time() . '_' . basename($wordPath, pathinfo($wordPath, PATHINFO_EXTENSION)) . '.pdf';
+            $outputPath = $tempDir.'/word_'.$expenseSheetId.'_'.time().'_'.basename($wordPath, pathinfo($wordPath, PATHINFO_EXTENSION)).'.pdf';
 
             // Configurer PHPWord pour utiliser TCPDF
             Settings::setPdfRendererName(Settings::PDF_RENDERER_TCPDF);
@@ -409,16 +460,17 @@ class DsfReimbursementService
             $pdfWriter = IOFactory::createWriter($phpWord, 'PDF');
             $pdfWriter->save($outputPath);
 
-            \Log::info("Document Word converti en PDF", ['word' => $wordPath, 'pdf' => $outputPath, 'size' => filesize($outputPath)]);
+            \Log::info('Document Word converti en PDF', ['word' => $wordPath, 'pdf' => $outputPath, 'size' => filesize($outputPath)]);
 
             return $outputPath;
 
         } catch (\Exception $e) {
-            \Log::error("Erreur lors de la conversion de Word en PDF", [
+            \Log::error('Erreur lors de la conversion de Word en PDF', [
                 'word' => $wordPath,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }

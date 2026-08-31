@@ -2,8 +2,9 @@
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { type NavItem } from '@/types';
+import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const sidebarNavItems: NavItem[] = [
     {
@@ -28,9 +29,26 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
-const page = usePage();
+const page = usePage<SharedData>();
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
+
+// Les réglages d'organisation ne concernent que ses administrateurs.
+const navItems = computed<NavItem[]>(() => {
+    const user = page.props.auth?.user;
+
+    if (!user?.is_admin && !user?.super_admin) {
+        return sidebarNavItems;
+    }
+
+    return [
+        ...sidebarNavItems,
+        {
+            title: 'Organisation',
+            href: '/settings/organization',
+        },
+    ];
+});
 </script>
 
 <template>
@@ -41,7 +59,7 @@ const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.locati
             <aside class="w-full max-w-xl lg:w-48">
                 <nav class="flex flex-col space-x-0 space-y-1">
                     <Button
-                        v-for="item in sidebarNavItems"
+                        v-for="item in navItems"
                         :key="item.href"
                         variant="ghost"
                         :class="['w-full justify-start', { 'bg-muted': currentPath === item.href }]"

@@ -22,6 +22,7 @@ class Organization extends Model
         'name',
         'slug',
         'domain',
+        'dsf_recipient_email',
         'organization_name',
     ];
 
@@ -79,7 +80,7 @@ class Organization extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'slug', 'domain', 'organization_name'])
+            ->logOnly(['name', 'slug', 'domain', 'dsf_recipient_email', 'organization_name'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('organization')

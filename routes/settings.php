@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\NotificationController;
+use App\Http\Controllers\Settings\OrganizationController;
 use App\Http\Controllers\Settings\PasskeyController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -23,6 +24,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/notifications', [NotificationController::class, 'edit'])->name('notifications.edit');
     Route::patch('settings/notifications', [NotificationController::class, 'update'])->name('notifications.update');
+
+    Route::get('settings/organization', [OrganizationController::class, 'edit'])->name('organization.edit');
+    Route::patch('settings/organization', [OrganizationController::class, 'update'])->name('organization.update');
 
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/Appearance');
