@@ -24,6 +24,7 @@ class FormCreateTest extends TestCase
                         'name' => 'Indemnité kilométrique',
                         'description' => 'Trajet domicile-travail',
                         'type' => 'km',
+                        'processing_department' => 'DSF',
                         'reimbursement_rates' => [
                             [
                                 'start_date' => '2026-01-01',
@@ -46,6 +47,7 @@ class FormCreateTest extends TestCase
 
         $this->assertSame('Indemnité kilométrique', $cost->name);
         $this->assertSame('km', $cost->type);
+        $this->assertSame('DSF', $cost->processing_department);
 
         $this->assertDatabaseHas('form_cost_remboursiement_rates', [
             'form_cost_id' => $cost->id,

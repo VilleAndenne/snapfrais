@@ -35,6 +35,7 @@ class FormUpdateTest extends TestCase
                         'name' => 'Coût modifié',
                         'description' => 'Desc modifiée',
                         'type' => 'fixed',
+                        'processing_department' => 'DSF',
                         'reimbursement_rates' => [
                             // Taux existant mis à jour
                             ['id' => $rate->id, 'start_date' => '2025-01-01', 'end_date' => null, 'value' => 20, 'transport' => 'car'],
@@ -52,7 +53,7 @@ class FormUpdateTest extends TestCase
         $this->assertSame('Nouveau', $form->name);
 
         // Coût mis à jour (pas recréé)
-        $this->assertDatabaseHas('form_costs', ['id' => $cost->id, 'name' => 'Coût modifié']);
+        $this->assertDatabaseHas('form_costs', ['id' => $cost->id, 'name' => 'Coût modifié', 'processing_department' => 'DSF']);
         $this->assertSame(1, $form->costs()->count());
 
         // Taux existant mis à jour + nouveau taux créé
@@ -77,7 +78,7 @@ class FormUpdateTest extends TestCase
                 'name' => $form->name,
                 'description' => $form->description,
                 'costs' => [
-                    ['id' => $kept->id, 'name' => 'Gardé', 'description' => 'D', 'type' => 'fixed', 'reimbursement_rates' => [], 'requirements' => []],
+                    ['id' => $kept->id, 'name' => 'Gardé', 'description' => 'D', 'type' => 'fixed', 'processing_department' => 'SRH', 'reimbursement_rates' => [], 'requirements' => []],
                 ],
             ])
             ->assertRedirect();

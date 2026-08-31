@@ -154,4 +154,49 @@ class ExpenseSheetExportTest extends TestCase
         $this->assertNotContains('MAI 2026', $headers);
         $this->assertNotContains('JUIN 2026', $headers);
     }
+
+    public function test_export_excludes_costs_processed_by_dsf(): void
+    {
+        Storage::fake();
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $department = Department::factory()->create();
+        $user = User::factory()->create(['is_admin' => false, 'name' => 'Jean Agent']);
+
+        $form = Form::factory()->create();
+        $srhCost = FormCost::factory()->create([
+            'name' => 'Repas',
+            'type' => 'fixed',
+            'form_id' => $form->id,
+            'processing_department' => 'SRH',
+        ]);
+        $dsfCost = FormCost::factory()->create([
+            'name' => 'Fourniture',
+            'type' => 'fixed',
+            'form_id' => $form->id,
+            'processing_department' => 'DSF',
+        ]);
+
+        $this->makeSheet($user, $department, $form, $srhCost, [
+            ['date' => '2026-04-05', 'amount' => 25],
+        ]);
+        $this->makeSheet($user, $department, $form, $dsfCost, [
+            ['date' => '2026-04-06', 'amount' => 90],
+        ]);
+
+        $this->actingAs($admin)->get(route('expense-sheets.export', [
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-30',
+        ]))->assertSessionHasNoErrors();
+
+        $rows = $this->readExport();
+        $headers = $rows[0];
+
+        $this->assertContains('EURO - Repas ('.$form->name.')', $headers);
+        $this->assertNotContains('EURO - Fourniture ('.$form->name.')', $headers);
+
+        // Seul le coût SRH est totalisé pour l'agent.
+        $this->assertSame('Jean Agent', $rows[1][0]);
+        $this->assertEquals(25, $rows[1][2]);
+    }
 }
