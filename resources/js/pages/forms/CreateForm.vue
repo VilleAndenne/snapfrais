@@ -258,7 +258,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Loader2Icon, PlusIcon, Trash2Icon, PencilIcon, CoinsIcon } from 'lucide-vue-next';
 
@@ -315,6 +315,27 @@ const blankCost = () => ({
 });
 
 const costDraft = ref(blankCost());
+
+// reka-ui verrouille `<body>` (overflow + pointer-events) tant qu'une couche
+// modale est ouverte. Avec plusieurs Select dans la boîte de dialogue, ce verrou
+// n'est pas toujours relâché à la fermeture : la page reste alors inerte et le
+// bouton « Enregistrer » ne répond plus. On le relâche nous-mêmes une fois qu'il
+// ne reste plus aucune couche ouverte.
+watch(showCostModal, (open) => {
+    if (open) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (document.querySelector('[data-state="open"][role="dialog"]')) {
+            return;
+        }
+
+        document.body.style.removeProperty('pointer-events');
+        document.body.style.removeProperty('overflow');
+    });
+});
+
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
