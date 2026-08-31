@@ -1,95 +1,200 @@
+@php
+    use Carbon\Carbon;
+
+    $organization = $expenseSheet->organization;
+    $organizationName = $organization?->organization_name
+        ?: ($organization?->name ?: config('app.name'));
+
+    $total = $dsfCosts->sum('total');
+    $validatedAt = $expenseSheet->validated_at
+        ? Carbon::parse($expenseSheet->validated_at)->locale('fr_BE')->translatedFormat('d/m/Y à H:i')
+        : null;
+
+    $label = 'padding: 10px 0; color: #5b6470; font-size: 14px; vertical-align: top; width: 40%;';
+    $value = 'padding: 10px 0; color: #1c2430; font-size: 14px; vertical-align: top; font-weight: 600;';
+    $cell = 'padding: 12px 16px; font-size: 14px; color: #1c2430; border-bottom: 1px solid #e3e6ea;';
+@endphp
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demande de remboursement DSF</title>
+    <title>Demande de remboursement — Direction des Services Financiers</title>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
-            Nouvelle demande de remboursement - Direction des Services Financiers
-        </h2>
+<body style="margin: 0; padding: 0; background-color: #eef0f3;">
 
-        <p>Bonjour,</p>
+<span style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+    Note de frais #{{ $expenseSheet->id }} — {{ number_format($total, 2, ',', ' ') }} € à rembourser à {{ $expenseSheet->user->name ?? 'l\'agent' }}.
+</span>
 
-        <p>Une nouvelle demande de remboursement a été validée et nécessite votre traitement.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #eef0f3; padding: 32px 16px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width: 640px; width: 100%; background-color: #ffffff; border: 1px solid #dfe3e8;">
 
-        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">Détails de la demande</h3>
-            <ul style="list-style: none; padding: 0;">
-                <li><strong>Numéro de note de frais :</strong> #{{ $expenseSheet->id }}</li>
-                <li><strong>Agent :</strong> {{ $expenseSheet->user->name ?? '-' }} ({{ $expenseSheet->user->email ?? '-' }})</li>
-                <li><strong>Service :</strong> {{ $expenseSheet->department->name ?? '-' }}</li>
-                <li><strong>Validée par :</strong> {{ $expenseSheet->validatedBy->name ?? '-' }}</li>
-                <li><strong>Date de validation :</strong> {{ $expenseSheet->validated_at ? \Carbon\Carbon::parse($expenseSheet->validated_at)->locale('fr_BE')->translatedFormat('d/m/Y à H:i') : '-' }}</li>
-                <li><strong>Montant total :</strong> {{ number_format($dsfCosts->sum('total'), 2, ',', ' ') }} €</li>
-                <li><strong>Nombre de coûts :</strong> {{ $dsfCosts->count() }}</li>
-            </ul>
-        </div>
-
-        <h3>Coûts à rembourser</h3>
-        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-            <thead>
-                <tr style="background-color: #e5e7eb;">
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Description</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">Montant</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($dsfCosts as $cost)
                 <tr>
-                    <td style="border: 1px solid #d1d5db; padding: 8px;">
-                        {{ $cost->formCost->name ?? '-' }}
-                        <br>
-                        <small style="color: #6b7280;">{{ \Carbon\Carbon::parse($cost->date)->format('d/m/Y') }}</small>
-                    </td>
-                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">
-                        {{ number_format($cost->total, 2, ',', ' ') }} €
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-            <tfoot>
-                <tr style="background-color: #f9fafb; font-weight: bold;">
-                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">Total :</td>
-                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">
-                        {{ number_format($dsfCosts->sum('total'), 2, ',', ' ') }} €
+                    <td style="background-color: #1c2430; padding: 24px 32px;">
+                        <p style="margin: 0; color: #ffffff; font-family: Georgia, 'Times New Roman', serif; font-size: 19px; letter-spacing: 0.3px;">
+                            {{ $organizationName }}
+                        </p>
+                        <p style="margin: 4px 0 0 0; color: #9aa4b1; font-family: Arial, Helvetica, sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px;">
+                            Direction des Services Financiers
+                        </p>
                     </td>
                 </tr>
-            </tfoot>
-        </table>
 
-        <p style="margin-top: 30px;">
-            <strong>Document joint :</strong>
-        </p>
-        <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; border-left: 4px solid #2563eb;">
-            <p style="margin: 0; font-weight: bold;">📄 Demande de remboursement complète (PDF)</p>
-            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6b7280;">
-                Ce PDF contient :
-            </p>
-            <ul style="margin: 10px 0; padding-left: 20px; color: #6b7280; font-size: 14px;">
-                <li>La demande de remboursement détaillée</li>
-                @if(isset($attachmentCount) && $attachmentCount > 0)
-                    <li>{{ $attachmentCount }} pièce(s) justificative(s) fusionnée(s) (PDF, images, documents Word)</li>
-                @endif
-                @if(isset($convertedCount) && $convertedCount > 0)
-                    <li>{{ $convertedCount }} fichier(s) converti(s) automatiquement en PDF</li>
-                @endif
-            </ul>
-            <p style="margin: 10px 0 0 0; font-size: 13px; color: #059669; font-weight: bold;">
-                ✓ Toutes les pièces justificatives sont incluses dans ce document unique
-            </p>
-        </div>
+                <tr>
+                    <td style="padding: 32px 32px 0 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <p style="margin: 0 0 24px 0; font-size: 15px; color: #1c2430;">
+                            <strong>Objet :</strong> demande de remboursement de frais — note n° {{ $expenseSheet->id }}
+                        </p>
 
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                        <p style="margin: 0 0 16px 0; font-size: 15px; color: #1c2430; line-height: 1.6;">
+                            Madame, Monsieur,
+                        </p>
 
-        <p style="color: #6b7280; font-size: 12px;">
-            Cet email a été généré automatiquement par le système de gestion des notes de frais de
-            {{ $expenseSheet->organization?->organization_name ?? $expenseSheet->organization?->name ?? config('app.name') }}.
-            <br>
-            Pour toute question, veuillez contacter le service concerné.
-        </p>
-    </div>
+                        <p style="margin: 0 0 24px 0; font-size: 15px; color: #1c2430; line-height: 1.6;">
+                            Une note de frais comportant des coûts relevant de votre service a été approuvée
+                            @if ($validatedAt) le {{ $validatedAt }} @endif
+                            et vous est transmise pour traitement. Le détail figure ci-dessous ; la demande complète
+                            et ses pièces justificatives sont réunies dans le document joint.
+                        </p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 0 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top: 2px solid #1c2430; border-bottom: 1px solid #dfe3e8;">
+                            <tr>
+                                <td colspan="2" style="padding: 14px 0 6px 0;">
+                                    <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #5b6470;">
+                                        Identification de la demande
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="{{ $label }}">Note de frais</td>
+                                <td style="{{ $value }}">n° {{ $expenseSheet->id }}</td>
+                            </tr>
+                            <tr>
+                                <td style="{{ $label }}">Agent bénéficiaire</td>
+                                <td style="{{ $value }}">
+                                    {{ $expenseSheet->user->name ?? '—' }}
+                                    @if ($expenseSheet->user?->email)
+                                        <br><span style="font-weight: 400; color: #5b6470;">{{ $expenseSheet->user->email }}</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="{{ $label }}">Service</td>
+                                <td style="{{ $value }}">{{ $expenseSheet->department->name ?? '—' }}</td>
+                            </tr>
+                            <tr>
+                                <td style="{{ $label }}">Approuvée par</td>
+                                <td style="{{ $value }}">{{ $expenseSheet->validatedBy->name ?? '—' }}</td>
+                            </tr>
+                            <tr>
+                                <td style="{{ $label }}">Date d'approbation</td>
+                                <td style="{{ $value }}">{{ $validatedAt ?? '—' }}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 28px 32px 0 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <p style="margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #5b6470;">
+                            Détail des montants
+                        </p>
+
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border: 1px solid #e3e6ea;">
+                            <thead>
+                                <tr style="background-color: #f5f6f8;">
+                                    <th align="left" style="padding: 10px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: #5b6470; border-bottom: 1px solid #e3e6ea;">Objet du frais</th>
+                                    <th align="right" style="padding: 10px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: #5b6470; border-bottom: 1px solid #e3e6ea;">Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($dsfCosts as $cost)
+                                    <tr>
+                                        <td style="{{ $cell }}">
+                                            {{ $cost->formCost->name ?? '—' }}
+                                            @if ($cost->date)
+                                                <br><span style="color: #5b6470; font-size: 13px;">Exposé le {{ Carbon::parse($cost->date)->format('d/m/Y') }}</span>
+                                            @endif
+                                        </td>
+                                        <td align="right" style="{{ $cell }} white-space: nowrap;">
+                                            {{ number_format($cost->total, 2, ',', ' ') }} €
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #1c2430;">
+                                    <td align="right" style="padding: 12px 16px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: #ffffff;">
+                                        Total à rembourser
+                                    </td>
+                                    <td align="right" style="padding: 12px 16px; font-size: 16px; font-weight: bold; color: #ffffff; white-space: nowrap;">
+                                        {{ number_format($total, 2, ',', ' ') }} €
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 28px 32px 0 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f6f8; border-left: 3px solid #1c2430;">
+                            <tr>
+                                <td style="padding: 16px 20px;">
+                                    <p style="margin: 0 0 6px 0; font-size: 14px; font-weight: bold; color: #1c2430;">
+                                        Pièce jointe — demande de remboursement (PDF)
+                                    </p>
+                                    <p style="margin: 0; font-size: 14px; color: #3d4753; line-height: 1.6;">
+                                        @php
+                                            $plural = ($attachmentCount ?? 0) > 1 ? 's' : '';
+
+                                            $piecesJointes = ($attachmentCount ?? 0) > 0
+                                                ? 'ainsi que '.$attachmentCount.' pièce'.$plural.' justificative'.$plural
+                                                    .(($convertedCount ?? 0) > 0
+                                                        ? ' (dont '.$convertedCount.' convertie'.(($convertedCount > 1) ? 's' : '').' au format PDF)'
+                                                        : '')
+                                                : '; aucune pièce justificative n\'était jointe à cette note';
+                                        @endphp
+                                        {{ 'Un document unique regroupant la demande détaillée '.$piecesJointes.'.' }}
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 28px 32px 32px 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <p style="margin: 0 0 4px 0; font-size: 15px; color: #1c2430; line-height: 1.6;">
+                            Nous vous prions d'agréer, Madame, Monsieur, l'expression de nos salutations distinguées.
+                        </p>
+                        <p style="margin: 16px 0 0 0; font-size: 15px; color: #1c2430;">
+                            {{ $organizationName }}
+                        </p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="background-color: #f5f6f8; border-top: 1px solid #dfe3e8; padding: 18px 32px; font-family: Arial, Helvetica, sans-serif;">
+                        <p style="margin: 0; font-size: 12px; color: #5b6470; line-height: 1.6;">
+                            {{ $organizationName }} — message généré automatiquement par SnapFrais, application de
+                            gestion des notes de frais. Merci de ne pas répondre à cet envoi ; pour toute question
+                            relative à cette demande, veuillez contacter le service émetteur.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
 </body>
 </html>
