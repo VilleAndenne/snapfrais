@@ -38,6 +38,8 @@ class User extends Authenticatable implements HasPasskeysContract
         'notify_expense_sheet_to_approval',
         'notify_receipt_expense_sheet',
         'notify_remind_approval',
+        'bank_account_number',
+        'address',
     ];
 
     protected $appends = ['is_head'];
@@ -47,9 +49,19 @@ class User extends Authenticatable implements HasPasskeysContract
      *
      * @var list<string>
      */
+    /**
+     * Les coordonnées de paiement ne sont jamais sérialisées : le modèle User est
+     * partagé avec le front (props Inertia, notes de frais consultées par un
+     * validateur), et personne d'autre que l'agent n'a à voir son IBAN. Les écrans
+     * qui en ont légitimement besoin les exposent explicitement.
+     *
+     * @var list<string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
+        'bank_account_number',
+        'address',
     ];
 
     public function setEmailAttribute($value)
@@ -72,7 +84,23 @@ class User extends Authenticatable implements HasPasskeysContract
             'notify_receipt_expense_sheet' => 'boolean',
             'notify_remind_approval' => 'boolean',
             'super_admin' => 'boolean',
+            'bank_account_number' => 'encrypted',
+            'address' => 'encrypted',
         ];
+    }
+
+    /**
+     * Coordonnées de paiement manquantes, parmi celles réclamées à l'agent pour
+     * qu'une demande de remboursement puisse être adressée à la DSF.
+     *
+     * @return list<string>
+     */
+    public function missingPaymentDetails(): array
+    {
+        return array_values(array_filter([
+            blank($this->bank_account_number) ? 'bank_account_number' : null,
+            blank($this->address) ? 'address' : null,
+        ]));
     }
 
     /**

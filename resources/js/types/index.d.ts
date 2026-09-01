@@ -36,6 +36,7 @@ export interface SharedData extends PageProps {
     auth: Auth;
     organization: Organization | null;
     organizationSwitcher: OrganizationSwitcher | null;
+    missingPaymentDetails: string[];
     ziggy: Config & { location: string };
 }
 

@@ -17,9 +17,16 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            // Masquées sur le modèle : l'agent est seul à voir les siennes.
+            'paymentDetails' => [
+                'bank_account_number' => $user->bank_account_number,
+                'address' => $user->address,
+            ],
         ]);
     }
 

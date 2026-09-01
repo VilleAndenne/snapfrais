@@ -9,6 +9,7 @@ use App\Models\FormCost;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\DsfReimbursementService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -146,5 +147,69 @@ class DsfReimbursementServiceTest extends TestCase
         $sheet = $this->makeSheet($organization, 'DSF');
 
         $this->assertTrue((new DsfReimbursementService)->hasDsfCosts($sheet));
+    }
+
+    public function test_the_payment_details_of_the_agent_reach_the_dsf(): void
+    {
+        Storage::fake();
+
+        $organization = Organization::factory()->create(['dsf_recipient_email' => 'compta@ville.test']);
+        $sheet = $this->makeSheet($organization, 'DSF');
+
+        $sheet->user->update([
+            'bank_account_number' => 'BE68539007547034',
+            'address' => 'Rue de Velaine 162, 5300 Andenne',
+        ]);
+
+        (new DsfReimbursementService)->generateAndSendReimbursementPdf($sheet->fresh());
+
+        $pdf = Storage::get(Storage::allFiles('dsf_reimbursements')[0]);
+        $texte = $this->pdfText($pdf);
+
+        // L'IBAN est mis en forme par blocs de quatre dans le document.
+        $this->assertStringContainsString('BE68 5390 0754 7034', $texte);
+        $this->assertStringContainsString('Rue de Velaine 162', $texte);
+    }
+
+    public function test_the_payment_details_never_appear_on_the_expense_sheet_pdf(): void
+    {
+        $organization = Organization::factory()->create(['dsf_recipient_email' => 'compta@ville.test']);
+        $sheet = $this->makeSheet($organization, 'DSF');
+
+        $sheet->user->update([
+            'bank_account_number' => 'BE68539007547034',
+            'address' => 'Rue de Velaine 162, 5300 Andenne',
+        ]);
+
+        $sheet->refresh()->load(['costs.formCost.reimbursementRates', 'user', 'department', 'validatedBy', 'form']);
+
+        $pdf = Pdf::loadView('expenseSheet.pdf', [
+            'expenseSheet' => $sheet,
+            'organizationName' => $organization->organization_name,
+        ])->setPaper('a4', 'landscape')->output();
+
+        $texte = $this->pdfText($pdf);
+
+        $this->assertStringNotContainsString('BE68', $texte);
+        $this->assertStringNotContainsString('5390', $texte);
+        $this->assertStringNotContainsString('Velaine', $texte);
+    }
+
+    /**
+     * Texte brut d'un PDF, via pdftotext lorsqu'il est disponible.
+     */
+    private function pdfText(string $binary): string
+    {
+        $source = tempnam(sys_get_temp_dir(), 'pdf').'.pdf';
+        file_put_contents($source, $binary);
+
+        exec('pdftotext -layout '.escapeshellarg($source).' - 2>/dev/null', $lines, $status);
+        @unlink($source);
+
+        if ($status !== 0) {
+            $this->markTestSkipped('pdftotext est requis pour inspecter le contenu du PDF.');
+        }
+
+        return implode("\n", $lines);
     }
 }

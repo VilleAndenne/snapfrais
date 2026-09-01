@@ -55,6 +55,9 @@ class HandleInertiaRequests extends Middleware
                 'organizationName' => $organization->organization_name,
             ],
             'organizationSwitcher' => $this->organizationSwitcher($request->user(), $organization),
+            // Pilote la fenêtre affichée à l'ouverture : on partage les champs qui
+            // manquent, jamais leur contenu.
+            'missingPaymentDetails' => $request->user()?->missingPaymentDetails() ?? [],
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),

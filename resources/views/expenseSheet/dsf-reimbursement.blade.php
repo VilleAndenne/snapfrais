@@ -3,26 +3,6 @@
 
     $sheet = $expenseSheet;
 
-    // Le corps d'une vue est ré-exécuté à chaque rendu : sans ce garde, générer
-    // deux demandes DSF dans le même process redéclare ces fonctions (erreur fatale).
-    if (! function_exists('fr_date')) {
-        function fr_date($d) {
-            return $d ? Carbon::parse($d)->locale('fr_BE')->translatedFormat('d/m/Y') : '';
-        }
-        function money_eur($v) {
-            return number_format((float)$v, 2, ',', ' ') . ' €';
-        }
-        function safe_array($value) {
-            if (is_array($value)) return $value;
-            if (is_object($value)) return (array)$value;
-            if (is_string($value)) {
-                $decoded = json_decode($value, true);
-                return is_array($decoded) ? $decoded : [];
-            }
-            return [];
-        }
-    }
-
     // Calculer les totaux uniquement pour les coûts DSF
     $totalDsf = (float) $dsfCosts->sum('total');
 @endphp
@@ -207,6 +187,20 @@
                 <tr>
                     <td class="w-25 muted">Agent</td>
                     <td>{{ $sheet->user->name ?? '-' }} ({{ $sheet->user->email ?? '-' }})</td>
+                </tr>
+                <tr>
+                    <td class="muted">Adresse</td>
+                    <td>{{ $sheet->user->address ?: 'Non renseignée' }}</td>
+                </tr>
+                <tr>
+                    <td class="muted">Compte à créditer</td>
+                    <td>
+                        @if ($sheet->user->bank_account_number)
+                            <strong>{{ iban_format($sheet->user->bank_account_number) }}</strong>
+                        @else
+                            <strong>Non renseigné</strong> &mdash; à réclamer à l'agent avant paiement
+                        @endif
+                    </td>
                 </tr>
                 @if($sheet->user_id !== $sheet->creator_id && !empty($sheet->created_by))
                 <tr>

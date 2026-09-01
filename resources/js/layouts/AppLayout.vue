@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import PatchNoteModal from '@/components/PatchNoteModal.vue';
+import PaymentDetailsModal from '@/components/PaymentDetailsModal.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 import { watch, ref, computed } from 'vue';
@@ -135,4 +136,7 @@ watch(
 
     <!-- Modal Patch Notes -->
     <PatchNoteModal />
+
+    <!-- Coordonnées de remboursement réclamées à l'agent tant qu'elles manquent -->
+    <PaymentDetailsModal />
 </template>

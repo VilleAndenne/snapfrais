@@ -6,6 +6,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
@@ -13,9 +14,13 @@ import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 interface Props {
     mustVerifyEmail: boolean;
     status?: string;
+    paymentDetails: {
+        bank_account_number: string | null;
+        address: string | null;
+    };
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -34,6 +39,17 @@ const form = useForm({
 
 const submit = () => {
     form.patch(route('profile.update'), {
+        preserveScroll: true,
+    });
+};
+
+const paymentForm = useForm({
+    bank_account_number: props.paymentDetails.bank_account_number ?? '',
+    address: props.paymentDetails.address ?? '',
+});
+
+const submitPaymentDetails = () => {
+    paymentForm.patch(route('payment-details.update'), {
         preserveScroll: true,
     });
 };
@@ -99,6 +115,56 @@ const submit = () => {
                         </Transition>
                     </div>
                 </form>
+
+                <div class="border-t pt-6">
+                    <HeadingSmall
+                        title="Coordonnées de remboursement"
+                        description="Utilisées par la Direction des Services Financiers pour vous rembourser les frais que vous avancez pour le compte de l'administration."
+                    />
+
+                    <form @submit.prevent="submitPaymentDetails" class="mt-6 space-y-6">
+                        <div class="grid gap-2">
+                            <Label for="bank_account_number">Numéro de compte (IBAN)</Label>
+                            <Input
+                                id="bank_account_number"
+                                v-model="paymentForm.bank_account_number"
+                                placeholder="BE68 5390 0754 7034"
+                                autocomplete="off"
+                            />
+                            <InputError :message="paymentForm.errors.bank_account_number" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="address">Adresse complète</Label>
+                            <Textarea
+                                id="address"
+                                v-model="paymentForm.address"
+                                rows="3"
+                                placeholder="Rue, numéro, code postal et localité"
+                            />
+                            <InputError :message="paymentForm.errors.address" />
+                        </div>
+
+                        <p class="text-sm text-muted-foreground">
+                            Ces données ne figurent que sur les demandes adressées à la Direction des Services
+                            Financiers. Elles n'apparaissent pas sur vos notes de frais et ne sont visibles ni de
+                            votre responsable, ni des autres agents.
+                        </p>
+
+                        <div class="flex items-center gap-4">
+                            <Button :disabled="paymentForm.processing">Sauvegarder</Button>
+
+                            <Transition
+                                enter-active-class="transition ease-in-out"
+                                enter-from-class="opacity-0"
+                                leave-active-class="transition ease-in-out"
+                                leave-to-class="opacity-0"
+                            >
+                                <p v-show="paymentForm.recentlySuccessful" class="text-sm text-neutral-600">Sauvegardé.</p>
+                            </Transition>
+                        </div>
+                    </form>
+                </div>
             </div>
         </SettingsLayout>
     </AppLayout>
