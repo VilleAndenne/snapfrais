@@ -61,6 +61,13 @@ class ExpenseSheetPolicy
             return false;
         }
 
+        // Séparation des rôles : une note encodée par l'utilisateur pour un agent
+        // ne remonte pas dans sa propre liste à valider, sauf s'il est
+        // responsable direct du service de la note.
+        if ($expenseSheet->created_by === $user->id && ! $noteDepartment->heads->contains($user)) {
+            return false;
+        }
+
         // L'auteur de la note est-il responsable de son département ?
         $authorIsHeadOfNoteDepartment = $noteDepartment->heads->contains($expenseSheet->user);
 
@@ -117,6 +124,15 @@ class ExpenseSheetPolicy
         // Département lié à la note de frais
         $department = $expenseSheet->department;
 
+        // Séparation des rôles : un encodeur ne valide pas ce qu'il a saisi pour
+        // un agent. Seul le responsable direct du service de la note conserve ce
+        // droit sur les notes qu'il encode lui-même.
+        if (! $isOwnNote
+            && $expenseSheet->created_by === $user->id
+            && ! ($department && $department->heads->contains($user))) {
+            return false;
+        }
+
         // Vérifie si l'utilisateur est responsable du département ou d'un parent
         while ($department) {
             // 1. L'utilisateur est responsable ici ?
@@ -169,6 +185,8 @@ class ExpenseSheetPolicy
     public function view(User $user, ExpenseSheet $expenseSheet)
     {
         if ($expenseSheet->user_id === $user->id) {
+            return true;
+        } elseif ($expenseSheet->created_by === $user->id) {
             return true;
         } elseif ($user->is_admin == true) {
             return true;

@@ -123,7 +123,7 @@ class ExpenseSheetController extends Controller
 
         return inertia('expenseSheet/Create', [
             'form' => $form,
-            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads', 'encoders')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -170,16 +170,15 @@ class ExpenseSheetController extends Controller
             // Convertir is_draft en booléen de manière fiable
             $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
 
-            // Département + relations nécessaires (heads + users)
-            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            // Département + relations nécessaires (heads + encoders + users)
+            $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
             $currentUserId = auth()->id();
             $targetUserId = $request->input('target_user_id');
 
-            // Si on encode pour quelqu'un d'autre : il faut être head du service + la cible doit appartenir au service
+            // Si on encode pour quelqu'un d'autre : il faut être responsable ou encodeur du service + la cible doit appartenir au service
             if ($targetUserId && (int) $targetUserId !== (int) $currentUserId) {
-                $isHead = $department->heads->contains('id', $currentUserId);
-                if (! $isHead) {
-                    abort(403, "Vous devez être responsable du service pour encoder au nom d'un agent.");
+                if (! auth()->user()->canEncodeForDepartment($department)) {
+                    abort(403, "Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.");
                 }
                 $belongsToDept = $department->users->contains('id', (int) $targetUserId);
                 if (! $belongsToDept) {
@@ -499,7 +498,7 @@ class ExpenseSheetController extends Controller
                 })->toArray(),
             ],
             'expenseSheet' => $expenseSheetData,
-            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads', 'encoders')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -528,6 +527,21 @@ class ExpenseSheetController extends Controller
             'costs.*.requirements.*.file.mimes' => 'Les annexes doivent être au format PDF ou image (JPG, PNG, GIF, WEBP, HEIC).',
             'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
         ]);
+
+        $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
+        $targetUserId = $validated['target_user_id'] ?? null;
+
+        // Réaffecter la note à un autre agent suppose le droit d'encoder pour le service
+        if ($targetUserId && (int) $targetUserId !== (int) auth()->id() && ! auth()->user()->is_admin) {
+            if (! auth()->user()->canEncodeForDepartment($department)) {
+                abort(403, "Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.");
+            }
+            if (! $department->users->contains('id', (int) $targetUserId)) {
+                return back()
+                    ->withErrors(['target_user_id' => "L'agent sélectionné n'appartient pas à ce service."])
+                    ->withInput();
+            }
+        }
 
         try {
             // Supprimer tous les coûts existants
@@ -757,20 +771,23 @@ class ExpenseSheetController extends Controller
             'approval' => 'required|boolean',
             'reason' => 'required_if:approval,0',
         ]);
-        if (! auth()->user()->can('approve', $expenseSheet) && $validated['approval'] === true) {
+        // `$validated` conserve le type brut de la requête ("1"/"0" en formulaire) :
+        // on compare sur le booléen pour que l'autorisation soit réellement évaluée.
+        $approval = $request->boolean('approval');
+
+        if ($approval && ! auth()->user()->can('approve', $expenseSheet)) {
             abort(403);
-        } elseif (! auth()->user()->can('reject', $expenseSheet) && $validated['approval'] === false) {
+        } elseif (! $approval && ! auth()->user()->can('reject', $expenseSheet)) {
             abort(403);
         }
 
-        $expenseSheet->approved = $validated['approval'];
+        $expenseSheet->approved = $approval;
         $expenseSheet->refusal_reason = $validated['reason'] ?? null;
         $expenseSheet->validated_by = auth()->id();
         $expenseSheet->validated_at = now();
-        $expenseSheet->validated_by = auth()->id();
         $expenseSheet->save();
 
-        if ($validated['approval']) {
+        if ($approval) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
         } else {
             $expenseSheet->user->notify(new RejectionExpenseSheet($expenseSheet));

@@ -83,6 +83,7 @@
                     >
                         {{ dept.name }}
                         <Badge v-if="dept.pivot?.is_head" variant="default" class="text-[10px]">Responsable</Badge>
+                        <Badge v-if="dept.pivot?.is_encoder" variant="secondary" class="text-[10px]">Encodeur</Badge>
                         <Badge v-else variant="outline" class="text-[10px]">Membre</Badge>
                     </span>
                 </div>
