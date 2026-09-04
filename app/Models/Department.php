@@ -25,6 +25,15 @@ class Department extends Model
         return $this->belongsToMany(User::class, 'department_user', 'department_id', 'user_id')->wherePivot('is_head', true);
     }
 
+    /**
+     * Membres autorisés à encoder une note de frais pour un autre agent du
+     * service, sans pouvoir la valider.
+     */
+    public function encoders()
+    {
+        return $this->belongsToMany(User::class, 'department_user', 'department_id', 'user_id')->wherePivot('is_encoder', true);
+    }
+
     public function parent()
     {
         return $this->belongsTo(Department::class, 'parent_id');

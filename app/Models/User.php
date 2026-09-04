@@ -173,12 +173,32 @@ class User extends Authenticatable implements HasPasskeysContract
 
     public function departments()
     {
-        return $this->belongsToMany(Department::class)->withPivot('is_head');
+        return $this->belongsToMany(Department::class)->withPivot('is_head', 'is_encoder');
     }
 
     public function headOfDepartments()
     {
         return $this->belongsToMany(Department::class)->wherePivot('is_head', true);
+    }
+
+    /**
+     * Services dans lesquels l'utilisateur est encodeur : il y saisit des notes
+     * de frais pour les autres agents, sans pouvoir les valider.
+     */
+    public function encoderOfDepartments()
+    {
+        return $this->belongsToMany(Department::class)->wherePivot('is_encoder', true);
+    }
+
+    /**
+     * Détermine si l'utilisateur peut encoder une note de frais au nom d'un
+     * autre agent du service : les responsables le peuvent toujours, les
+     * encodeurs y sont explicitement autorisés.
+     */
+    public function canEncodeForDepartment(Department $department): bool
+    {
+        return $department->heads->contains('id', $this->id)
+            || $department->encoders->contains('id', $this->id);
     }
 
     public function superiors()

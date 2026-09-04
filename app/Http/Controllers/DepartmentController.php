@@ -54,6 +54,7 @@ class DepartmentController extends Controller
             'users' => 'array',
             'users.*.id' => 'integer|exists:users,id',
             'users.*.is_head' => 'boolean',
+            'users.*.is_encoder' => 'boolean',
         ]);
 
         $dep = Department::create([
@@ -63,7 +64,10 @@ class DepartmentController extends Controller
 
         $syncData = [];
         foreach ($validated['users'] as $user) {
-            $syncData[$user['id']] = ['is_head' => $user['is_head']];
+            $syncData[$user['id']] = [
+                'is_head' => $user['is_head'],
+                'is_encoder' => $user['is_encoder'] ?? false,
+            ];
         }
 
         $dep->users()->sync($syncData);
@@ -90,7 +94,7 @@ class DepartmentController extends Controller
 
         return Inertia::render('departments/Edit', [
             'department' => Department::with(['users' => function ($query) {
-                $query->withPivot('is_head');
+                $query->withPivot('is_head', 'is_encoder');
             }])->find($id),
             'users' => User::inCurrentOrganization()->get(),
             'departments' => Department::all(),
@@ -111,6 +115,7 @@ class DepartmentController extends Controller
             'users' => 'array',
             'users.*.id' => 'integer|exists:users,id',
             'users.*.is_head' => 'boolean',
+            'users.*.is_encoder' => 'boolean',
         ]);
 
         $dep = Department::find($id);
@@ -122,7 +127,10 @@ class DepartmentController extends Controller
 
         $syncData = [];
         foreach ($validated['users'] as $user) {
-            $syncData[$user['id']] = ['is_head' => $user['is_head']];
+            $syncData[$user['id']] = [
+                'is_head' => $user['is_head'],
+                'is_encoder' => $user['is_encoder'] ?? false,
+            ];
         }
 
         $dep->users()->sync($syncData);

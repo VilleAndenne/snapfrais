@@ -23,8 +23,8 @@
                 </span>
             </div>
 
-            <!-- Sélecteur d'agent (visible si l'utilisateur est head du service sélectionné) -->
-            <div v-if="isHeadOfSelectedDept" class="flex flex-col space-y-2">
+            <!-- Sélecteur d'agent (visible si l'utilisateur est responsable ou encodeur du service sélectionné) -->
+            <div v-if="canEncodeForSelectedDept" class="flex flex-col space-y-2">
                 <Label for="targetUser">Pour quel agent ?</Label>
                 <Select v-model="form.target_user_id">
                     <SelectTrigger id="targetUser">
@@ -259,7 +259,7 @@ const costData = ref([]);
 
 const props = defineProps({
     form: { type: Object, required: true },
-    departments: { type: Array, required: true }, // heads[] + users[]
+    departments: { type: Array, required: true }, // heads[] + encoders[] + users[]
     authUser: { type: Object, required: true }, // { id, name }
 });
 
@@ -274,20 +274,21 @@ onMounted(() => {
     costs.value = props.form.costs;
 });
 
-// Département sélectionné + statut "head"
+// Département sélectionné + droit d'encoder pour un autre agent
 const selectedDepartment = computed(() => props.departments.find((d) => d.id === form.department_id) || null);
 
-const isHeadOfSelectedDept = computed(() => {
+// Responsable ou encodeur du service : peut saisir une note pour un autre agent
+const canEncodeForSelectedDept = computed(() => {
     if (!selectedDepartment.value) return false;
-    const heads = selectedDepartment.value.heads || [];
-    return heads.some((h) => Number(h.id) === Number(props.authUser.id));
+    const allowed = [...(selectedDepartment.value.heads || []), ...(selectedDepartment.value.encoders || [])];
+    return allowed.some((u) => Number(u.id) === Number(props.authUser.id));
 });
 
-// Quand le département change : si head -> pré-sélectionne soi-même, sinon reset
+// Quand le département change : si l'utilisateur peut encoder -> pré-sélectionne soi-même, sinon reset
 watch(
     () => form.department_id,
     () => {
-        if (isHeadOfSelectedDept.value) {
+        if (canEncodeForSelectedDept.value) {
             form.target_user_id = props.authUser.id;
         } else {
             form.target_user_id = null;
