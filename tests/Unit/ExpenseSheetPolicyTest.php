@@ -479,4 +479,77 @@ class ExpenseSheetPolicyTest extends TestCase
             'Un non-admin ne devrait pas pouvoir renvoyer une note de frais'
         );
     }
+
+    public function test_encoder_who_is_head_of_the_parent_department_cannot_approve_what_he_encoded(): void
+    {
+        // Service parent avec son responsable, qui est aussi encodeur du sous-service
+        $parent = Department::factory()->create();
+        $child = Department::factory()->create(['parent_id' => $parent->id]);
+
+        $parentHead = User::factory()->create(['is_admin' => false]);
+        $parent->users()->attach($parentHead->id, ['is_head' => true]);
+        $child->users()->attach($parentHead->id, ['is_encoder' => true]);
+
+        $agent = User::factory()->create(['is_admin' => false]);
+        $child->users()->attach($agent->id);
+
+        $form = Form::factory()->create();
+
+        // Note encodée par le responsable N+1 pour l'agent du sous-service
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $agent->id,
+            'created_by' => $parentHead->id,
+            'is_draft' => false,
+            'department_id' => $child->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy;
+
+        // Il encode, donc il ne valide pas : il n'est pas responsable direct du service de la note
+        $this->assertFalse(
+            $policy->approve($parentHead, $expenseSheet),
+            "Un encodeur ne devrait pas pouvoir valider la note qu'il a encodée"
+        );
+        $this->assertFalse(
+            $policy->shouldAppearInValidationList($parentHead, $expenseSheet),
+            "La note encodée ne devrait pas remonter dans la liste à valider de l'encodeur"
+        );
+    }
+
+    public function test_head_still_approves_the_expense_sheet_he_encoded_for_his_agent(): void
+    {
+        $department = Department::factory()->create();
+
+        $head = User::factory()->create(['is_admin' => false]);
+        $department->users()->attach($head->id, ['is_head' => true]);
+
+        $agent = User::factory()->create(['is_admin' => false]);
+        $department->users()->attach($agent->id);
+
+        $form = Form::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $agent->id,
+            'created_by' => $head->id,
+            'is_draft' => false,
+            'department_id' => $department->id,
+            'form_id' => $form->id,
+            'status' => 'En attente',
+            'approved' => null,
+        ]);
+
+        $policy = new ExpenseSheetPolicy;
+
+        $this->assertTrue(
+            $policy->approve($head, $expenseSheet),
+            'Le responsable du service conserve la validation des notes qu\'il encode'
+        );
+        $this->assertTrue(
+            $policy->shouldAppearInValidationList($head, $expenseSheet),
+            'La note encodée par le responsable reste dans sa liste à valider'
+        );
+    }
 }

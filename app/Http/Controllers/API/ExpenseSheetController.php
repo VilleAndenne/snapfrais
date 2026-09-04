@@ -13,12 +13,12 @@ use App\Notifications\ReceiptExpenseSheet;
 use App\Notifications\ReceiptExpenseSheetForUser;
 use App\Notifications\RejectionExpenseSheet;
 use App\Services\DsfReimbursementService;
+use App\Services\RouteDistanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -115,16 +115,15 @@ class ExpenseSheetController extends BaseController
 
             $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
 
-            // Département + relations nécessaires (heads + users)
-            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            // Département + relations nécessaires (heads + encoders + users)
+            $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
             $currentUserId = auth()->id();
             $targetUserId = $request->input('target_user_id');
 
-            // Si on encode pour quelqu'un d'autre : il faut être head du service + la cible doit appartenir au service
+            // Si on encode pour quelqu'un d'autre : il faut être responsable ou encodeur du service + la cible doit appartenir au service
             if ($targetUserId && (int) $targetUserId !== (int) $currentUserId) {
-                $isHead = $department->heads->contains('id', $currentUserId);
-                if (! $isHead) {
-                    return $this->handleError("Vous devez être responsable du service pour encoder au nom d'un agent.", Response::HTTP_FORBIDDEN);
+                if (! auth()->user()->canEncodeForDepartment($department)) {
+                    return $this->handleError("Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.", Response::HTTP_FORBIDDEN);
                 }
                 $belongsToDept = $department->users->contains('id', (int) $targetUserId);
                 if (! $belongsToDept) {
@@ -191,28 +190,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);
@@ -446,7 +424,23 @@ class ExpenseSheetController extends BaseController
             $wasDraft = $expenseSheet->is_draft;
 
             // Vérifier le département
-            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
+
+            // Même règle que sur le web : déplacer la note d'un autre agent vers
+            // un service suppose d'y avoir le droit d'encoder, et que l'agent y
+            // appartienne. Sans ce contrôle, un encodeur pouvait déplacer un
+            // brouillon vers un service sur lequel il n'a aucun droit.
+            $beneficiaryId = (int) $expenseSheet->user_id;
+
+            if ($beneficiaryId !== (int) auth()->id() && ! auth()->user()->is_admin) {
+                if (! auth()->user()->canEncodeForDepartment($department)) {
+                    return $this->handleError('Vous devez être responsable ou encodeur du service pour encoder au nom d\'un agent.', Response::HTTP_FORBIDDEN);
+                }
+
+                if (! $department->users->contains('id', $beneficiaryId)) {
+                    return $this->handleError('L\'agent sélectionné n\'appartient pas à ce service.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+            }
 
             DB::beginTransaction();
 
@@ -509,28 +503,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);
@@ -673,19 +646,23 @@ class ExpenseSheetController extends BaseController
             'reason' => 'required_if:approval,false',
         ]);
 
-        if (! auth()->user()->can('approve', $expenseSheet) && $validated['approval'] === true) {
+        // `$validated` conserve le type brut de la requête ("1"/"0") : on compare
+        // sur le booléen pour que l'autorisation soit réellement évaluée.
+        $approval = $request->boolean('approval');
+
+        if ($approval && ! auth()->user()->can('approve', $expenseSheet)) {
             return $this->handleError('Vous n\'avez pas les droits pour approuver cette note de frais.', Response::HTTP_FORBIDDEN);
-        } elseif (! auth()->user()->can('reject', $expenseSheet) && $validated['approval'] === false) {
+        } elseif (! $approval && ! auth()->user()->can('reject', $expenseSheet)) {
             return $this->handleError('Vous n\'avez pas les droits pour rejeter cette note de frais.', Response::HTTP_FORBIDDEN);
         }
 
-        $expenseSheet->approved = $validated['approval'];
+        $expenseSheet->approved = $approval;
         $expenseSheet->refusal_reason = $validated['reason'] ?? null;
         $expenseSheet->validated_by = auth()->id();
         $expenseSheet->validated_at = now();
         $expenseSheet->save();
 
-        if ($validated['approval']) {
+        if ($approval) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
 
             // Générer et envoyer le PDF pour les coûts DSF
@@ -697,7 +674,7 @@ class ExpenseSheetController extends BaseController
             $expenseSheet->user->notify(new RejectionExpenseSheet($expenseSheet));
         }
 
-        $message = $validated['approval'] ? 'Note de frais approuvée.' : 'Note de frais rejetée.';
+        $message = $approval ? 'Note de frais approuvée.' : 'Note de frais rejetée.';
 
         return $this->handleResponse(
             $expenseSheet->load(['costs.formCost', 'user', 'department', 'validatedBy']),

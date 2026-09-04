@@ -122,6 +122,7 @@ class ExpenseSheet extends Model
      *
      * Un responsable peut voir :
      * - Ses propres notes
+     * - Les notes qu'il a encodées pour un autre agent
      * - Les notes de son département ET de tous les sous-départements (hiérarchie complète)
      * - Sauf celles où l'auteur est co-responsable du même département que lui
      */
@@ -141,6 +142,9 @@ class ExpenseSheet extends Model
         return $query->where(function ($q) use ($user, $headDepartmentIds, $allVisibleDepartmentIds) {
             // L'utilisateur peut voir ses propres notes
             $q->where('expense_sheets.user_id', $user->id);
+
+            // Ainsi que celles qu'il a encodées pour un autre agent
+            $q->orWhere('expense_sheets.created_by', $user->id);
 
             // Ou les notes des départements où il est responsable + tous les sous-départements
             if (! empty($allVisibleDepartmentIds)) {

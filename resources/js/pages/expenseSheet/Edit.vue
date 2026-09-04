@@ -24,7 +24,7 @@
             </div>
 
             <!-- Sélecteur d'agent (visible si l'utilisateur est head du service sélectionné) -->
-            <div v-if="isHeadOfSelectedDept" class="flex flex-col space-y-2">
+            <div v-if="canEncodeForSelectedDept" class="flex flex-col space-y-2">
                 <Label for="targetUser">Pour quel agent ?</Label>
                 <Select v-model="form.target_user_id">
                     <SelectTrigger id="targetUser">
@@ -298,17 +298,19 @@ const selectedDepartment = computed(() => {
     return departments.value.find((d) => d.id === form.department_id) || null;
 });
 
-// Vérifie si l'utilisateur est head du département sélectionné
-const isHeadOfSelectedDept = computed(() => {
+// Vérifie si l'utilisateur peut encoder pour un autre agent du département sélectionné
+// (responsable ou encodeur du service)
+const canEncodeForSelectedDept = computed(() => {
     if (!selectedDepartment.value) return false;
-    return (selectedDepartment.value.heads || []).some((h) => h.id === props.authUser.id);
+    const allowed = [...(selectedDepartment.value.heads || []), ...(selectedDepartment.value.encoders || [])];
+    return allowed.some((u) => Number(u.id) === Number(props.authUser.id));
 });
 
-// Quand le département change : si head -> pré-sélectionne l'utilisateur existant ou soi-même, sinon reset
+// Quand le département change : si l'utilisateur peut encoder -> pré-sélectionne l'utilisateur existant ou soi-même, sinon reset
 watch(
     () => form.department_id,
     () => {
-        if (isHeadOfSelectedDept.value) {
+        if (canEncodeForSelectedDept.value) {
             if (!form.target_user_id) {
                 form.target_user_id = props.authUser.id;
             }

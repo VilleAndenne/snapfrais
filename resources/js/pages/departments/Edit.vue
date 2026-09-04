@@ -88,6 +88,7 @@
                                 >
                                     {{ member.name }}
                                     <Badge v-if="member.is_head" variant="default" class="text-[10px]">Responsable</Badge>
+                                    <Badge v-if="member.is_encoder" variant="secondary" class="text-[10px]">Encodeur</Badge>
                                     <button type="button" @click="removeUser(member.id)" class="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors">
                                         <XIcon class="h-3 w-3" />
                                     </button>
@@ -171,19 +172,36 @@
                                 </span>
                             </label>
 
-                            <label
-                                class="flex items-center gap-2 text-xs whitespace-nowrap"
-                                :class="draft[user.id]?.selected ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :checked="draft[user.id]?.is_head"
-                                    :disabled="!draft[user.id]?.selected"
-                                    @change="toggleHead(user.id)"
-                                    class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
-                                />
-                                Responsable du service
-                            </label>
+                            <div class="flex items-center gap-4">
+                                <label
+                                    class="flex items-center gap-2 text-xs whitespace-nowrap"
+                                    :class="draft[user.id]?.selected ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="draft[user.id]?.is_head"
+                                        :disabled="!draft[user.id]?.selected"
+                                        @change="toggleHead(user.id)"
+                                        class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    Responsable du service
+                                </label>
+
+                                <label
+                                    class="flex items-center gap-2 text-xs whitespace-nowrap"
+                                    :class="draft[user.id]?.selected && !draft[user.id]?.is_head ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
+                                    title="Peut encoder une note de frais pour un autre agent du service, sans pouvoir la valider."
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="draft[user.id]?.is_head || draft[user.id]?.is_encoder"
+                                        :disabled="!draft[user.id]?.selected || draft[user.id]?.is_head"
+                                        @change="toggleEncoder(user.id)"
+                                        class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    Encodeur
+                                </label>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -253,6 +271,7 @@ const transformDepartmentUsers = () => {
     return props.department.users.map((user) => ({
         id: user.id,
         is_head: user.pivot?.is_head === 1 || user.pivot?.is_head === true || user.pivot?.is_head === '1',
+        is_encoder: user.pivot?.is_encoder === 1 || user.pivot?.is_encoder === true || user.pivot?.is_encoder === '1',
     }));
 };
 
@@ -287,6 +306,7 @@ const selectedUsersDetails = computed(() =>
         id: u.id,
         name: props.users.find((user) => user.id === u.id)?.name ?? `#${u.id}`,
         is_head: u.is_head,
+        is_encoder: u.is_encoder,
     }))
 );
 
@@ -296,7 +316,7 @@ const removeUser = (id) => {
 
 // === Modale membres ===
 const showUserModal = ref(false);
-const draft = ref({}); // { [id]: { selected, is_head } }
+const draft = ref({}); // { [id]: { selected, is_head, is_encoder } }
 const userSearch = ref('');
 
 const filteredModalUsers = computed(() => {
@@ -323,6 +343,7 @@ const openUserModal = () => {
         state[user.id] = {
             selected: !!existing,
             is_head: existing?.is_head ?? false,
+            is_encoder: existing?.is_encoder ?? false,
         };
     }
     draft.value = state;
@@ -335,6 +356,7 @@ const toggleSelected = (id) => {
     entry.selected = !entry.selected;
     if (!entry.selected) {
         entry.is_head = false;
+        entry.is_encoder = false;
     }
 };
 
@@ -344,6 +366,18 @@ const toggleHead = (id) => {
         return;
     }
     entry.is_head = !entry.is_head;
+    // Un responsable encode toujours pour ses agents : le rôle d'encodeur devient superflu
+    if (entry.is_head) {
+        entry.is_encoder = false;
+    }
+};
+
+const toggleEncoder = (id) => {
+    const entry = draft.value[id];
+    if (!entry.selected || entry.is_head) {
+        return;
+    }
+    entry.is_encoder = !entry.is_encoder;
 };
 
 const toggleSelectAll = () => {
@@ -352,6 +386,7 @@ const toggleSelectAll = () => {
         draft.value[user.id].selected = target;
         if (!target) {
             draft.value[user.id].is_head = false;
+            draft.value[user.id].is_encoder = false;
         }
     }
 };
@@ -359,7 +394,7 @@ const toggleSelectAll = () => {
 const applyUsers = () => {
     form.users = Object.entries(draft.value)
         .filter(([, v]) => v.selected)
-        .map(([id, v]) => ({ id: Number(id), is_head: v.is_head }));
+        .map(([id, v]) => ({ id: Number(id), is_head: v.is_head, is_encoder: v.is_encoder }));
     showUserModal.value = false;
 };
 

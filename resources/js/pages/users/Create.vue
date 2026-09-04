@@ -113,6 +113,7 @@
                                 >
                                     {{ dept.name }}
                                     <Badge v-if="dept.is_head" variant="default" class="text-[10px]">Responsable</Badge>
+                                    <Badge v-if="dept.is_encoder" variant="secondary" class="text-[10px]">Encodeur</Badge>
                                     <button type="button" @click="removeDepartment(dept.id)" class="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors">
                                         <XIcon class="h-3 w-3" />
                                     </button>
@@ -205,19 +206,36 @@
                                 <span class="truncate">{{ dept.name }}</span>
                             </label>
 
-                            <label
-                                class="flex items-center gap-2 text-xs whitespace-nowrap"
-                                :class="draft[dept.id]?.selected ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :checked="draft[dept.id]?.is_head"
-                                    :disabled="!draft[dept.id]?.selected"
-                                    @change="toggleHead(dept.id)"
-                                    class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
-                                />
-                                Responsable du service
-                            </label>
+                            <div class="flex items-center gap-4">
+                                <label
+                                    class="flex items-center gap-2 text-xs whitespace-nowrap"
+                                    :class="draft[dept.id]?.selected ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="draft[dept.id]?.is_head"
+                                        :disabled="!draft[dept.id]?.selected"
+                                        @change="toggleHead(dept.id)"
+                                        class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    Responsable du service
+                                </label>
+
+                                <label
+                                    class="flex items-center gap-2 text-xs whitespace-nowrap"
+                                    :class="draft[dept.id]?.selected && !draft[dept.id]?.is_head ? 'cursor-pointer text-foreground' : 'opacity-40 cursor-not-allowed'"
+                                    title="Peut encoder une note de frais pour un autre agent du service, sans pouvoir la valider."
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="draft[dept.id]?.is_head || draft[dept.id]?.is_encoder"
+                                        :disabled="!draft[dept.id]?.selected || draft[dept.id]?.is_head"
+                                        @change="toggleEncoder(dept.id)"
+                                        class="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    Encodeur
+                                </label>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -266,7 +284,7 @@ const form = useForm({
     name: '',
     email: '',
     is_admin: false,
-    departments: [], // [{ id, is_head }]
+    departments: [], // [{ id, is_head, is_encoder }]
 });
 
 const initials = computed(() =>
@@ -280,7 +298,7 @@ const initials = computed(() =>
 
 // === Modale départements ===
 const showDepartmentModal = ref(false);
-const draft = ref({}); // { [id]: { selected, is_head } }
+const draft = ref({}); // { [id]: { selected, is_head, is_encoder } }
 const departmentSearch = ref('');
 
 const filteredDepartments = computed(() => {
@@ -296,6 +314,7 @@ const selectedDepartmentsDetails = computed(() =>
         id: d.id,
         name: props.departments.find((dep) => dep.id === d.id)?.name ?? `#${d.id}`,
         is_head: d.is_head,
+        is_encoder: d.is_encoder,
     }))
 );
 
@@ -306,6 +325,7 @@ const openDepartmentModal = () => {
         state[dept.id] = {
             selected: !!existing,
             is_head: existing?.is_head ?? false,
+            is_encoder: existing?.is_encoder ?? false,
         };
     }
     draft.value = state;
@@ -318,6 +338,7 @@ const toggleSelected = (id) => {
     entry.selected = !entry.selected;
     if (!entry.selected) {
         entry.is_head = false;
+        entry.is_encoder = false;
     }
 };
 
@@ -327,12 +348,24 @@ const toggleHead = (id) => {
         return;
     }
     entry.is_head = !entry.is_head;
+    // Un responsable encode toujours pour ses agents : le rôle d'encodeur devient superflu
+    if (entry.is_head) {
+        entry.is_encoder = false;
+    }
+};
+
+const toggleEncoder = (id) => {
+    const entry = draft.value[id];
+    if (!entry.selected || entry.is_head) {
+        return;
+    }
+    entry.is_encoder = !entry.is_encoder;
 };
 
 const applyDepartments = () => {
     form.departments = Object.entries(draft.value)
         .filter(([, v]) => v.selected)
-        .map(([id, v]) => ({ id: Number(id), is_head: v.is_head }));
+        .map(([id, v]) => ({ id: Number(id), is_head: v.is_head, is_encoder: v.is_encoder }));
     showDepartmentModal.value = false;
 };
 

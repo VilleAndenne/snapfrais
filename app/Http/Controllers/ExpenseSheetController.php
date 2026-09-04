@@ -13,10 +13,10 @@ use App\Notifications\ReceiptExpenseSheet;
 use App\Notifications\ReceiptExpenseSheetForUser;
 use App\Notifications\RejectionExpenseSheet;
 use App\Notifications\SRHReturnExpenseSheet;
+use App\Services\RouteDistanceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -123,7 +123,7 @@ class ExpenseSheetController extends Controller
 
         return inertia('expenseSheet/Create', [
             'form' => $form,
-            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads', 'encoders')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -170,16 +170,15 @@ class ExpenseSheetController extends Controller
             // Convertir is_draft en booléen de manière fiable
             $isDraft = in_array($request->input('is_draft'), [1, '1', 'true', true], true);
 
-            // Département + relations nécessaires (heads + users)
-            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            // Département + relations nécessaires (heads + encoders + users)
+            $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
             $currentUserId = auth()->id();
             $targetUserId = $request->input('target_user_id');
 
-            // Si on encode pour quelqu'un d'autre : il faut être head du service + la cible doit appartenir au service
+            // Si on encode pour quelqu'un d'autre : il faut être responsable ou encodeur du service + la cible doit appartenir au service
             if ($targetUserId && (int) $targetUserId !== (int) $currentUserId) {
-                $isHead = $department->heads->contains('id', $currentUserId);
-                if (! $isHead) {
-                    abort(403, "Vous devez être responsable du service pour encoder au nom d'un agent.");
+                if (! auth()->user()->canEncodeForDepartment($department)) {
+                    abort(403, "Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.");
                 }
                 $belongsToDept = $department->users->contains('id', (int) $targetUserId);
                 if (! $belongsToDept) {
@@ -249,29 +248,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            // Utilisation du mode issu du taux
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     // Arrondir la distance totale à l'entier le plus proche avant le calcul
                     $distance = round($googleKm + $manualKm);
@@ -499,7 +476,7 @@ class ExpenseSheetController extends Controller
                 })->toArray(),
             ],
             'expenseSheet' => $expenseSheetData,
-            'departments' => auth()->user()->departments()->with('users', 'heads')->get(),
+            'departments' => auth()->user()->departments()->with('users', 'heads', 'encoders')->get(),
             'authUser' => auth()->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -529,11 +506,43 @@ class ExpenseSheetController extends Controller
             'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
         ]);
 
+        $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
+        $targetUserId = $validated['target_user_id'] ?? null;
+
+        // Organisation destinataire des alertes de distance anormale : celle du
+        // service soumis, l'organisation de la note pouvant être nulle quand
+        // elle a été créée via l'API.
+        $organization = $department->organization;
+
+        // Bénéficiaire de la note *après* mise à jour : le formulaire ne renvoie
+        // pas toujours `target_user_id` (changement de service seul), auquel cas
+        // le bénéficiaire déjà enregistré est conservé. Contrôler la cible plutôt
+        // que ce bénéficiaire effectif laisserait déplacer la note d'un agent
+        // vers un service où l'on n'encode pas et auquel il n'appartient pas.
+        $beneficiaryId = (int) ($targetUserId ?? $expenseSheet->user_id);
+
+        // Encoder pour un autre agent suppose le droit d'encoder pour le service
+        if ($beneficiaryId !== (int) auth()->id() && ! auth()->user()->is_admin) {
+            if (! auth()->user()->canEncodeForDepartment($department)) {
+                abort(403, "Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.");
+            }
+            if (! $department->users->contains('id', $beneficiaryId)) {
+                return back()
+                    ->withErrors(['target_user_id' => "L'agent sélectionné n'appartient pas à ce service."])
+                    ->withInput();
+            }
+        }
+
         try {
             // Supprimer tous les coûts existants
             $expenseSheet->costs()->delete();
 
-            // Réinitialiser l'approbation et remettre en attente pour resoumission
+            // Réinitialiser l'approbation et remettre en attente pour resoumission.
+            // `created_by` n'est volontairement pas réécrit : il identifie
+            // l'encodeur d'origine, sur lequel reposent la séparation des rôles
+            // (un encodeur ne valide pas ce qu'il a saisi) et sa visibilité sur
+            // la note. L'écraser à chaque édition rendait ces règles caduques dès
+            // que le bénéficiaire corrigeait une note rejetée.
             $expenseSheet->update([
                 'approved' => null,
                 'status' => 'En attente',
@@ -541,8 +550,7 @@ class ExpenseSheetController extends Controller
                 'validated_by' => null,
                 'validated_at' => null,
                 'department_id' => $validated['department_id'],
-                'user_id' => $validated['target_user_id'] ?? $expenseSheet->user_id,
-                'created_by' => auth()->user()->id,
+                'user_id' => $beneficiaryId,
             ]);
             // Si c'est un brouillon, on garde le statut brouillon
             // Sinon on réinitialise l'approbation et on remet en attente pour resoumission
@@ -613,28 +621,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = $googleKm + $manualKm;
                     $total = round($distance * $rate->value, 2);
@@ -757,20 +744,23 @@ class ExpenseSheetController extends Controller
             'approval' => 'required|boolean',
             'reason' => 'required_if:approval,0',
         ]);
-        if (! auth()->user()->can('approve', $expenseSheet) && $validated['approval'] === true) {
+        // `$validated` conserve le type brut de la requête ("1"/"0" en formulaire) :
+        // on compare sur le booléen pour que l'autorisation soit réellement évaluée.
+        $approval = $request->boolean('approval');
+
+        if ($approval && ! auth()->user()->can('approve', $expenseSheet)) {
             abort(403);
-        } elseif (! auth()->user()->can('reject', $expenseSheet) && $validated['approval'] === false) {
+        } elseif (! $approval && ! auth()->user()->can('reject', $expenseSheet)) {
             abort(403);
         }
 
-        $expenseSheet->approved = $validated['approval'];
+        $expenseSheet->approved = $approval;
         $expenseSheet->refusal_reason = $validated['reason'] ?? null;
         $expenseSheet->validated_by = auth()->id();
         $expenseSheet->validated_at = now();
-        $expenseSheet->validated_by = auth()->id();
         $expenseSheet->save();
 
-        if ($validated['approval']) {
+        if ($approval) {
             $expenseSheet->user->notify(new ApprovalExpenseSheet($expenseSheet));
         } else {
             $expenseSheet->user->notify(new RejectionExpenseSheet($expenseSheet));
@@ -874,11 +864,30 @@ class ExpenseSheetController extends Controller
 
     public function duplicate($id)
     {
-        $originalExpenseSheet = ExpenseSheet::with(['costs', 'department', 'user'])->findOrFail($id);
+        $originalExpenseSheet = ExpenseSheet::with([
+            'costs',
+            'department.heads:id',
+            'department.encoders:id',
+            'department.users:id',
+            'user',
+        ])->findOrFail($id);
 
         // Vérifier les permissions
         if (! auth()->user()->can('view', $originalExpenseSheet)) {
             abort(403);
+        }
+
+        // Dupliquer une note encodée pour un agent revient à encoder pour lui :
+        // le droit doit donc être vérifié *maintenant*. `view` ne suffit pas, il
+        // reste acquis via `created_by` même après le retrait du rôle d'encodeur.
+        if ((int) $originalExpenseSheet->user_id !== (int) auth()->id() && ! auth()->user()->is_admin) {
+            $department = $originalExpenseSheet->department;
+
+            if (! $department
+                || ! auth()->user()->canEncodeForDepartment($department)
+                || ! $department->users->contains('id', (int) $originalExpenseSheet->user_id)) {
+                abort(403, "Vous devez être responsable ou encodeur du service pour dupliquer la note d'un agent.");
+            }
         }
 
         // Créer une nouvelle note de frais en brouillon

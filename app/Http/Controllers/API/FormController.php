@@ -24,7 +24,7 @@ class FormController extends BaseController
 
         return $this->handleResponse([
             'form' => $form,
-            'departments' => auth()->user()->departments()->with('heads')->get(),
+            'departments' => auth()->user()->departments()->with('heads', 'encoders')->get(),
         ]);
     }
 }

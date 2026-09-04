@@ -71,6 +71,7 @@ class UserController extends Controller
             'departments' => 'array',
             'departments.*.id' => 'required|integer|exists:departments,id',
             'departments.*.is_head' => 'boolean',
+            'departments.*.is_encoder' => 'boolean',
         ]);
 
         $user = User::create([
@@ -85,7 +86,10 @@ class UserController extends Controller
         }
 
         $attach = collect($validated['departments'] ?? [])
-            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => ['is_head' => $dept['is_head'] ?? false]]);
+            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => [
+                'is_head' => $dept['is_head'] ?? false,
+                'is_encoder' => $dept['is_encoder'] ?? false,
+            ]]);
 
         if ($attach->isNotEmpty()) {
             $user->departments()->attach($attach);
@@ -161,6 +165,7 @@ class UserController extends Controller
             'departments' => 'array',
             'departments.*.id' => 'required|integer|exists:departments,id',
             'departments.*.is_head' => 'boolean',
+            'departments.*.is_encoder' => 'boolean',
         ]);
 
         $user = User::findOrFail($id);
@@ -173,7 +178,10 @@ class UserController extends Controller
         $user->save();
 
         $sync = collect($validated['departments'] ?? [])
-            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => ['is_head' => $dept['is_head'] ?? false]]);
+            ->mapWithKeys(fn (array $dept): array => [$dept['id'] => [
+                'is_head' => $dept['is_head'] ?? false,
+                'is_encoder' => $dept['is_encoder'] ?? false,
+            ]]);
 
         $user->departments()->sync($sync);
 
