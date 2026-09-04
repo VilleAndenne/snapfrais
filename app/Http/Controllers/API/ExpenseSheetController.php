@@ -191,7 +191,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = (new RouteDistanceService)->distanceInKm($points, $transport);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);
@@ -488,7 +488,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = (new RouteDistanceService)->distanceInKm($points, $transport);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);

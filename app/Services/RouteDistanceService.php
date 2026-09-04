@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\RouteDistance;
 use App\Models\User;
 use App\Notifications\RouteDistanceAnomalyDetected;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,14 @@ use Illuminate\Support\Facades\Notification;
 class RouteDistanceService
 {
     private const ENDPOINT = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+
+    /**
+     * @param  Organization|null  $organization  Organisation de la note en cours,
+     *                                           destinataire des alertes. Les routes API ne passent pas par
+     *                                           ResolveOrganization : sans cet argument, `currentOrganization()`
+     *                                           y est nul et personne n'est alerté.
+     */
+    public function __construct(private ?Organization $organization = null) {}
 
     /**
      * Distance totale (en km, arrondie à 2 décimales) des segments successifs
@@ -94,6 +103,11 @@ class RouteDistanceService
 
     /**
      * Première mesure d'un segment encore inconnu.
+     *
+     * Deux encodages simultanés du même trajet mesurent tous les deux avant
+     * d'insérer : `createOrFirst()` rattrape la violation de contrainte unique
+     * et rend la ligne gagnante au lieu de faire échouer l'enregistrement de
+     * la note.
      */
     private function createReference(string $signature, string $origin, string $destination, string $transport): int
     {
@@ -103,17 +117,17 @@ class RouteDistanceService
             return 0;
         }
 
-        RouteDistance::create([
-            'signature' => $signature,
-            'origin' => $origin,
-            'destination' => $destination,
-            'transport' => $transport,
-            'distance_meters' => $measured,
-            'verified_at' => now(),
-            'last_used_at' => now(),
-        ]);
-
-        return $measured;
+        return RouteDistance::createOrFirst(
+            ['signature' => $signature],
+            [
+                'origin' => $origin,
+                'destination' => $destination,
+                'transport' => $transport,
+                'distance_meters' => $measured,
+                'verified_at' => now(),
+                'last_used_at' => now(),
+            ]
+        )->distance_meters;
     }
 
     /**
@@ -158,27 +172,23 @@ class RouteDistanceService
     }
 
     /**
-     * Administrateurs de l'organisation courante — ou, hors contexte tenant,
-     * de la première organisation de l'utilisateur qui encode.
+     * Administrateurs de l'organisation de la note — jamais d'une autre : sans
+     * organisation identifiée, mieux vaut ne prévenir personne que d'envoyer le
+     * trajet et le nom de l'encodeur aux administrateurs d'un autre locataire.
      *
      * @return Collection<int, User>
      */
     private function administrators(): Collection
     {
-        $organization = currentOrganization() ?? $this->organizationOfCurrentUser();
+        $organization = $this->organization ?? currentOrganization();
 
         if ($organization === null) {
+            Log::warning('Distance anormale détectée sans organisation identifiable : aucune alerte envoyée.');
+
             return collect();
         }
 
         return $organization->users()->where('is_admin', true)->get();
-    }
-
-    private function organizationOfCurrentUser(): ?Organization
-    {
-        $user = auth()->user();
-
-        return $user instanceof User ? $user->organizations()->first() : null;
     }
 
     private function fetchSegmentDistanceInMeters(string $origin, string $destination, string $transport): int
@@ -193,10 +203,22 @@ class RouteDistanceService
             $payload['routingPreference'] = 'TRAFFIC_UNAWARE';
         }
 
-        $response = Http::withHeaders([
-            'X-Goog-Api-Key' => config('services.google_maps.key'),
-            'X-Goog-FieldMask' => 'routes.distanceMeters',
-        ])->post(self::ENDPOINT, $payload);
+        try {
+            $response = Http::withHeaders([
+                'X-Goog-Api-Key' => config('services.google_maps.key'),
+                'X-Goog-FieldMask' => 'routes.distanceMeters',
+            ])->post(self::ENDPOINT, $payload);
+        } catch (ConnectionException $e) {
+            // DNS, délai dépassé, connexion refusée : l'appelant se rabat sur la
+            // référence enregistrée plutôt que de faire échouer l'encodage.
+            Log::warning('Appel à l\'API Google Routes impossible', [
+                'origin' => $origin,
+                'destination' => $destination,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
 
         if ($response->successful() && isset($response->json()['routes'][0]['distanceMeters'])) {
             return (int) $response->json()['routes'][0]['distanceMeters'];

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\RouteDistanceAnomalyDetected;
 use App\Services\RouteDistanceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -199,6 +200,92 @@ class RouteDistanceServiceTest extends TestCase
 
         $this->assertSame(10.0, $km);
         Notification::assertNothingSent();
+    }
+
+    public function test_it_alerts_the_administrators_of_the_organization_it_was_given(): void
+    {
+        Notification::fake();
+
+        // Les routes API ne passent pas par ResolveOrganization : aucun locataire
+        // n'est lié à la requête, l'organisation vient de l'appelant.
+        $organization = Organization::factory()->create();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $organization->users()->attach($admin->id);
+
+        $otherOrganization = Organization::factory()->create();
+        $otherAdmin = User::factory()->create(['is_admin' => true]);
+        $otherOrganization->users()->attach($otherAdmin->id);
+
+        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+
+        Http::fake([
+            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
+        ]);
+
+        (new RouteDistanceService($organization))->distanceInKm(['A', 'B'], 'car');
+
+        Notification::assertSentTo($admin, RouteDistanceAnomalyDetected::class);
+        Notification::assertNotSentTo($otherAdmin, RouteDistanceAnomalyDetected::class);
+    }
+
+    public function test_it_alerts_nobody_when_no_organization_can_be_identified(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        Organization::factory()->create()->users()->attach($admin->id);
+
+        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+
+        Http::fake([
+            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
+        ]);
+
+        (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_it_falls_back_on_the_reference_when_the_connection_fails(): void
+    {
+        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+
+        Http::fake(function () {
+            throw new ConnectionException('cURL error 6: Could not resolve host');
+        });
+
+        $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
+
+        $this->assertSame(10.0, $km);
+    }
+
+    public function test_it_skips_the_segment_when_the_connection_fails_on_a_first_measure(): void
+    {
+        Http::fake(function () {
+            throw new ConnectionException('cURL error 6: Could not resolve host');
+        });
+
+        $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
+
+        $this->assertSame(0.0, $km);
+        $this->assertDatabaseCount('route_distances', 0);
+    }
+
+    public function test_it_yields_to_a_concurrent_first_measure_of_the_same_segment(): void
+    {
+        // Un autre encodage du même trajet insère la référence pendant que
+        // celui-ci interroge Google : l'INSERT qui suit viole la contrainte
+        // unique et doit rendre la ligne gagnante, pas une erreur.
+        Http::fake(function () {
+            $this->makeReference('A', 'B', 7000, now());
+
+            return Http::response(['routes' => [['distanceMeters' => 12000]]]);
+        });
+
+        $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
+
+        $this->assertSame(7.0, $km);
+        $this->assertDatabaseCount('route_distances', 1);
     }
 
     public function test_the_alert_mail_details_the_gap(): void

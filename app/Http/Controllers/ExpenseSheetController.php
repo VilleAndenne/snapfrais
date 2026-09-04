@@ -249,7 +249,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = (new RouteDistanceService)->distanceInKm($points, $transport);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     // Arrondir la distance totale à l'entier le plus proche avant le calcul
                     $distance = round($googleKm + $manualKm);
@@ -507,6 +507,11 @@ class ExpenseSheetController extends Controller
             'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
         ]);
 
+        // Organisation destinataire des alertes de distance anormale : celle du
+        // service soumis, l'organisation de la note pouvant être nulle quand
+        // elle a été créée via l'API.
+        $organization = Department::find($validated['department_id'])?->organization;
+
         try {
             // Supprimer tous les coûts existants
             $expenseSheet->costs()->delete();
@@ -591,7 +596,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = (new RouteDistanceService)->distanceInKm($points, $transport);
+                    $googleKm = (new RouteDistanceService($organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = $googleKm + $manualKm;
                     $total = round($distance * $rate->value, 2);
