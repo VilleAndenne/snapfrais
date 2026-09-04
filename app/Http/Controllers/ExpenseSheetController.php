@@ -531,12 +531,19 @@ class ExpenseSheetController extends Controller
         $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
         $targetUserId = $validated['target_user_id'] ?? null;
 
-        // Réaffecter la note à un autre agent suppose le droit d'encoder pour le service
-        if ($targetUserId && (int) $targetUserId !== (int) auth()->id() && ! auth()->user()->is_admin) {
+        // Bénéficiaire de la note *après* mise à jour : le formulaire ne renvoie
+        // pas toujours `target_user_id` (changement de service seul), auquel cas
+        // le bénéficiaire déjà enregistré est conservé. Contrôler la cible plutôt
+        // que ce bénéficiaire effectif laisserait déplacer la note d'un agent
+        // vers un service où l'on n'encode pas et auquel il n'appartient pas.
+        $beneficiaryId = (int) ($targetUserId ?? $expenseSheet->user_id);
+
+        // Encoder pour un autre agent suppose le droit d'encoder pour le service
+        if ($beneficiaryId !== (int) auth()->id() && ! auth()->user()->is_admin) {
             if (! auth()->user()->canEncodeForDepartment($department)) {
                 abort(403, "Vous devez être responsable ou encodeur du service pour encoder au nom d'un agent.");
             }
-            if (! $department->users->contains('id', (int) $targetUserId)) {
+            if (! $department->users->contains('id', $beneficiaryId)) {
                 return back()
                     ->withErrors(['target_user_id' => "L'agent sélectionné n'appartient pas à ce service."])
                     ->withInput();
@@ -547,7 +554,12 @@ class ExpenseSheetController extends Controller
             // Supprimer tous les coûts existants
             $expenseSheet->costs()->delete();
 
-            // Réinitialiser l'approbation et remettre en attente pour resoumission
+            // Réinitialiser l'approbation et remettre en attente pour resoumission.
+            // `created_by` n'est volontairement pas réécrit : il identifie
+            // l'encodeur d'origine, sur lequel reposent la séparation des rôles
+            // (un encodeur ne valide pas ce qu'il a saisi) et sa visibilité sur
+            // la note. L'écraser à chaque édition rendait ces règles caduques dès
+            // que le bénéficiaire corrigeait une note rejetée.
             $expenseSheet->update([
                 'approved' => null,
                 'status' => 'En attente',
@@ -555,8 +567,7 @@ class ExpenseSheetController extends Controller
                 'validated_by' => null,
                 'validated_at' => null,
                 'department_id' => $validated['department_id'],
-                'user_id' => $validated['target_user_id'] ?? $expenseSheet->user_id,
-                'created_by' => auth()->user()->id,
+                'user_id' => $beneficiaryId,
             ]);
             // Si c'est un brouillon, on garde le statut brouillon
             // Sinon on réinitialise l'approbation et on remet en attente pour resoumission
@@ -891,11 +902,30 @@ class ExpenseSheetController extends Controller
 
     public function duplicate($id)
     {
-        $originalExpenseSheet = ExpenseSheet::with(['costs', 'department', 'user'])->findOrFail($id);
+        $originalExpenseSheet = ExpenseSheet::with([
+            'costs',
+            'department.heads:id',
+            'department.encoders:id',
+            'department.users:id',
+            'user',
+        ])->findOrFail($id);
 
         // Vérifier les permissions
         if (! auth()->user()->can('view', $originalExpenseSheet)) {
             abort(403);
+        }
+
+        // Dupliquer une note encodée pour un agent revient à encoder pour lui :
+        // le droit doit donc être vérifié *maintenant*. `view` ne suffit pas, il
+        // reste acquis via `created_by` même après le retrait du rôle d'encodeur.
+        if ((int) $originalExpenseSheet->user_id !== (int) auth()->id() && ! auth()->user()->is_admin) {
+            $department = $originalExpenseSheet->department;
+
+            if (! $department
+                || ! auth()->user()->canEncodeForDepartment($department)
+                || ! $department->users->contains('id', (int) $originalExpenseSheet->user_id)) {
+                abort(403, "Vous devez être responsable ou encodeur du service pour dupliquer la note d'un agent.");
+            }
         }
 
         // Créer une nouvelle note de frais en brouillon

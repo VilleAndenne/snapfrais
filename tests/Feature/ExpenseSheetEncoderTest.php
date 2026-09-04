@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ExpenseSheetEncoderTest extends TestCase
@@ -67,6 +68,23 @@ class ExpenseSheetEncoderTest extends TestCase
         return [
             'department_id' => $context['department']->id,
             'target_user_id' => $target->id,
+            'is_draft' => 0,
+            'costs' => [[
+                'cost_id' => $context['formCost']->id,
+                'data' => ['amount' => 25],
+                'date' => '2026-05-01',
+            ]],
+        ];
+    }
+
+    /**
+     * @param  array{formCost: FormCost}  $context
+     * @return array<string, mixed>
+     */
+    private function updatePayloadFor(array $context, Department $department): array
+    {
+        return [
+            'department_id' => $department->id,
             'is_draft' => 0,
             'costs' => [[
                 'cost_id' => $context['formCost']->id,
@@ -166,6 +184,141 @@ class ExpenseSheetEncoderTest extends TestCase
 
         $response->assertRedirect("/expense-sheet/{$expenseSheet->id}");
         $this->assertTrue((bool) $expenseSheet->fresh()->approved);
+    }
+
+    public function test_encoder_cannot_move_the_draft_of_another_agent_to_a_department_he_cannot_encode_for(): void
+    {
+        $context = $this->bootstrap();
+        $foreignDepartment = Department::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => true,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        $response = $this->actingAs($context['encoder'])
+            ->put("/expense-sheet/{$expenseSheet->id}", $this->updatePayloadFor($context, $foreignDepartment));
+
+        $response->assertForbidden();
+        $this->assertSame($context['department']->id, $expenseSheet->fresh()->department_id);
+    }
+
+    public function test_encoder_cannot_move_the_draft_of_another_agent_to_a_department_the_agent_left(): void
+    {
+        $context = $this->bootstrap();
+        $otherDepartment = Department::factory()->create();
+        $otherDepartment->users()->attach($context['encoder']->id, ['is_encoder' => true]);
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => true,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        $response = $this->actingAs($context['encoder'])
+            ->put("/expense-sheet/{$expenseSheet->id}", $this->updatePayloadFor($context, $otherDepartment));
+
+        $response->assertSessionHasErrors('target_user_id');
+        $this->assertSame($context['department']->id, $expenseSheet->fresh()->department_id);
+    }
+
+    public function test_resubmitting_a_rejected_sheet_keeps_the_original_encoder(): void
+    {
+        $context = $this->bootstrap();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => false,
+            'approved' => 0,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        $response = $this->actingAs($context['agent'])
+            ->put("/expense-sheet/{$expenseSheet->id}", $this->updatePayloadFor($context, $context['department']));
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame($context['encoder']->id, $expenseSheet->fresh()->created_by);
+    }
+
+    public function test_a_former_encoder_cannot_duplicate_the_sheet_of_another_agent(): void
+    {
+        $context = $this->bootstrap();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => false,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        $context['department']->users()->updateExistingPivot($context['encoder']->id, ['is_encoder' => false]);
+
+        $response = $this->actingAs($context['encoder'])
+            ->post("/expense-sheet/{$expenseSheet->id}/duplicate");
+
+        $response->assertForbidden();
+        $this->assertDatabaseCount('expense_sheets', 1);
+    }
+
+    public function test_an_encoder_still_in_place_can_duplicate_the_sheet_of_another_agent(): void
+    {
+        $context = $this->bootstrap();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => false,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        $response = $this->actingAs($context['encoder'])
+            ->post("/expense-sheet/{$expenseSheet->id}/duplicate");
+
+        $response->assertRedirect();
+        $this->assertDatabaseCount('expense_sheets', 2);
+        $this->assertDatabaseHas('expense_sheets', [
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => true,
+        ]);
+    }
+
+    public function test_api_encoder_cannot_move_the_draft_of_another_agent_to_a_foreign_department(): void
+    {
+        $context = $this->bootstrap();
+        $foreignDepartment = Department::factory()->create();
+
+        $expenseSheet = ExpenseSheet::factory()->create([
+            'user_id' => $context['agent']->id,
+            'created_by' => $context['encoder']->id,
+            'is_draft' => true,
+            'department_id' => $context['department']->id,
+            'form_id' => $context['form']->id,
+        ]);
+
+        Sanctum::actingAs($context['encoder']);
+
+        $response = $this->putJson("/api/expense-sheets/{$expenseSheet->id}", [
+            'department_id' => $foreignDepartment->id,
+            'is_draft' => true,
+            'costs' => [[
+                'cost_id' => $context['formCost']->id,
+                'data' => ['amount' => 25],
+                'date' => '2026-05-01',
+            ]],
+        ]);
+
+        $response->assertForbidden();
+        $this->assertSame($context['department']->id, $expenseSheet->fresh()->department_id);
     }
 
     public function test_encoder_sees_the_expense_sheets_he_encoded(): void

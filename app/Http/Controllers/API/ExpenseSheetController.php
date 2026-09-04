@@ -445,7 +445,23 @@ class ExpenseSheetController extends BaseController
             $wasDraft = $expenseSheet->is_draft;
 
             // Vérifier le département
-            $department = Department::with(['heads:id', 'users:id'])->findOrFail($validated['department_id']);
+            $department = Department::with(['heads:id', 'encoders:id', 'users:id'])->findOrFail($validated['department_id']);
+
+            // Même règle que sur le web : déplacer la note d'un autre agent vers
+            // un service suppose d'y avoir le droit d'encoder, et que l'agent y
+            // appartienne. Sans ce contrôle, un encodeur pouvait déplacer un
+            // brouillon vers un service sur lequel il n'a aucun droit.
+            $beneficiaryId = (int) $expenseSheet->user_id;
+
+            if ($beneficiaryId !== (int) auth()->id() && ! auth()->user()->is_admin) {
+                if (! auth()->user()->canEncodeForDepartment($department)) {
+                    return $this->handleError('Vous devez être responsable ou encodeur du service pour encoder au nom d\'un agent.', Response::HTTP_FORBIDDEN);
+                }
+
+                if (! $department->users->contains('id', $beneficiaryId)) {
+                    return $this->handleError('L\'agent sélectionné n\'appartient pas à ce service.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+            }
 
             DB::beginTransaction();
 
