@@ -13,10 +13,10 @@ use App\Notifications\ReceiptExpenseSheet;
 use App\Notifications\ReceiptExpenseSheetForUser;
 use App\Notifications\RejectionExpenseSheet;
 use App\Notifications\SRHReturnExpenseSheet;
+use App\Services\RouteDistanceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -249,29 +249,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            // Utilisation du mode issu du taux
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     // Arrondir la distance totale à l'entier le plus proche avant le calcul
                     $distance = round($googleKm + $manualKm);
@@ -529,6 +507,11 @@ class ExpenseSheetController extends Controller
             'costs.*.requirements.*.file.max' => 'Chaque annexe ne peut pas dépasser 20 Mo.',
         ]);
 
+        // Organisation destinataire des alertes de distance anormale : celle du
+        // service soumis, l'organisation de la note pouvant être nulle quand
+        // elle a été créée via l'API.
+        $organization = Department::find($validated['department_id'])?->organization;
+
         try {
             // Supprimer tous les coûts existants
             $expenseSheet->costs()->delete();
@@ -613,28 +596,7 @@ class ExpenseSheetController extends Controller
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = $googleKm + $manualKm;
                     $total = round($distance * $rate->value, 2);
