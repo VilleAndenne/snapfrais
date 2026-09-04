@@ -4,32 +4,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Durée de vie de la distance de référence
+    | Seuil d'alerte
     |--------------------------------------------------------------------------
     |
-    | Une distance déjà mesurée est réutilisée telle quelle pendant ce nombre
-    | de jours : un chantier ou une déviation temporaire ne peut donc pas
-    | gonfler un remboursement. Passé ce délai, le trajet est recalculé et
-    | comparé à la référence.
-    |
-    */
-
-    'revalidate_after_days' => env('ROUTE_DISTANCE_REVALIDATE_AFTER_DAYS', 30),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Seuils d'anomalie
-    |--------------------------------------------------------------------------
-    |
-    | Lors d'une revalidation, un écart qui dépasse *à la fois* le pourcentage
-    | et le nombre de kilomètres ci-dessous est considéré comme anormal : la
-    | référence est conservée et les administrateurs sont alertés.
+    | Chaque encodage remesure le trajet et le compare à la dernière mesure
+    | connue. Au-delà de cet écart, la nouvelle mesure est retenue malgré tout
+    | mais les administrateurs sont alertés.
     |
     */
 
     'anomaly' => [
         'percent' => env('ROUTE_DISTANCE_ANOMALY_PERCENT', 20),
-        'min_km' => env('ROUTE_DISTANCE_ANOMALY_MIN_KM', 3),
+
+        /*
+        | Plancher facultatif, désactivé par défaut : sur un trajet de deux
+        | kilomètres, trois cents mètres pèsent plus de 20 % sans rien changer
+        | au remboursement. À relever si les alertes deviennent bruyantes.
+        */
+        'min_km' => env('ROUTE_DISTANCE_ANOMALY_MIN_KM', 0),
     ],
 
 ];

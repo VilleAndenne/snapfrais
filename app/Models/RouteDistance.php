@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 /**
- * Distance de référence entre deux adresses, mesurée une seule fois puis
- * réutilisée. Le cache est volontairement global (pas de `organization_id`) :
- * la distance entre deux adresses ne dépend pas du locataire.
+ * Dernière distance mesurée entre deux adresses, conservée pour servir de
+ * point de comparaison au prochain encodage du même trajet. Ce n'est pas une
+ * référence figée : chaque nouvelle mesure remplace la précédente.
+ *
+ * La table est volontairement globale (pas de `organization_id`) : la distance
+ * entre deux adresses ne dépend pas du locataire.
  */
 class RouteDistance extends Model
 {
@@ -18,20 +20,18 @@ class RouteDistance extends Model
         'destination',
         'transport',
         'distance_meters',
-        'last_anomaly_meters',
+        'previous_distance_meters',
         'last_anomaly_at',
-        'verified_at',
-        'last_used_at',
+        'measured_at',
     ];
 
     protected function casts(): array
     {
         return [
             'distance_meters' => 'integer',
-            'last_anomaly_meters' => 'integer',
+            'previous_distance_meters' => 'integer',
             'last_anomaly_at' => 'datetime',
-            'verified_at' => 'datetime',
-            'last_used_at' => 'datetime',
+            'measured_at' => 'datetime',
         ];
     }
 
@@ -49,7 +49,7 @@ class RouteDistance extends Model
 
     /**
      * Normalise une adresse pour que « Place du Chapitre, 1 » et
-     * « place du chapitre,1 » partagent la même référence.
+     * « place du chapitre,1 » soient reconnues comme un même point.
      */
     public static function normalizeAddress(string $address): string
     {
@@ -57,20 +57,5 @@ class RouteDistance extends Model
         $address = preg_replace('/\s*,\s*/', ', ', $address);
 
         return preg_replace('/\s+/', ' ', $address);
-    }
-
-    /**
-     * La référence doit-elle être recontrôlée auprès de Google ?
-     */
-    public function needsRevalidation(): bool
-    {
-        $days = (int) config('route_distance.revalidate_after_days');
-
-        if ($days <= 0) {
-            return true;
-        }
-
-        return $this->verified_at === null
-            || $this->verified_at->lessThan(Carbon::now()->subDays($days));
     }
 }

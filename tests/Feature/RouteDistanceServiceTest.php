@@ -73,8 +73,10 @@ class RouteDistanceServiceTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_it_stores_the_first_measure_as_reference(): void
+    public function test_the_first_encoding_of_a_trip_is_stored_without_alerting(): void
     {
+        Notification::fake();
+
         Http::fake([
             'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 4200]]]),
         ]);
@@ -87,50 +89,42 @@ class RouteDistanceServiceTest extends TestCase
             'transport' => 'car',
             'distance_meters' => 4200,
         ]);
+        Notification::assertNothingSent();
     }
 
-    public function test_it_reuses_the_cached_reference_without_calling_google(): void
+    public function test_it_remeasures_the_trip_at_every_encoding(): void
     {
-        $this->makeReference('Place du Chapitre', 'Square des Martyrs 1', 4200, now());
-
-        Http::fake();
-
-        $km = (new RouteDistanceService)->distanceInKm(['Place du Chapitre', 'Square des Martyrs 1'], 'car');
-
-        $this->assertSame(4.2, $km);
-        Http::assertNothingSent();
-    }
-
-    public function test_it_reuses_the_reference_whatever_the_address_casing_and_spacing(): void
-    {
-        $this->makeReference('Place du Chapitre, 1', 'Square des Martyrs 1', 4200, now());
-
-        Http::fake();
-
-        $km = (new RouteDistanceService)->distanceInKm(['  place du   chapitre ,1 ', 'SQUARE DES MARTYRS 1'], 'car');
-
-        $this->assertSame(4.2, $km);
-        Http::assertNothingSent();
-    }
-
-    public function test_it_refreshes_the_reference_when_the_gap_stays_reasonable(): void
-    {
-        $reference = $this->makeReference('A', 'B', 100000, now()->subDays(60));
+        $known = $this->storeMeasure('A', 'B', 10000);
 
         Http::fake([
-            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 110000]]]),
+            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 10400]]]),
         ]);
 
         Notification::fake();
 
         $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
 
-        $this->assertSame(110.0, $km);
-        $this->assertSame(110000, $reference->fresh()->distance_meters);
+        Http::assertSentCount(1);
+        $this->assertSame(10.4, $km);
+        $this->assertSame(10400, $known->fresh()->distance_meters);
         Notification::assertNothingSent();
     }
 
-    public function test_it_keeps_the_reference_and_alerts_administrators_on_a_large_gap(): void
+    public function test_it_matches_a_known_trip_whatever_the_address_casing_and_spacing(): void
+    {
+        $this->storeMeasure('Place du Chapitre, 1', 'Square des Martyrs 1', 4200);
+
+        Http::fake([
+            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 4300]]]),
+        ]);
+
+        (new RouteDistanceService)->distanceInKm(['  place du   chapitre ,1 ', 'SQUARE DES MARTYRS 1'], 'car');
+
+        $this->assertDatabaseCount('route_distances', 1);
+        $this->assertDatabaseHas('route_distances', ['distance_meters' => 4300]);
+    }
+
+    public function test_it_keeps_the_new_measure_and_alerts_administrators_beyond_the_threshold(): void
     {
         Notification::fake();
 
@@ -141,7 +135,7 @@ class RouteDistanceServiceTest extends TestCase
         setCurrentOrganization($organization);
         $this->actingAs($encoder);
 
-        $reference = $this->makeReference('Place du Chapitre', 'Square des Martyrs 1', 10000, now()->subDays(60));
+        $known = $this->storeMeasure('Place du Chapitre', 'Square des Martyrs 1', 10000);
 
         Http::fake([
             'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
@@ -149,22 +143,23 @@ class RouteDistanceServiceTest extends TestCase
 
         $km = (new RouteDistanceService)->distanceInKm(['Place du Chapitre', 'Square des Martyrs 1'], 'car');
 
-        $this->assertSame(10.0, $km);
+        // La note utilise bien la mesure du jour, pas l'ancienne.
+        $this->assertSame(20.0, $km);
 
-        $reference->refresh();
-        $this->assertSame(10000, $reference->distance_meters);
-        $this->assertSame(20000, $reference->last_anomaly_meters);
-        $this->assertNotNull($reference->last_anomaly_at);
+        $known->refresh();
+        $this->assertSame(20000, $known->distance_meters);
+        $this->assertSame(10000, $known->previous_distance_meters);
+        $this->assertNotNull($known->last_anomaly_at);
 
-        Notification::assertSentTo($admin, RouteDistanceAnomalyDetected::class, function ($notification) use ($reference) {
-            return $notification->routeDistance->is($reference)
+        Notification::assertSentTo($admin, RouteDistanceAnomalyDetected::class, function ($notification) {
+            return $notification->previousMeters === 10000
                 && $notification->measuredMeters === 20000
                 && $notification->deviationPercent() === 100.0;
         });
         Notification::assertNotSentTo($encoder, RouteDistanceAnomalyDetected::class);
     }
 
-    public function test_it_does_not_alert_twice_before_the_next_revalidation(): void
+    public function test_a_durable_change_only_alerts_once(): void
     {
         Notification::fake();
 
@@ -173,12 +168,13 @@ class RouteDistanceServiceTest extends TestCase
         $organization->users()->attach($admin->id);
         setCurrentOrganization($organization);
 
-        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+        $this->storeMeasure('A', 'B', 10000);
 
         Http::fake([
             'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
         ]);
 
+        // Le second encodage se compare à la mesure du premier : l'écart a disparu.
         $service = new RouteDistanceService;
         $service->distanceInKm(['A', 'B'], 'car');
         $service->distanceInKm(['A', 'B'], 'car');
@@ -186,19 +182,24 @@ class RouteDistanceServiceTest extends TestCase
         Notification::assertSentToTimes($admin, RouteDistanceAnomalyDetected::class, 1);
     }
 
-    public function test_it_falls_back_on_the_reference_when_google_is_unavailable(): void
+    public function test_it_does_not_alert_below_the_threshold(): void
     {
-        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+        Notification::fake();
+
+        $organization = Organization::factory()->create();
+        $admin = User::factory()->create(['is_admin' => true]);
+        $organization->users()->attach($admin->id);
+        setCurrentOrganization($organization);
+
+        $this->storeMeasure('A', 'B', 100000);
 
         Http::fake([
-            'routes.googleapis.com/*' => Http::response([], 500),
+            'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 110000]]]),
         ]);
-
-        Notification::fake();
 
         $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
 
-        $this->assertSame(10.0, $km);
+        $this->assertSame(110.0, $km);
         Notification::assertNothingSent();
     }
 
@@ -216,7 +217,7 @@ class RouteDistanceServiceTest extends TestCase
         $otherAdmin = User::factory()->create(['is_admin' => true]);
         $otherOrganization->users()->attach($otherAdmin->id);
 
-        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+        $this->storeMeasure('A', 'B', 10000);
 
         Http::fake([
             'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
@@ -235,7 +236,7 @@ class RouteDistanceServiceTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
         Organization::factory()->create()->users()->attach($admin->id);
 
-        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+        $this->storeMeasure('A', 'B', 10000);
 
         Http::fake([
             'routes.googleapis.com/*' => Http::response(['routes' => [['distanceMeters' => 20000]]]),
@@ -246,9 +247,25 @@ class RouteDistanceServiceTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_it_falls_back_on_the_reference_when_the_connection_fails(): void
+    public function test_it_falls_back_on_the_last_known_measure_when_google_answers_in_error(): void
     {
-        $this->makeReference('A', 'B', 10000, now()->subDays(60));
+        $this->storeMeasure('A', 'B', 10000);
+
+        Http::fake([
+            'routes.googleapis.com/*' => Http::response([], 500),
+        ]);
+
+        Notification::fake();
+
+        $km = (new RouteDistanceService)->distanceInKm(['A', 'B'], 'car');
+
+        $this->assertSame(10.0, $km);
+        Notification::assertNothingSent();
+    }
+
+    public function test_it_falls_back_on_the_last_known_measure_when_the_connection_fails(): void
+    {
+        $this->storeMeasure('A', 'B', 10000);
 
         Http::fake(function () {
             throw new ConnectionException('cURL error 6: Could not resolve host');
@@ -259,7 +276,7 @@ class RouteDistanceServiceTest extends TestCase
         $this->assertSame(10.0, $km);
     }
 
-    public function test_it_skips_the_segment_when_the_connection_fails_on_a_first_measure(): void
+    public function test_it_skips_the_segment_when_the_connection_fails_on_a_first_encoding(): void
     {
         Http::fake(function () {
             throw new ConnectionException('cURL error 6: Could not resolve host');
@@ -271,13 +288,13 @@ class RouteDistanceServiceTest extends TestCase
         $this->assertDatabaseCount('route_distances', 0);
     }
 
-    public function test_it_yields_to_a_concurrent_first_measure_of_the_same_segment(): void
+    public function test_it_yields_to_a_concurrent_first_encoding_of_the_same_segment(): void
     {
-        // Un autre encodage du même trajet insère la référence pendant que
-        // celui-ci interroge Google : l'INSERT qui suit viole la contrainte
-        // unique et doit rendre la ligne gagnante, pas une erreur.
+        // Un autre encodage du même trajet insère la ligne pendant que celui-ci
+        // interroge Google : l'INSERT qui suit viole la contrainte unique et
+        // doit rendre la ligne gagnante, pas une erreur.
         Http::fake(function () {
-            $this->makeReference('A', 'B', 7000, now());
+            $this->storeMeasure('A', 'B', 7000);
 
             return Http::response(['routes' => [['distanceMeters' => 12000]]]);
         });
@@ -288,23 +305,26 @@ class RouteDistanceServiceTest extends TestCase
         $this->assertDatabaseCount('route_distances', 1);
     }
 
-    public function test_the_alert_mail_details_the_gap(): void
+    public function test_the_alert_mail_states_that_the_new_distance_was_kept(): void
     {
-        $reference = $this->makeReference('Place du Chapitre', 'Square des Martyrs 1', 10000, now());
+        $known = $this->storeMeasure('Place du Chapitre', 'Square des Martyrs 1', 10000);
         $admin = User::factory()->create(['is_admin' => true]);
 
-        $mail = (new RouteDistanceAnomalyDetected($reference, 20000, $admin))->toMail($admin);
+        $mail = (new RouteDistanceAnomalyDetected($known, 10000, 20000, $admin))->toMail($admin);
 
         $this->assertSame('Distance inhabituelle sur un trajet encodé', $mail->subject);
         $this->assertTrue(collect($mail->introLines)->contains(
-            fn ($line) => str_contains($line, '**Distance de référence :** 10 km')
+            fn ($line) => str_contains($line, '**Distance précédente :** 10 km')
         ));
         $this->assertTrue(collect($mail->introLines)->contains(
-            fn ($line) => str_contains($line, "**Distance mesurée :** 20 km (100 % d'écart)")
+            fn ($line) => str_contains($line, "**Distance retenue :** 20 km (100 % d'écart)")
+        ));
+        $this->assertTrue(collect($mail->introLines)->contains(
+            fn ($line) => str_contains($line, 'nouvelle distance qui a été retenue')
         ));
     }
 
-    private function makeReference(string $origin, string $destination, int $meters, $verifiedAt): RouteDistance
+    private function storeMeasure(string $origin, string $destination, int $meters): RouteDistance
     {
         return RouteDistance::create([
             'signature' => RouteDistance::signatureFor($origin, $destination, 'car'),
@@ -312,8 +332,7 @@ class RouteDistanceServiceTest extends TestCase
             'destination' => $destination,
             'transport' => 'car',
             'distance_meters' => $meters,
-            'verified_at' => $verifiedAt,
-            'last_used_at' => $verifiedAt,
+            'measured_at' => now(),
         ]);
     }
 

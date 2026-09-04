@@ -28,13 +28,12 @@ class RouteDistanceService
      * Distance totale (en km, arrondie à 2 décimales) des segments successifs
      * reliant les points fournis.
      *
-     * Chaque segment est mesuré une seule fois via l'API Google Routes sans
-     * trafic temps réel (routingPreference TRAFFIC_UNAWARE), puis conservé
-     * comme distance de référence. Les encodages suivants réutilisent cette
-     * référence : un chantier ou une déviation ponctuelle ne peut donc pas
-     * gonfler un remboursement. La référence n'est recontrôlée qu'après le
-     * délai configuré, et un écart important alerte les administrateurs sans
-     * modifier la distance retenue.
+     * Chaque segment est mesuré à chaque encodage via l'API Google Routes sans
+     * trafic temps réel (routingPreference TRAFFIC_UNAWARE), ce qui écarte déjà
+     * les bouchons et les déviations signalées en direct. La mesure est ensuite
+     * comparée à la dernière connue pour ce trajet : au-delà du seuil
+     * configuré, la nouvelle mesure est tout de même retenue mais les
+     * administrateurs sont alertés pour qu'ils puissent regarder.
      *
      * @param  array<int, string>  $points  Adresses ordonnées (départ, étapes…, arrivée)
      */
@@ -47,76 +46,64 @@ class RouteDistanceService
         $totalMeters = 0;
 
         foreach (range(0, count($points) - 2) as $i) {
-            $totalMeters += $this->referenceDistanceInMeters($points[$i], $points[$i + 1], $transport);
+            $totalMeters += $this->segmentDistanceInMeters($points[$i], $points[$i + 1], $transport);
         }
 
         return round($totalMeters / 1000, 2);
     }
 
     /**
-     * Distance de référence d'un segment, mesurée puis mise en cache.
+     * Mesure d'un segment, comparée puis substituée à la dernière connue.
      */
-    private function referenceDistanceInMeters(string $origin, string $destination, string $transport): int
+    private function segmentDistanceInMeters(string $origin, string $destination, string $transport): int
     {
         $signature = RouteDistance::signatureFor($origin, $destination, $transport);
-        $reference = RouteDistance::where('signature', $signature)->first();
-
-        if ($reference === null) {
-            return $this->createReference($signature, $origin, $destination, $transport);
-        }
-
-        if (! $reference->needsRevalidation()) {
-            $reference->forceFill(['last_used_at' => now()])->save();
-
-            return $reference->distance_meters;
-        }
-
+        $known = RouteDistance::where('signature', $signature)->first();
         $measured = $this->fetchSegmentDistanceInMeters($origin, $destination, $transport);
 
         if ($measured <= 0) {
-            $reference->forceFill(['last_used_at' => now()])->save();
-
-            return $reference->distance_meters;
+            // Google injoignable ou sans itinéraire : plutôt que de compter le
+            // segment pour zéro, on retient la dernière mesure connue.
+            return $known?->distance_meters ?? 0;
         }
 
-        if ($this->isAnomalous($reference->distance_meters, $measured)) {
-            $reference->forceFill([
-                'last_anomaly_meters' => $measured,
-                'last_anomaly_at' => now(),
-                'verified_at' => now(),
-                'last_used_at' => now(),
-            ])->save();
-
-            $this->alertAdministrators($reference, $measured);
-
-            return $reference->distance_meters;
+        if ($known === null) {
+            return $this->storeFirstMeasure($signature, $origin, $destination, $transport, $measured);
         }
 
-        $reference->forceFill([
+        $previous = $known->distance_meters;
+        $isAnomalous = $this->isAnomalous($previous, $measured);
+
+        $attributes = [
             'distance_meters' => $measured,
-            'verified_at' => now(),
-            'last_used_at' => now(),
-        ])->save();
+            'measured_at' => now(),
+        ];
+
+        // La trace de la dernière alerte n'est écrasée que par une nouvelle
+        // alerte : un encodage normal ne l'efface pas.
+        if ($isAnomalous) {
+            $attributes['previous_distance_meters'] = $previous;
+            $attributes['last_anomaly_at'] = now();
+        }
+
+        $known->forceFill($attributes)->save();
+
+        if ($isAnomalous) {
+            $this->alertAdministrators($known, $previous, $measured);
+        }
 
         return $measured;
     }
 
     /**
-     * Première mesure d'un segment encore inconnu.
+     * Premier encodage de ce trajet : rien à comparer, rien à signaler.
      *
-     * Deux encodages simultanés du même trajet mesurent tous les deux avant
-     * d'insérer : `createOrFirst()` rattrape la violation de contrainte unique
-     * et rend la ligne gagnante au lieu de faire échouer l'enregistrement de
-     * la note.
+     * Deux encodages simultanés mesurent tous les deux avant d'insérer :
+     * `createOrFirst()` rattrape la violation de contrainte unique et rend la
+     * ligne gagnante au lieu de faire échouer l'enregistrement de la note.
      */
-    private function createReference(string $signature, string $origin, string $destination, string $transport): int
+    private function storeFirstMeasure(string $signature, string $origin, string $destination, string $transport, int $measured): int
     {
-        $measured = $this->fetchSegmentDistanceInMeters($origin, $destination, $transport);
-
-        if ($measured <= 0) {
-            return 0;
-        }
-
         return RouteDistance::createOrFirst(
             ['signature' => $signature],
             [
@@ -124,33 +111,32 @@ class RouteDistanceService
                 'destination' => $destination,
                 'transport' => $transport,
                 'distance_meters' => $measured,
-                'verified_at' => now(),
-                'last_used_at' => now(),
+                'measured_at' => now(),
             ]
         )->distance_meters;
     }
 
     /**
-     * Un écart n'est anormal que s'il dépasse à la fois le seuil relatif et le
-     * seuil absolu : sur un court trajet, quelques centaines de mètres pèsent
-     * beaucoup en pourcentage sans rien changer au remboursement.
+     * Écart jugé anormal. Le plancher kilométrique est désactivé par défaut :
+     * il n'existe que pour étouffer le bruit des trajets très courts, où
+     * quelques centaines de mètres pèsent lourd en pourcentage.
      */
-    private function isAnomalous(int $referenceMeters, int $measuredMeters): bool
+    private function isAnomalous(int $previousMeters, int $measuredMeters): bool
     {
-        if ($referenceMeters <= 0) {
+        if ($previousMeters <= 0) {
             return false;
         }
 
-        $gap = abs($measuredMeters - $referenceMeters);
+        $gap = abs($measuredMeters - $previousMeters);
 
         if ($gap < (float) config('route_distance.anomaly.min_km') * 1000) {
             return false;
         }
 
-        return $gap / $referenceMeters * 100 >= (float) config('route_distance.anomaly.percent');
+        return $gap / $previousMeters * 100 >= (float) config('route_distance.anomaly.percent');
     }
 
-    private function alertAdministrators(RouteDistance $reference, int $measuredMeters): void
+    private function alertAdministrators(RouteDistance $routeDistance, int $previousMeters, int $measuredMeters): void
     {
         try {
             $administrators = $this->administrators();
@@ -161,11 +147,11 @@ class RouteDistanceService
 
             Notification::send(
                 $administrators,
-                new RouteDistanceAnomalyDetected($reference, $measuredMeters, auth()->user())
+                new RouteDistanceAnomalyDetected($routeDistance, $previousMeters, $measuredMeters, auth()->user())
             );
         } catch (\Throwable $e) {
             Log::error('Impossible d\'alerter les administrateurs d\'une distance anormale', [
-                'route_distance_id' => $reference->id,
+                'route_distance_id' => $routeDistance->id,
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -210,7 +196,7 @@ class RouteDistanceService
             ])->post(self::ENDPOINT, $payload);
         } catch (ConnectionException $e) {
             // DNS, délai dépassé, connexion refusée : l'appelant se rabat sur la
-            // référence enregistrée plutôt que de faire échouer l'encodage.
+            // dernière mesure connue plutôt que de faire échouer l'encodage.
             Log::warning('Appel à l\'API Google Routes impossible', [
                 'origin' => $origin,
                 'destination' => $destination,

@@ -10,9 +10,10 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Alerte envoyée aux administrateurs lorsqu'un trajet déjà encodé est
- * recalculé avec une distance très différente de sa référence : travaux
- * durables, changement de voirie… ou adresse ambiguë.
+ * Alerte envoyée aux administrateurs lorsqu'un trajet déjà encodé est mesuré
+ * avec une distance très différente de la dernière connue : voirie modifiée,
+ * chantier de longue durée… ou adresse ambiguë. La note utilise la nouvelle
+ * mesure ; l'alerte permet de vérifier qu'elle est justifiée.
  */
 class RouteDistanceAnomalyDetected extends Notification implements ShouldQueue
 {
@@ -20,6 +21,7 @@ class RouteDistanceAnomalyDetected extends Notification implements ShouldQueue
 
     public function __construct(
         public RouteDistance $routeDistance,
+        public int $previousMeters,
         public int $measuredMeters,
         public ?User $encoder = null,
     ) {}
@@ -35,17 +37,15 @@ class RouteDistanceAnomalyDetected extends Notification implements ShouldQueue
     }
 
     /**
-     * Écart en pourcentage entre la distance mesurée et la référence.
+     * Écart en pourcentage entre la mesure du jour et la précédente.
      */
     public function deviationPercent(): float
     {
-        $reference = $this->routeDistance->distance_meters;
-
-        if ($reference <= 0) {
+        if ($this->previousMeters <= 0) {
             return 0.0;
         }
 
-        return round(abs($this->measuredMeters - $reference) / $reference * 100, 1);
+        return round(abs($this->measuredMeters - $this->previousMeters) / $this->previousMeters * 100, 1);
     }
 
     /**
@@ -53,26 +53,26 @@ class RouteDistanceAnomalyDetected extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $referenceKm = round($this->routeDistance->distance_meters / 1000, 2);
+        $previousKm = round($this->previousMeters / 1000, 2);
         $measuredKm = round($this->measuredMeters / 1000, 2);
+        $direction = $this->measuredMeters > $this->previousMeters ? 'plus longue' : 'plus courte';
 
         $message = (new MailMessage)
             ->subject('Distance inhabituelle sur un trajet encodé')
             ->greeting('Bonjour,')
-            ->line('Un trajet vient d\'être recalculé avec une distance très différente de celle enregistrée lors des précédents encodages.')
+            ->line('Un trajet vient d\'être encodé avec une distance nettement '.$direction.' que la dernière fois qu\'il a été calculé.')
             ->line('**Départ :** '.$this->routeDistance->origin)
             ->line('**Arrivée :** '.$this->routeDistance->destination)
             ->line('**Mode :** '.($this->routeDistance->transport === 'bike' ? 'Vélo' : 'Voiture'))
-            ->line('**Distance de référence :** '.$referenceKm.' km')
-            ->line('**Distance mesurée :** '.$measuredKm.' km ('.$this->deviationPercent().' % d\'écart)');
+            ->line('**Distance précédente :** '.$previousKm.' km')
+            ->line('**Distance retenue :** '.$measuredKm.' km ('.$this->deviationPercent().' % d\'écart)');
 
         if ($this->encoder) {
             $message->line('**Encodage réalisé par :** '.$this->encoder->name);
         }
 
         return $message
-            ->line('La distance de référence a été conservée pour le remboursement : le montant n\'a donc pas été affecté.')
-            ->line('Si ce nouvel itinéraire est durable, la référence doit être mise à jour manuellement.')
+            ->line('C\'est bien la nouvelle distance qui a été retenue pour le remboursement. Ce message est informatif : il vous permet de vérifier que l\'écart est justifié (voirie modifiée, chantier de longue durée) et non dû à une adresse mal saisie.')
             ->salutation('Bien cordialement,');
     }
 
@@ -88,7 +88,7 @@ class RouteDistanceAnomalyDetected extends Notification implements ShouldQueue
             'origin' => $this->routeDistance->origin,
             'destination' => $this->routeDistance->destination,
             'transport' => $this->routeDistance->transport,
-            'reference_meters' => $this->routeDistance->distance_meters,
+            'previous_meters' => $this->previousMeters,
             'measured_meters' => $this->measuredMeters,
             'deviation_percent' => $this->deviationPercent(),
         ];
