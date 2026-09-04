@@ -13,12 +13,12 @@ use App\Notifications\ReceiptExpenseSheet;
 use App\Notifications\ReceiptExpenseSheetForUser;
 use App\Notifications\RejectionExpenseSheet;
 use App\Services\DsfReimbursementService;
+use App\Services\RouteDistanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -190,28 +190,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);
@@ -524,28 +503,7 @@ class ExpenseSheetController extends BaseController
                     }
 
                     $points = array_merge([$origin], $steps, [$destination]);
-                    $googleKm = 0;
-
-                    foreach (range(0, count($points) - 2) as $i) {
-                        $segmentOrigin = $points[$i];
-                        $segmentDest = $points[$i + 1];
-
-                        $params = [
-                            'origin' => $segmentOrigin,
-                            'destination' => $segmentDest,
-                            'mode' => $transport === 'bike' ? 'bicycling' : 'driving',
-                            'key' => env('GOOGLE_MAPS_API_KEY'),
-                        ];
-
-                        $response = Http::get('https://maps.googleapis.com/maps/api/directions/json', $params);
-                        $json = $response->json();
-
-                        if ($response->successful() && $json['status'] === 'OK' && isset($json['routes'][0]['legs'][0]['distance']['value'])) {
-                            $googleKm += $json['routes'][0]['legs'][0]['distance']['value'];
-                        }
-                    }
-
-                    $googleKm = round($googleKm / 1000, 2);
+                    $googleKm = (new RouteDistanceService($department->organization))->distanceInKm($points, $transport);
                     $googleDistance = $googleKm;
                     $distance = round($googleKm + $manualKm);
                     $total = round($distance * $rate->value, 2);
