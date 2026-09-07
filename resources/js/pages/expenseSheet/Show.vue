@@ -572,9 +572,9 @@ const getActiveRateRecordLocal = (cost: any) => {
     return actives[0] || null;
 };
 const resolveTransport = (cost: any) => {
-    if (cost?.route?.transport) return cost.route.transport;
     const rate = getActiveRateRecordLocal(cost);
-    return rate?.transport ?? 'car';
+    if (rate?.transport) return rate.transport;
+    return cost?.route?.transport ?? 'car';
 };
 const transportLabel = (t: string) => (t === 'bike' ? 'Vélo' : t === 'other' ? 'Autre' : 'Voiture');
 const transportIcon = (t: string) => (t === 'bike' ? BikeIcon : t === 'other' ? FootprintsIcon : CarIcon);
