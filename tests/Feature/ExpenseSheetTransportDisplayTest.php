@@ -69,7 +69,7 @@ class ExpenseSheetTransportDisplayTest extends TestCase
             );
     }
 
-    public function test_show_exposes_the_configured_rate_transport_even_when_the_stored_route_says_car(): void
+    public function test_show_exposes_the_transport_recorded_on_the_trip_alongside_the_configured_rate(): void
     {
         Notification::fake();
 
@@ -116,6 +116,7 @@ class ExpenseSheetTransportDisplayTest extends TestCase
         $this->actingAs($user)
             ->get("/expense-sheet/{$expenseSheet->id}")
             ->assertInertia(fn ($page) => $page
+                ->where('expenseSheet.costs.0.route.transport', 'car')
                 ->where('expenseSheet.costs.0.form_cost.reimbursement_rates.0.transport', 'bike')
                 ->where('expenseSheet.costs.0.form_cost.reimbursement_rates.0.start_date', '2026-01-01')
                 ->where('expenseSheet.costs.0.date', '2026-05-01')
