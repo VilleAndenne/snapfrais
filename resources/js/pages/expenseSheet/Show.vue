@@ -214,6 +214,25 @@
                 </CardContent>
             </Card>
 
+            <!-- Récapitulatif -->
+            <div class="flex flex-col gap-2 rounded-lg border bg-card px-3 sm:px-4 py-2.5 text-card-foreground sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span class="text-xs sm:text-sm font-medium text-muted-foreground">Total de la note</span>
+                    <span class="text-lg sm:text-xl font-bold text-foreground">{{ formatCurrency(costSummary.total) }}</span>
+                    <span v-if="periodLabel" class="text-xs text-muted-foreground">· {{ periodLabel }}</span>
+                </div>
+                <Button
+                    v-if="costSummary.groups.length"
+                    variant="outline"
+                    size="sm"
+                    class="self-start text-xs sm:self-auto sm:text-sm"
+                    @click="isSummaryModalOpen = true"
+                >
+                    <ListIcon class="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                    Voir la ventilation
+                </Button>
+            </div>
+
             <!-- Détails des coûts -->
             <Card class="bg-card text-card-foreground">
                 <CardHeader>
@@ -306,6 +325,32 @@
                 </CardContent>
             </Card>
         </div>
+
+        <!-- Modal ventilation -->
+        <Dialog :open="isSummaryModalOpen" @update:open="isSummaryModalOpen = $event">
+            <DialogContent class="max-w-[90vw] sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle class="text-base sm:text-lg">Ventilation par groupe de frais</DialogTitle>
+                    <DialogDescription v-if="periodLabel" class="text-xs sm:text-sm">{{ periodLabel }}</DialogDescription>
+                </DialogHeader>
+                <ul class="divide-y rounded-lg border">
+                    <li v-for="group in costSummary.groups" :key="group.name" class="flex items-center justify-between gap-3 px-3 py-2">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-foreground">{{ group.name }}</p>
+                            <p class="text-xs text-muted-foreground">{{ group.count }} ligne{{ group.count > 1 ? 's' : '' }}</p>
+                        </div>
+                        <span class="whitespace-nowrap text-sm font-semibold text-foreground">
+                            {{ formatCurrency(group.total) }}
+                            <span v-if="group.distance" class="font-normal text-muted-foreground">({{ group.distance }} km)</span>
+                        </span>
+                    </li>
+                </ul>
+                <div class="flex items-baseline justify-between border-t pt-3">
+                    <span class="text-sm font-medium text-muted-foreground">Total</span>
+                    <span class="text-base font-bold text-foreground">{{ formatCurrency(costSummary.total) }}</span>
+                </div>
+            </DialogContent>
+        </Dialog>
 
         <!-- Modal rejet -->
         <Dialog :open="isRejectModalOpen" @update:open="isRejectModalOpen = $event">
@@ -421,16 +466,18 @@ import {
     CopyIcon,
     DownloadIcon,
     FootprintsIcon,
+    ListIcon,
     MoreVerticalIcon,
     PrinterIcon,
     RotateCcwIcon,
     TrashIcon,
     XIcon,
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     expenseSheet: Object,
+    costSummary: { type: Object, default: () => ({ total: 0, groups: [], period: null }) },
     canApprove: { type: Boolean, default: false },
     canReject: { type: Boolean, default: false },
     canEdit: { type: Boolean, default: false },
@@ -442,6 +489,16 @@ const breadcrumbs = [
     { title: 'Tableau de bord', href: '/dashboard' },
     { title: `Note de frais #${props.expenseSheet.id}`, href: `/expense-sheet/${props.expenseSheet.id}` },
 ];
+
+// Modal ventilation
+const isSummaryModalOpen = ref(false);
+
+// Période couverte par les coûts de la note
+const periodLabel = computed(() => {
+    const period = props.costSummary?.period;
+    if (!period) return null;
+    return period.start === period.end ? `le ${formatDate(period.start)}` : `du ${formatDate(period.start)} au ${formatDate(period.end)}`;
+});
 
 // Modal refus
 const isRejectModalOpen = ref(false);
