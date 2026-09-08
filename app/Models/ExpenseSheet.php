@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -79,6 +80,51 @@ class ExpenseSheet extends Model
     public function expenseSheetCosts()
     {
         return $this->hasMany(ExpenseSheetCost::class);
+    }
+
+    /**
+     * Ventilation des montants de la note par groupe de frais.
+     *
+     * Sert à la vérification avant approbation : le validateur voit d'un coup
+     * d'œil le total de la note et sa répartition (voiture, vélo, parking, ...).
+     * Le total est recalculé depuis les coûts pour que la ventilation affichée
+     * corresponde toujours exactement à la somme annoncée.
+     *
+     * @return array{total: float, groups: list<array{name: string, total: float, count: int, distance: float|null}>, period: array{start: string, end: string}|null}
+     */
+    public function costSummary(): array
+    {
+        $groups = $this->costs
+            ->groupBy(fn (ExpenseSheetCost $cost) => $cost->formCost?->name ?? 'Inconnu')
+            ->map(function (Collection $costs, string $name): array {
+                $kmCosts = $costs->where('type', 'km');
+
+                return [
+                    'name' => $name,
+                    'total' => round((float) $costs->sum('total'), 2),
+                    'count' => $costs->count(),
+                    'distance' => $kmCosts->isNotEmpty() ? round((float) $kmCosts->sum('distance'), 2) : null,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values()
+            ->all();
+
+        $dates = $this->costs
+            ->pluck('date')
+            ->filter()
+            ->map(fn ($date) => Carbon::parse($date))
+            ->sort()
+            ->values();
+
+        return [
+            'total' => round(array_sum(array_column($groups, 'total')), 2),
+            'groups' => $groups,
+            'period' => $dates->isEmpty() ? null : [
+                'start' => $dates->first()->toDateString(),
+                'end' => $dates->last()->toDateString(),
+            ],
+        ];
     }
 
     /**
