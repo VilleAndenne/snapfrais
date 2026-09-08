@@ -571,6 +571,9 @@ const getActiveRateRecordLocal = (cost: any) => {
     actives.sort((a: any, b: any) => (a.start_date > b.start_date ? -1 : 1));
     return actives[0] || null;
 };
+// Le mode enregistré sur le trajet fait foi : c'est celui qui a servi à calculer
+// la distance et le montant affichés. On ne retombe sur le taux configuré que
+// pour les trajets encodés avant que le mode ne soit stocké sur la route.
 const resolveTransport = (cost: any) => {
     if (cost?.route?.transport) return cost.route.transport;
     const rate = getActiveRateRecordLocal(cost);
