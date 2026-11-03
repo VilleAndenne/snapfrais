@@ -3,20 +3,26 @@
 
     $sheet = $expenseSheet;
 
-    function fr_date($d) {
-        return $d ? Carbon::parse($d)->locale('fr_BE')->translatedFormat('d/m/Y') : '';
-    }
-    function money_eur($v) {
-        return number_format((float)$v, 2, ',', ' ') . ' €';
-    }
-    function safe_array($value) {
-        if (is_array($value)) return $value;
-        if (is_object($value)) return (array)$value;
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            return is_array($decoded) ? $decoded : [];
+    if (!function_exists('fr_date')) {
+        function fr_date($d) {
+            return $d ? Carbon::parse($d)->locale('fr_BE')->translatedFormat('d/m/Y') : '';
         }
-        return [];
+    }
+    if (!function_exists('money_eur')) {
+        function money_eur($v) {
+            return number_format((float)$v, 2, ',', ' ') . ' €';
+        }
+    }
+    if (!function_exists('safe_array')) {
+        function safe_array($value) {
+            if (is_array($value)) return $value;
+            if (is_object($value)) return (array)$value;
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                return is_array($decoded) ? $decoded : [];
+            }
+            return [];
+        }
     }
 
     // ⬇️ Nouveaux totaux
@@ -224,7 +230,7 @@
                     <td class="muted">Statut</td>
                     <td>
                         <span class="status">
-{{ $sheet->is_draft ? 'Brouillon' : ($sheet->approved === 1 ? 'Approuvée' : ($sheet->approved === 0 ? 'Refusée' : 'En attente')) }}
+{{ $sheet->is_draft ? 'Brouillon' : ($sheet->approved === true ? 'Approuvée' : ($sheet->approved === false ? 'Refusée' : 'En attente')) }}
                             </span>
                         @if(($sheet->approved == false || ($sheet->status ?? null) == 'Refusée') && !empty($sheet->refusal_reason))
                             <div class="small muted">Motif: {{ $sheet->refusal_reason }}</div>
