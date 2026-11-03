@@ -141,6 +141,11 @@ class ExpenseSheetPolicyTest extends TestCase
             'approved' => 0,
         ]);
 
+        // Recharger depuis la base pour exercer le cast de `approved` :
+        // sans cast, la colonne booléenne revient en chaîne "0" et la
+        // comparaison stricte de la policy bloquait la modification.
+        $expenseSheet = $expenseSheet->fresh();
+
         $policy = new ExpenseSheetPolicy;
 
         // Le propriétaire doit pouvoir modifier sa note rejetée
